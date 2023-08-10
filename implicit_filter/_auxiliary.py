@@ -264,3 +264,63 @@ def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.nd
         area[n] = np.sum(elem_area[ne_pos[0:ne_num[n], n]]) / 3.0
 
     return area, elem_area, dx, dy, Mt
+
+
+def make_tri(nodnum: np.ndarray, nx: int, ny: int):
+    """
+    Compute the triangulation for mock data using the given node numbering, width, and height.
+
+    This function generates triangles that form a mesh over a rectangular domain defined by the mock data's
+    node numbering, width (nx), and height (ny).
+
+    Parameters:
+    ----------
+    nodnum : np.ndarray
+        A 2D NumPy array of shape (ny, nx) containing the node numbering.
+
+    nx : int
+        Width of the domain (number of nodes in the x-direction).
+
+    ny : int
+        Height of the domain (number of nodes in the y-direction).
+
+    Returns:
+    -------
+    np.ndarray
+        A 2D NumPy array of shape (2 * (nx - 1) * (ny - 1), 3) representing the triangulation of the mock data.
+        Each row contains the indices of three nodes that form a triangle.
+
+    Notes:
+    ------
+    This function assumes that the nodnum array provides a consistent node numbering for a rectangular domain.
+    The generated triangulation covers the domain with triangles formed by adjacent nodes.
+
+    Example:
+    --------
+    nodnum = np.array([[0, 1, 2],
+                       [3, 4, 5],
+                       [6, 7, 8]])
+    nx = 3
+    ny = 3
+    tri = make_tri(nodnum, nx, ny)
+    # Resulting tri array:
+    # array([[0, 3, 1],
+    #        [3, 4, 1],
+    #        [1, 4, 2],
+    #        [4, 5, 2],
+    #        [3, 6, 4],
+    #        [6, 7, 4],
+    #        [4, 7, 5],
+    #        [7, 8, 5]])
+    """
+    tri = np.zeros((2 * (nx - 1) * (ny - 1), 3), dtype=int)
+    mx = 0
+    for n in range(nx - 1):
+        for nn in range(ny - 1):
+            tri[mx, :] = [nodnum[nn, n], nodnum[nn + 1, n], nodnum[nn, n + 1]]
+            mx += 1
+            tri[mx, :] = [nodnum[nn + 1, n], nodnum[nn + 1, n + 1], nodnum[nn, n + 1]]
+            mx += 1
+
+    return tri
+
