@@ -1,6 +1,5 @@
 import jax.numpy as jnp
-from jax import jit
-import jax
+from jax import jit, vmap
 from jax.lax import fori_loop, scan, cond
 from functools import partial
 
@@ -81,22 +80,24 @@ def make_smooth(Mt, elem_area, dx, dy, nn_num, nn_pos, tri, n2d, e2d, full=True)
                 c1 = m == n
 
                 smooth_m = smooth_m.at[pos, row].add(cond(c1 & full,
-                                                            lambda : (tmp_x + tmp_y) * elem_area + jnp.square(Mt) * elem_area / 3.0,
-                                                            lambda : (tmp_x + tmp_y) * elem_area
-                                                            )
+                                                          lambda: (tmp_x + tmp_y) * elem_area + jnp.square(
+                                                              Mt) * elem_area / 3.0,
+                                                          lambda: (tmp_x + tmp_y) * elem_area
+                                                          )
                                                      )
                 metric = metric.at[pos, row].add(Mt * (dx[n] - dx[m]) * elem_area / 3.0)
                 return smooth_m, metric, aux, enodes, elem_area, dx, dy, n
 
-
-            smooth_m, metric, aux, _, _, _, _, _ = fori_loop(0, 3, update_smooth_m, (smooth_m, metric, aux, enodes, elem_area, dx, dy, n))
+            smooth_m, metric, aux, _, _, _, _, _ = fori_loop(0, 3, update_smooth_m,
+                                                             (smooth_m, metric, aux, enodes, elem_area, dx, dy, n))
             return smooth_m, metric, aux, enodes, nn_num, nn_pos, elem_area, dx, dy, Mt
 
-
-        smooth_m, metric, aux, _, _, _, _, _, _, _ = fori_loop(0, 3, inner_loop_body, (smooth_m, metric, aux, enodes, nn_num, nn_pos, elem_area[j], dx[j, :], dy[j, :], Mt[j]))
+        smooth_m, metric, aux, _, _, _, _, _, _, _ = fori_loop(0, 3, inner_loop_body, (
+        smooth_m, metric, aux, enodes, nn_num, nn_pos, elem_area[j], dx[j, :], dy[j, :], Mt[j]))
         return smooth_m, metric, aux, nn_num, nn_pos, elem_area, dx, dy, Mt
 
-    smooth_m, metric, _, _, _, _, _, _, _ = fori_loop(0, e2d, loop_body, (smooth_m, metric, aux, nn_num, nn_pos, elem_area, dx, dy, Mt))
+    smooth_m, metric, _, _, _, _, _, _, _ = fori_loop(0, e2d, loop_body,
+                                                      (smooth_m, metric, aux, nn_num, nn_pos, elem_area, dx, dy, Mt))
     return smooth_m, metric
 
 
@@ -224,3 +225,63 @@ def make_smat_full(nn_pos: jnp.ndarray, nn_num: jnp.ndarray, smooth_m: jnp.ndarr
     jj = jnp.concatenate((tmp1[2], tmp2[2], tmp3[2], tmp4[2]))
 
     return ss, ii, jj
+
+
+def transform_veloctiy_to_nodes(u: jnp.ndarray, v: jnp.ndarray, ne_pos: jnp.ndarray, ne_num: jnp.ndarray, n2d: int,
+                                elem_area: jnp.ndarray, area: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    """
+        Project velocity components to vertices (nodes) based on the given elements' information.
+
+        This function calculates the projected velocity components (u and v) onto the vertices (nodes) of a mesh. The
+        projection is done based on the element information, including element positions, numbers, areas, and overall area.
+
+        Parameters:
+        ----------
+        u : jnp.ndarray
+            JAX array containing the eastward velocity component.
+
+        v : jnp.ndarray
+            JAX array containing the northward velocity component.
+
+        ne_pos : jnp.ndarray
+            JAX array of shape (ne_num, n2d) containing the positions of elements (triangles) in terms of nodes.
+
+        ne_num : jnp.ndarray
+            JAX array of shape (n2d,) containing the number of elements connected to each node.
+
+        n2d : int
+            The total number of nodes in the mesh.
+
+        elem_area : jnp.ndarray
+            JAX array of shape (e2d,) containing the areas of elements (triangles).
+
+        area : jnp.ndarray
+            JAX array of shape (n2d,) containing the areas of vertices (nodes).
+
+        Returns:
+        -------
+        Tuple[jnp.ndarray, jnp.ndarray]
+            A tuple containing two JAX arrays: the eastward velocity component projected to nodes (uxn) and
+            the northward velocity component projected to nodes (vyn).
+
+        Notes:
+        ------
+        - This function uses JAX operations to efficiently calculate the projected velocity components onto nodes.
+        - The function iterates through each node and its associated elements to compute the projection.
+    """
+
+    @jit
+    def calculate(ne_pos: jnp.ndarray, ne_num: int, elem_area: jnp.ndarray, area: float, vel: jnp.ndarray):
+        def helper(i, val):
+            out = val
+            pos = ne_pos[i]
+            out += vel[pos] * elem_area[pos] / 3.0
+            return out
+
+        out = fori_loop(0, ne_num, helper, (0)) / area
+        return out
+
+    uxn = vmap(lambda n: calculate(ne_pos[:, n], ne_num[n], elem_area, area[n], u))(jnp.arange(0, n2d))
+    vyn = vmap(lambda n: calculate(ne_pos[:, n], ne_num[n], elem_area, area[n], v))(jnp.arange(0, n2d))
+
+    return uxn, vyn
