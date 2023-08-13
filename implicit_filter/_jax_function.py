@@ -1,3 +1,4 @@
+from typing import Tuple
 import jax.numpy as jnp
 from jax import jit, vmap
 from jax.lax import fori_loop, scan, cond
