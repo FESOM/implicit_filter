@@ -87,7 +87,7 @@ class JaxFilter(Filter):
         return np.array(self.__compute_full(n, k, data) if self.__full else self.__compute(n, k, data))
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
-                carthesian: bool, full: bool, cyclic_length):
+                carthesian: bool, cyclic_length: float, full: bool = False):
         ne_num, ne_pos = neighboring_triangles(n2d, e2d, tri)
         nn_num, nn_pos = neighbouring_nodes(n2d, tri, ne_num, ne_pos)
         area, elem_area, dx, dy, Mt = areas(n2d, e2d, tri, xcoord, ycoord, ne_num, ne_pos, meshtype, carthesian,

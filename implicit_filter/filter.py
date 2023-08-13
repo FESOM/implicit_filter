@@ -45,7 +45,7 @@ class Filter(ABC):
 
     @abstractmethod
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
-                carthesian: bool, full: bool, cyclic_length: float):
+                carthesian: bool, cyclic_length: float, full: bool):
         """
         Prepare the filter to be used with the given mesh.
 
@@ -73,16 +73,16 @@ class Filter(ABC):
         carthesian : bool
             Boolean indicating whether the mesh is in Cartesian coordinates.
 
-        full : bool, optional
-            A flag indicating whether to use the calculation including metric factors (True) or not (False).
-            Default is True.
-
         cyclic_length : float
             The length of the cyclic boundary if the mesh is cyclic (for 'r' meshtype).
+
+        full : bool, optional
+            A flag indicating whether to use the calculation including metric factors (True) or not (False).
+            Default is False.
         """
         pass
 
-    def prepare_from_file(self, file: str, meshtype: str, carthesian: bool, metric: bool, cyclic_length: float):
+    def prepare_from_file(self, file: str, meshtype: str, carthesian: bool, cyclic_length: float):
         """
         Prepare the filter to be used with a mesh provided in the given file path.
 
@@ -93,10 +93,6 @@ class Filter(ABC):
 
         meshtype : str
         Mesh type, either 'm' (metric) or 'r' (radial).
-
-        metric : bool, optional
-            A flag indicating whether to use the calculation including metric factors (True) or not (False).
-            Default is True.
 
         carthesian : bool
             Boolean indicating whether the mesh is in Cartesian coordinates.
