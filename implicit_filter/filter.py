@@ -82,7 +82,7 @@ class Filter(ABC):
         """
         pass
 
-    def prepare_from_file(self, file: str, meshtype: str, carthesian: bool, cyclic_length: float):
+    def prepare_from_file(self, file: str, meshtype: str, carthesian: bool, cyclic_length: float, metric: bool):
         """
         Prepare the filter to be used with a mesh provided in the given file path.
 
@@ -99,10 +99,14 @@ class Filter(ABC):
 
         cyclic_length : float
             The length of the cyclic boundary if the mesh is cyclic (for 'r' meshtype).
+
+        metric : bool, optional
+            A flag indicating whether to use the calculation including metric terms (True) or not (False).
+            Default is False.
         """
         mesh = xr.open_dataset(file)
         xcoord = mesh['lon'].values
         ycoord = mesh['lat'].values
         tri = mesh['elements'].values.T - 1
 
-        self.prepare(len(xcoord), len(tri[:, 1]), tri, xcoord, ycoord, meshtype, carthesian, metric, cyclic_length)
+        self.prepare(len(xcoord), len(tri[:, 1]), tri, xcoord, ycoord, meshtype, carthesian, cyclic_length, metric)
