@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Tuple
+
 import numpy as np
 import xarray as xr
 
@@ -31,6 +33,32 @@ class Filter(ABC):
         -------
         np.ndarray
             NumPy array with filtered data.
+        """
+        pass
+
+    @abstractmethod
+    def compute_velocity(self, n: int, k: float, ux: np.ndarray, uy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the filtered data using a specified filter size.
+
+        Parameters:
+        ----------
+        n : int
+            Order of filter, one is recommended
+
+        k : float
+            Size of the filter.
+
+        ux : np.ndarray
+            NumPy array containing eastward velocity component to be filtered.
+
+        uy : np.ndarray
+            NumPy array containing northwards velocity component to be filtered.
+
+        Returns:
+        -------
+        Tuple[np.ndarray, np.ndarray]:
+            Tuple containing NumPy arrays with filtered data ux and uy velocities.
         """
         pass
 
