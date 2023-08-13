@@ -1,8 +1,6 @@
 from typing import Tuple, Optional
-
 import numpy as np
 import jax.numpy as jnp
-from jax.lax import fori_loop
 from jax import vmap, jit
 from ._auxiliary import neighboring_triangles, neighbouring_nodes, areas
 from ._jax_function import make_smooth, make_smat, make_smat_full, transform_veloctiy_to_nodes
@@ -12,7 +10,58 @@ from scipy.sparse.linalg import cg
 
 
 class JaxFilter(Filter):
+    """
+    A class for filtering data using JAX-based implicit filtering techniques.
+    Extends the base Filter class.
+
+    Attributes:
+    -----------
+    __elem_area : Optional[jnp.ndarray]
+        Area of each element in the mesh.
+    __area : Optional[jnp.ndarray]
+        Area of each node's neighborhood in the mesh.
+    __ne_pos : Optional[jnp.ndarray]
+        Connectivity matrix representing neighboring elements for each node.
+    __ne_num : Optional[jnp.ndarray]
+        Number of neighboring elements for each node.
+    __dx : Optional[jnp.ndarray]
+        X-component of the derivative of P1 basis functions.
+    __dy : Optional[jnp.ndarray]
+        Y-component of the derivative of P1 basis functions.
+    __ss : Optional[jnp.ndarray]
+        Non-zero entries of the sparse matrix.
+    __ii : Optional[jnp.ndarray]
+        Row indices of non-zero entries.
+    __jj : Optional[jnp.ndarray]
+        Column indices of non-zero entries.
+    __n2d : int
+        Total number of nodes in the mesh.
+    __full : bool
+        Flag indicating whether to use the full matrix.
+
+    Methods:
+    --------
+    compute_velocity(n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        Compute filtered velocity components (u, v) using implicit filtering.
+    compute(n: int, k: float, data: np.ndarray) -> np.ndarray:
+        Compute filtered data using implicit filtering.
+    prepare(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
+            carthesian: bool, cyclic_length: float, full: bool = False):
+        Prepare the filter for a specific mesh.
+
+    """
+
     def __init__(self, *initial_data, **kwargs):
+        """
+        Initialize the JaxFilter instance.
+
+        Parameters:
+        -----------
+        *initial_data : positional arguments
+            Positional arguments passed to the base class constructor.
+        **kwargs : keyword arguments
+            Keyword arguments passed to the base class constructor.
+        """
         super().__init__(initial_data, kwargs)
         self.__elem_area: Optional[jnp.ndarray] = None
         self.__area: Optional[jnp.ndarray] = None
@@ -68,6 +117,7 @@ class JaxFilter(Filter):
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
                 carthesian: bool, cyclic_length: float, full: bool = False):
+
         ne_num, ne_pos = neighboring_triangles(n2d, e2d, tri)
         nn_num, nn_pos = neighbouring_nodes(n2d, tri, ne_num, ne_pos)
         area, elem_area, dx, dy, Mt = areas(n2d, e2d, tri, xcoord, ycoord, ne_num, ne_pos, meshtype, carthesian,
