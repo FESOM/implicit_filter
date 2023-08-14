@@ -6,6 +6,9 @@ import xarray as xr
 
 
 class Filter(ABC):
+    """
+    Abstract base class for filters
+    """
     def __init__(self, *initial_data, **kwargs):
         for dictionary in initial_data:
             for key in dictionary:
@@ -19,7 +22,7 @@ class Filter(ABC):
         Compute the filtered data using a specified filter size.
 
         Parameters:
-        ----------
+        ------------
         n : int
             Order of filter, one is recommended
 
@@ -30,7 +33,7 @@ class Filter(ABC):
             NumPy array containing data to be filtered.
 
         Returns:
-        -------
+        --------
         np.ndarray
             NumPy array with filtered data.
         """
@@ -42,7 +45,7 @@ class Filter(ABC):
         Compute the filtered data using a specified filter size.
 
         Parameters:
-        ----------
+        -----------
         n : int
             Order of filter, one is recommended
 
@@ -56,7 +59,7 @@ class Filter(ABC):
             NumPy array containing northwards velocity component to be filtered.
 
         Returns:
-        -------
+        --------
         Tuple[np.ndarray, np.ndarray]:
             Tuple containing NumPy arrays with filtered data ux and uy velocities.
         """
@@ -78,7 +81,7 @@ class Filter(ABC):
         Prepare the filter to be used with the given mesh.
 
         Parameters:
-        ----------
+        -----------
         n2d : int
             The total number of nodes in the mesh.
 
@@ -115,7 +118,7 @@ class Filter(ABC):
         Prepare the filter to be used with a mesh provided in the given file path.
 
         Parameters:
-        ----------
+        -----------
         file : str
             Path to the FESOM mesh file.
 
