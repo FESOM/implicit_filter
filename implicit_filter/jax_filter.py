@@ -16,27 +16,27 @@ class JaxFilter(Filter):
 
     Attributes:
     -----------
-    __elem_area : Optional[jnp.ndarray]
+    _elem_area : Optional[jnp.ndarray]
         Area of each element in the mesh.
-    __area : Optional[jnp.ndarray]
+    _area : Optional[jnp.ndarray]
         Area of each node's neighborhood in the mesh.
-    __ne_pos : Optional[jnp.ndarray]
+    _ne_pos : Optional[jnp.ndarray]
         Connectivity matrix representing neighboring elements for each node.
-    __ne_num : Optional[jnp.ndarray]
+    _ne_num : Optional[jnp.ndarray]
         Number of neighboring elements for each node.
-    __dx : Optional[jnp.ndarray]
+    _dx : Optional[jnp.ndarray]
         X-component of the derivative of P1 basis functions.
-    __dy : Optional[jnp.ndarray]
+    _dy : Optional[jnp.ndarray]
         Y-component of the derivative of P1 basis functions.
-    __ss : Optional[jnp.ndarray]
+    _ss : Optional[jnp.ndarray]
         Non-zero entries of the sparse matrix.
-    __ii : Optional[jnp.ndarray]
+    _ii : Optional[jnp.ndarray]
         Row indices of non-zero entries.
-    __jj : Optional[jnp.ndarray]
+    _jj : Optional[jnp.ndarray]
         Column indices of non-zero entries.
-    __n2d : int
+    _n2d : int
         Total number of nodes in the mesh.
-    __full : bool
+    _full : bool
         Flag indicating whether to use the full matrix.
 
     Methods:
@@ -63,23 +63,23 @@ class JaxFilter(Filter):
             Keyword arguments passed to the base class constructor.
         """
         super().__init__(initial_data, kwargs)
-        self.__elem_area: Optional[jnp.ndarray] = None
-        self.__area: Optional[jnp.ndarray] = None
-        self.__ne_pos: Optional[jnp.ndarray] = None
-        self.__ne_num: Optional[jnp.ndarray] = None
-        self.__dx: Optional[jnp.ndarray] = None
-        self.__dy: Optional[jnp.ndarray] = None
+        self._elem_area: Optional[jnp.ndarray] = None
+        self._area: Optional[jnp.ndarray] = None
+        self._ne_pos: Optional[jnp.ndarray] = None
+        self._ne_num: Optional[jnp.ndarray] = None
+        self._dx: Optional[jnp.ndarray] = None
+        self._dy: Optional[jnp.ndarray] = None
 
-        self.__ss: Optional[jnp.ndarray] = None
-        self.__ii: Optional[jnp.ndarray] = None
-        self.__jj: Optional[jnp.ndarray] = None
+        self._ss: Optional[jnp.ndarray] = None
+        self._ii: Optional[jnp.ndarray] = None
+        self._jj: Optional[jnp.ndarray] = None
 
-        self.__n2d: int = 0
-        self.__full: bool = False
+        self._n2d: int = 0
+        self._full: bool = False
 
-    def __compute(self, n, kl, ttu, tol=1e-6, maxiter=150000):
-        Smat1 = csc_matrix((self.__ss * (1.0 / jnp.square(kl)), (self.__ii, self.__jj)), shape=(self.__n2d, self.__n2d))
-        Smat = identity(self.__n2d) + 0.5 * (Smat1 ** n)
+    def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000):
+        Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
+        Smat = identity(self._n2d) + 0.5 * (Smat1 ** n)
 
         ttw = ttu - Smat @ ttu  # Work with perturbations
 
@@ -89,9 +89,9 @@ class JaxFilter(Filter):
         tts += ttu
         return np.array(tts)
 
-    def __compute_full(self, n, kl, ttuv, tol=1e-6, maxiter=150000):
-        Smat1 = csc_matrix((self.__ss * (1.0 / jnp.square(kl)), (self.__ii, self.__jj)), shape=(2 * self.__n2d, 2 * self.__n2d))
-        Smat = identity(2 * self.__n2d) + 0.5 * (Smat1 ** n)
+    def _compute_full(self, n, kl, ttuv, tol=1e-6, maxiter=150000):
+        Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(2 * self._n2d, 2 * self._n2d))
+        Smat = identity(2 * self._n2d) + 0.5 * (Smat1 ** n)
 
         ttw = ttuv - Smat @ ttuv  # Work with perturbations
 
@@ -102,18 +102,18 @@ class JaxFilter(Filter):
         return np.array(tts)
 
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        uxn, vyn = transform_veloctiy_to_nodes(jnp.array(ux), jnp.array(vy), self.__ne_pos, self.__ne_num, self.__n2d,
-                                               self.__elem_area, self.__area)
-        if self.__full:
-            ttuv = self.__compute_full(n, k, jnp.concatenate((uxn, vyn)))
-            return ttuv[0:self.__n2d], ttuv[self.__n2d:2*self.__n2d]
+        uxn, vyn = transform_veloctiy_to_nodes(jnp.array(ux), jnp.array(vy), self._ne_pos, self._ne_num, self._n2d,
+                                               self._elem_area, self._area)
+        if self._full:
+            ttuv = self._compute_full(n, k, jnp.concatenate((uxn, vyn)))
+            return ttuv[0:self._n2d], ttuv[self._n2d:2*self._n2d]
         else:
-            ttu = self.__compute(n, k, uxn)
-            ttv = self.__compute(n, k, vyn)
+            ttu = self._compute(n, k, uxn)
+            ttv = self._compute(n, k, vyn)
             return ttu, ttv
 
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
-        return np.array(self.__compute_full(n, k, data) if self.__full else self.__compute(n, k, data))
+        return np.array(self._compute_full(n, k, data) if self._full else self._compute(n, k, data))
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
                 carthesian: bool, cyclic_length: float, full: bool = False):
@@ -123,23 +123,23 @@ class JaxFilter(Filter):
         area, elem_area, dx, dy, Mt = areas(n2d, e2d, tri, xcoord, ycoord, ne_num, ne_pos, meshtype, carthesian,
                                         cyclic_length)
 
-        self.__elem_area = jnp.array(elem_area)
-        self.__dx = jnp.array(dx)
-        self.__dy = jnp.array(dy)
+        self._elem_area = jnp.array(elem_area)
+        self._dx = jnp.array(dx)
+        self._dy = jnp.array(dy)
         jMt = jnp.array(Mt)
         jnn_num = jnp.array(nn_num)
         jnn_pos = jnp.array(nn_pos)
         jtri = jnp.array(tri)
-        self.__ne_num = jnp.array(ne_num)
-        self.__ne_pos = jnp.array(ne_pos)
-        self.__area = jnp.array(area)
+        self._ne_num = jnp.array(ne_num)
+        self._ne_pos = jnp.array(ne_pos)
+        self._area = jnp.array(area)
 
-        smooth, metric = make_smooth(jMt, self.__elem_area, self.__dx, self.__dy, jnn_num, jnn_pos, jtri, n2d, e2d, False)
+        smooth, metric = make_smooth(jMt, self._elem_area, self._dx, self._dy, jnn_num, jnn_pos, jtri, n2d, e2d, False)
 
-        smooth = vmap(lambda n: smooth[:, n] / self.__area[n])(jnp.arange(0, n2d)).T
-        metric = vmap(lambda n: metric[:, n] / self.__area[n])(jnp.arange(0, n2d)).T
+        smooth = vmap(lambda n: smooth[:, n] / self._area[n])(jnp.arange(0, n2d)).T
+        metric = vmap(lambda n: metric[:, n] / self._area[n])(jnp.arange(0, n2d)).T
 
-        self.__ss, self.__ii, self.__jj = make_smat_full(jnn_pos, jnn_num, smooth, metric, n2d, int(jnp.sum(jnn_num))) \
+        self._ss, self._ii, self._jj = make_smat_full(jnn_pos, jnn_num, smooth, metric, n2d, int(jnp.sum(jnn_num))) \
             if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
-        self.__n2d = n2d
-        self.__full = full
+        self._n2d = n2d
+        self._full = full
