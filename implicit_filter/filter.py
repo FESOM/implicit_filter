@@ -27,7 +27,7 @@ class Filter(ABC):
             Order of filter, one is recommended
 
         k : float
-            Size of the filter.
+            Wavelength of the filter.
 
         data : np.ndarray
             NumPy array containing data to be filtered.
@@ -50,7 +50,7 @@ class Filter(ABC):
             Order of filter, one is recommended
 
         k : float
-            Size of the filter.
+            Wavelength of the filter.
 
         ux : np.ndarray
             NumPy array containing eastward velocity component to be filtered.
@@ -72,7 +72,7 @@ class Filter(ABC):
     @classmethod
     def load_from_file(cls, file: str):
         """Load auxiliary arrays from file"""
-        return cls(np.load(file))
+        return cls(**dict(np.load(file)))
 
     @abstractmethod
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
@@ -113,7 +113,7 @@ class Filter(ABC):
         """
         pass
 
-    def prepare_from_file(self, file: str, meshtype: str, carthesian: bool, cyclic_length: float, metric: bool):
+    def prepare_from_file(self, file: str, meshtype: str, carthesian: bool, cyclic_length: float, metric: bool = False):
         """
         Prepare the filter to be used with a mesh provided in the given file path.
 
