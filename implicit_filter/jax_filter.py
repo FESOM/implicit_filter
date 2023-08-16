@@ -51,6 +51,15 @@ class JaxFilter(Filter):
 
     """
 
+    def __transform_atribute(self, atr: str, lmbd, fill=None):
+        """
+        If atribute atr exists then transform it using given Callable lmbd, otherwise it set with fill value
+        """
+        if hasattr(self, atr):
+            setattr(self, atr, lmbd(getattr(self, atr)))
+        else:
+            setattr(self, atr, fill)
+
     def __init__(self, *initial_data, **kwargs):
         """
         Initialize the JaxFilter instance.
@@ -63,19 +72,24 @@ class JaxFilter(Filter):
             Keyword arguments passed to the base class constructor.
         """
         super().__init__(initial_data, kwargs)
-        self._elem_area: Optional[jnp.ndarray] = None
-        self._area: Optional[jnp.ndarray] = None
-        self._ne_pos: Optional[jnp.ndarray] = None
-        self._ne_num: Optional[jnp.ndarray] = None
-        self._dx: Optional[jnp.ndarray] = None
-        self._dy: Optional[jnp.ndarray] = None
+        # Transform to JAX array
+        jx = lambda ar: jnp.array(ar)
+        bl = lambda ar: bool(ar)
+        it = lambda ar: int(ar)
 
-        self._ss: Optional[jnp.ndarray] = None
-        self._ii: Optional[jnp.ndarray] = None
-        self._jj: Optional[jnp.ndarray] = None
+        self.__transform_atribute("_elem_area", jx, None)
+        self.__transform_atribute("_area", jx, None)
+        self.__transform_atribute("_ne_pos", jx, None)
+        self.__transform_atribute("_ne_num", jx, None)
+        self.__transform_atribute("_dx", jx, None)
+        self.__transform_atribute("_dy", jx, None)
 
-        self._n2d: int = 0
-        self._full: bool = False
+        self.__transform_atribute("_ss", jx, None)
+        self.__transform_atribute("_ii", jx, None)
+        self.__transform_atribute("_jj", jx, None)
+
+        self.__transform_atribute("_n2d", it, 0)
+        self.__transform_atribute("_full", bl, False)
 
     def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000):
         Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
