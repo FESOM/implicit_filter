@@ -324,3 +324,29 @@ def make_tri(nodnum: np.ndarray, nx: int, ny: int):
 
     return tri
 
+
+def convert_to_wavenumbers(dist, dxm):
+    """
+    Converts a given spatial distance to wavenumbers for spectral analysis.
+
+    Parameters:
+    -----------
+    dist : float
+        The spatial distance for which wavenumbers are to be calculated.
+    dxm : float
+        The mesh resolution, representing the distance between grid points.
+
+    Returns:
+    --------
+    float
+        The corresponding wavenumber for the given spatial distance.
+
+    Notes:
+    ------
+    - Input parameters `dist` and `dxm` must have the same unit.
+    - The factor 3.5 is used to make the results comparable with box-type filters.
+
+    """
+    size = 3.5 * (dist / dxm)
+    return 2 * math.pi / size
+
