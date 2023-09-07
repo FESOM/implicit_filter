@@ -3,6 +3,7 @@ from typing import Tuple
 
 import numpy as np
 import xarray as xr
+import math
 
 
 class Filter(ABC):
@@ -75,8 +76,8 @@ class Filter(ABC):
         return cls(**dict(np.load(file)))
 
     @abstractmethod
-    def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
-                carthesian: bool, cyclic_length: float, full: bool):
+    def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str = 'r',
+                carthesian: bool = False, cyclic_length: float = 360.0 * math.pi / 180.0, full: bool = False):
         """
         Prepare the filter to be used with the given mesh.
 
@@ -99,13 +100,13 @@ class Filter(ABC):
             A 1D NumPy array containing the y-coordinates of nodes in the mesh.
 
         meshtype : str
-        Mesh type, either 'm' (metric) or 'r' (radial).
+        Mesh type, either 'm' (metric) or 'r' (radial). Default is radial
 
         carthesian : bool
-            Boolean indicating whether the mesh is in Cartesian coordinates.
+            Boolean indicating whether the mesh is in Cartesian coordinates. Default is False
 
         cyclic_length : float
-            The length of the cyclic boundary if the mesh is cyclic (for 'r' meshtype).
+            The length of the cyclic boundary if the mesh is cyclic (for 'r' meshtype). Default is 360 * pi / 180
 
         full : bool, optional
             A flag indicating whether to use the calculation including metric factors (True) or not (False).
@@ -113,7 +114,8 @@ class Filter(ABC):
         """
         pass
 
-    def prepare_from_file(self, file: str, meshtype: str, carthesian: bool, cyclic_length: float, metric: bool = False):
+    def prepare_from_file(self, file: str, meshtype: str = 'r', carthesian: bool = False,
+                          cyclic_length: float = 360.0 * math.pi / 180.0, metric: bool = False):
         """
         Prepare the filter to be used with a mesh provided in the given file path.
 
@@ -123,13 +125,13 @@ class Filter(ABC):
             Path to the FESOM mesh file.
 
         meshtype : str
-        Mesh type, either 'm' (metric) or 'r' (radial).
+        Mesh type, either 'm' (metric) or 'r' (radial). Default is radial
 
         carthesian : bool
-            Boolean indicating whether the mesh is in Cartesian coordinates.
+            Boolean indicating whether the mesh is in Cartesian coordinates. Default is False
 
         cyclic_length : float
-            The length of the cyclic boundary if the mesh is cyclic (for 'r' meshtype).
+            The length of the cyclic boundary if the mesh is cyclic (for 'r' meshtype). Default is 360 * pi / 180
 
         metric : bool, optional
             A flag indicating whether to use the calculation including metric terms (True) or not (False).
