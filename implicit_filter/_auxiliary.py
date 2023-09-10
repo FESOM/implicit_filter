@@ -347,6 +347,9 @@ def convert_to_wavenumbers(dist, dxm):
     - The factor 3.5 is used to make the results comparable with box-type filters.
 
     """
+    if dist <= 0 or dxm <= 0:
+        raise ValueError("Both dist and dxm parameters must be positive")
+
     size = 3.5 * (dist / dxm)
     return 2 * math.pi / size
 

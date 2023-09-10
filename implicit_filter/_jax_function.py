@@ -5,7 +5,8 @@ from jax.lax import fori_loop, scan, cond
 from functools import partial
 
 
-def make_smooth(Mt, elem_area, dx, dy, nn_num, nn_pos, tri, n2d, e2d, full=True):
+def make_smooth(Mt: jnp.ndarray, elem_area: jnp.ndarray, dx: jnp.ndarray, dy: jnp.ndarray, nn_num: jnp.ndarray,
+                nn_pos: jnp.ndarray, tri: jnp.ndarray, n2d: int, e2d: int, full: bool = True):
     """
     Calculate the smoothness matrix and metric matrix for a given mesh.
 
@@ -270,7 +271,6 @@ def transform_veloctiy_to_nodes(u: jnp.ndarray, v: jnp.ndarray, ne_pos: jnp.ndar
         - This function uses JAX operations to efficiently calculate the projected velocity components onto nodes.
         - The function iterates through each node and its associated elements to compute the projection.
     """
-
     @jit
     def calculate(ne_pos: jnp.ndarray, ne_num: int, elem_area: jnp.ndarray, area: float, vel: jnp.ndarray):
         def helper(i, val):
