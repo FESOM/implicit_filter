@@ -13,6 +13,14 @@ implicit\_filter.jax\_filter module
    :undoc-members:
    :show-inheritance:
 
+implicit\_filter.cupy_filter module
+-----------------------------------
+
+.. automodule:: implicit_filter.cupy_filter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 implicit\_filter.filter module
 ------------------------------
 
