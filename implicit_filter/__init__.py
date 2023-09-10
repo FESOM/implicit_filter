@@ -1,3 +1,8 @@
 from .jax_filter import JaxFilter
 from ._auxiliary import make_tri, convert_to_wavenumbers
-from .cupy_filter import CuPyFilter
+
+# If CuPy is not installed this class won't be imported
+try:
+    from .cupy_filter import CuPyFilter
+except ModuleNotFoundError:
+    pass
