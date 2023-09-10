@@ -1,3 +1,4 @@
+from ._utils import SolverNotConvergedError
 from .jax_filter import JaxFilter
 import numpy as np
 import cupy
@@ -24,7 +25,9 @@ class CuPyFilter(JaxFilter):
 
         tts, code = cupy_cg(Smat, ttw, tol=1e-6, maxiter=150000)
         if code != 0:
-            print(code)
+            raise SolverNotConvergedError("Solver has not converged without metric terms",
+                                          [f"output code with code: {code}"])
+
         tts += ttu
         return tts.get()
 
@@ -40,6 +43,8 @@ class CuPyFilter(JaxFilter):
 
         tts, code = cupy_cg(Smat, ttw, tol=1e-7, maxiter=150000)
         if code != 0:
-            print(code)
+            raise SolverNotConvergedError("Solver has not converged with metric terms",
+                                          [f"output code with code: {code}"])
+
         tts += ttuv
         return tts.get()

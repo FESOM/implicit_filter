@@ -1,9 +1,10 @@
-from typing import Tuple, Optional
+from typing import Tuple
 import numpy as np
 import jax.numpy as jnp
-from jax import vmap, jit
+from jax import vmap
 from ._auxiliary import neighboring_triangles, neighbouring_nodes, areas
 from ._jax_function import make_smooth, make_smat, make_smat_full, transform_veloctiy_to_nodes
+from ._utils import VeryStupidIdeaError, SolverNotConvergedError
 from implicit_filter.filter import Filter
 from scipy.sparse import csc_matrix, identity
 from scipy.sparse.linalg import cg
@@ -99,7 +100,9 @@ class JaxFilter(Filter):
 
         tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)
         if code != 0:
-            print(code)
+            raise SolverNotConvergedError("Solver has not converged without metric terms",
+                                          [f"output code with code: {code}"])
+
         tts += ttu
         return np.array(tts)
 
@@ -111,11 +114,20 @@ class JaxFilter(Filter):
 
         tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)
         if code != 0:
-            print(code)
+            raise SolverNotConvergedError("Solver has not converged with metric terms",
+                                          [f"output code with code: {code}"])
+
         tts += ttuv
         return np.array(tts)
 
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
+
+
         uxn, vyn = transform_veloctiy_to_nodes(jnp.array(ux), jnp.array(vy), self._ne_pos, self._ne_num, self._n2d,
                                                self._elem_area, self._area)
         if self._full:
@@ -127,6 +139,11 @@ class JaxFilter(Filter):
             return ttu, ttv
 
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
         return np.array(self._compute_full(n, k, data) if self._full else self._compute(n, k, data))
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
