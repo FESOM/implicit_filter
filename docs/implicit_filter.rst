@@ -21,6 +21,14 @@ implicit\_filter.cupy_filter module
    :undoc-members:
    :show-inheritance:
 
+implicit\_filter.numpy_filter module
+------------------------------------
+
+.. automodule:: implicit_filter.numpy_filter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 implicit\_filter.filter module
 ------------------------------
 
