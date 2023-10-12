@@ -165,7 +165,7 @@ class JaxFilter(Filter):
         self._ne_pos = jnp.array(ne_pos)
         self._area = jnp.array(area)
 
-        smooth, metric = make_smooth(jMt, self._elem_area, self._dx, self._dy, jnn_num, jnn_pos, jtri, n2d, e2d, False)
+        smooth, metric = make_smooth(jMt, self._elem_area, self._dx, self._dy, jnn_num, jnn_pos, jtri, n2d, e2d, full)
 
         smooth = vmap(lambda n: smooth[:, n] / self._area[n])(jnp.arange(0, n2d)).T
         metric = vmap(lambda n: metric[:, n] / self._area[n])(jnp.arange(0, n2d)).T
