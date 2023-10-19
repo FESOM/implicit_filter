@@ -24,6 +24,11 @@ dynamic = ["dependencies"]
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
+[project.optional-dependencies]
+gpu = [
+    "cupy"
+]
+
 [project.urls]
 Homepage = "https://github.com/FESOM/implicit_filter"
 

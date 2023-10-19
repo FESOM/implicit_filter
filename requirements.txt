@@ -28,4 +28,3 @@ tornado==6.3.2
 typing_extensions==4.7.1
 wheel==0.38.4
 xarray==2023.6.0
-cupy==12.1.0
