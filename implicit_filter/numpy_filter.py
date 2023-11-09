@@ -47,6 +47,10 @@ class NumpyFilter(Filter):
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError("Filtering non-scalar values are not supported with NumPy Filer")
 
+    def many_compute_velocity(self, n: int, k: float, ux: Union[np.ndarray, List[np.ndarray]],
+                              vy: Union[np.ndarray, List[np.ndarray]]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        raise NotImplementedError("Filtering non-scalar values are not supported with NumPy Filer")
+
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str = 'r',
                 carthesian: bool = False, cyclic_length: float = 360.0 * math.pi / 180.0, full: bool = False):
         if full:

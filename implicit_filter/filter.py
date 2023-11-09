@@ -93,6 +93,34 @@ class Filter(ABC):
         """
         pass
 
+    def many_compute_velocity(self, n: int, k: float, ux: Union[np.ndarray, List[np.ndarray]],
+                              vy: Union[np.ndarray, List[np.ndarray]]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        """
+        Computes multiple velocity inputs
+
+        Parameters:
+        -----------
+        n : int
+            Order of filter, one is recommended
+
+        k : float
+            Wavelength of the filter.
+
+        ux : np.ndarray
+            Eastward velocity component to be filtered. It can be either a list of 1D NumPy arrays to be processed or
+            a 2D NumPy array which 2nd dimension will be iterated over.
+
+        uy : np.ndarray
+            Northwards velocity component to be filtered. It can be either a list of 1D NumPy arrays to be processed or
+            a 2D NumPy array which 2nd dimension will be iterated over.
+
+        Returns:
+        --------
+        Tuple[List[np.ndarray], List[np.ndarray]]:
+            Tuple containing lists containing NumPy arrays with filtered data
+        """
+        pass
+
     def save_to_file(self, file: str):
         """Save auxiliary arrays to file, as they are mesh specific"""
         np.savez(file, **vars(self))
