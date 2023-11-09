@@ -1,5 +1,5 @@
 import math
-from typing import Tuple
+from typing import Tuple, List, Union
 
 import numpy as np
 from scipy.sparse import csc_matrix, identity
@@ -13,7 +13,7 @@ from implicit_filter.filter import Filter
 
 class NumpyFilter(Filter):
     """
-    A class for filtering data using JAX-based implicit filtering techniques.
+    A class for filtering data using only NumPy implicit filtering techniques.
     Extends the base Filter class.
     """
 
@@ -26,6 +26,23 @@ class NumpyFilter(Filter):
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
         self._check_filter_order(n)
         return self._compute(n, k, data)
+
+    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+        output = []
+        if type(data) is np.ndarray:
+            if len(data.shape) != 2:
+                raise ValueError("Input NumPy array must be 2D")
+
+            for col in data.T:
+                output.append(self._compute(n, k, col))
+
+        elif type(data) is list:
+            for col in data:
+                output.append(self._compute(n, k, col))
+        else:
+            raise ValueError("Input data is of incorrect type")
+
+        return output
 
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError("Filtering non-scalar values are not supported with NumPy Filer")
@@ -71,7 +88,7 @@ class NumpyFilter(Filter):
         self.__transform_atribute("_n2d", lambda x: int(x), 0)
         self.__transform_atribute("_full", lambda x: bool(x), False)
 
-    def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000):
+    def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
         Smat1 = csc_matrix((self._ss * (1.0 / np.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
         Smat = identity(self._n2d) + 0.5 * (Smat1 ** n)
 
