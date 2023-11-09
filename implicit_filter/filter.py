@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Tuple, List, Union
 
 import numpy as np
 import xarray as xr
@@ -43,7 +43,10 @@ class Filter(ABC):
     @abstractmethod
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, uy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the filtered data using a specified filter size.
+        Compute the filtered velocity data using a specified filter size.
+
+        It performs implicit interpolates it from elements to nodes. Currently, filtering directly on elements
+        is not supported.
 
         Parameters:
         -----------
@@ -63,6 +66,30 @@ class Filter(ABC):
         --------
         Tuple[np.ndarray, np.ndarray]:
             Tuple containing NumPy arrays with filtered data ux and uy velocities.
+        """
+        pass
+
+    @abstractmethod
+    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+        """
+        Computes multiple inputs, which are scalar data
+
+        Parameters:
+        -----------
+        n : int
+            Order of filter, one is recommended
+
+        k : float
+            Wavelength of the filter.
+
+        data : Union[np.ndarray, List[np.ndarray]]
+            It can be either a list of 1D NumPy arrays to be processed or
+            a 2D NumPy array which 2nd dimension will be iterated over.
+
+        Returns:
+        --------
+        List[np.ndarray]:
+            List containing NumPy arrays with filtered data
         """
         pass
 
