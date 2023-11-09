@@ -1,7 +1,8 @@
-from typing import List
+from typing import List, Tuple
 
 from ._utils import SolverNotConvergedError
 from .jax_filter import JaxFilter
+import jax.numpy as jnp
 import numpy as np
 import cupy
 import concurrent
@@ -72,3 +73,27 @@ class CuPyFilter(JaxFilter):
             output.append(f.result())
 
         return output
+
+    def _many_compute_full(self, n, kl, ux, vy, tol=1e-7, maxiter=150000) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        def helper(tt: jnp.ndarray, i):
+            with cupy.cuda.Device(i):
+                tts = self._compute_full(n, kl, tt, tol, maxiter)
+            return tts
+
+        no_gpu = cupy.cuda.runtime.getDeviceCount()
+
+        futures = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for i in range(len(ux)):
+                ttuv = jnp.concatenate((ux[i], vy[i]))
+                futures.append(executor.submit(helper, ttuv, i % no_gpu))
+            executor.shutdown(wait=True)
+
+        oux = []
+        ovy = []
+        for f in futures:
+            tts = f.result()
+            oux.append(tts[0:self._n2d])
+            ovy.append(tts[self._n2d:2 * self._n2d])
+
+        return oux, ovy
