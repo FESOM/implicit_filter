@@ -1,3 +1,4 @@
+import concurrent
 from typing import Tuple, Union, List
 import numpy as np
 import jax.numpy as jnp
@@ -137,13 +138,34 @@ class JaxFilter(Filter):
         tts += ttuv
         return np.array(tts)
 
+    def _many_compute_full(self, n, kl, ux, vy, tol=1e-6, maxiter=150000) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(2 * self._n2d, 2 * self._n2d))
+        Smat = identity(2 * self._n2d) + 0.5 * (Smat1 ** n)
+
+        oux: List[np.ndarray] = list()
+        ovy: List[np.ndarray] = list()
+
+        for i in range(len(ux)):
+            ttuv = jnp.concatenate((ux[i], vy[i]))
+            ttw = ttuv - Smat @ ttuv  # Work with perturbations
+
+            tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)
+            if code != 0:
+                raise SolverNotConvergedError("Solver has not converged with metric terms",
+                                              [f"output code with code: {code}"])
+
+            tts += ttuv
+
+            oux.append(tts[0:self._n2d])
+            ovy.append(tts[self._n2d:2 * self._n2d])
+
+        return oux, ovy
+
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if n < 1:
             raise ValueError("Filter order must be positive")
         elif n > 2:
             raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
-
-
 
         uxn, vyn = transform_veloctiy_to_nodes(jnp.array(ux), jnp.array(vy), self._ne_pos, self._ne_num, self._n2d,
                                                self._elem_area, self._area)
@@ -164,6 +186,11 @@ class JaxFilter(Filter):
         return np.array(self._compute_full(n, k, data) if self._full else self._compute(n, k, data))
 
     def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
         if type(data) is np.ndarray:
             if len(data.shape) != 2:
                 raise ValueError("Input NumPy array must be 2D")
@@ -175,6 +202,52 @@ class JaxFilter(Filter):
             raise ValueError("Input data is of incorrect type")
 
 
+    def many_compute_velocity(self, n: int, k: float, ux: Union[np.ndarray, List[np.ndarray]],
+                              vy: Union[np.ndarray, List[np.ndarray]]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
+        uxn = []
+        vyn = []
+        futures = []
+
+        if type(ux) is np.ndarray:
+            if len(ux.shape) != 2 and len(vy.shape) != 2:
+                raise ValueError("Input NumPy array must be 2D")
+
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                for i in range(len(ux.T)):
+                    futures.append(executor.submit(
+                        transform_veloctiy_to_nodes, jnp.array(ux[: i]), jnp.array(vy[:, i]),
+                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
+                executor.shutdown(wait=True)
+
+        elif type(ux) is list:
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                for i in range(len(ux)):
+                    futures.append(
+                        executor.submit(transform_veloctiy_to_nodes, jnp.array(ux[i]), jnp.array(vy[i]),
+                                        self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
+                executor.shutdown(wait=True)
+        else:
+            raise ValueError("Input data is of incorrect type")
+
+        for f in futures:
+            tmp_u, tmp_v = f.result()
+            uxn.append(tmp_u)
+            vyn.append(tmp_v)
+
+        ttu = []
+        ttv = []
+        if self._full:
+            ttu, ttv = self._many_compute_full(n, k, uxn, vyn)
+        else:
+            ttu = self._many_compute(n, k, uxn)
+            ttv = self._many_compute(n, k, vyn)
+
+        return ttu, ttv
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
                 carthesian: bool, cyclic_length: float, full: bool = False):
