@@ -217,19 +217,17 @@ class JaxFilter(Filter):
             if len(ux.shape) != 2 and len(vy.shape) != 2:
                 raise ValueError("Input NumPy array must be 2D")
 
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
                 for i in range(len(ux.T)):
-                    futures.append(executor.submit(
-                        transform_veloctiy_to_nodes, jnp.array(ux[: i]), jnp.array(vy[:, i]),
+                    futures.append(executor.submit(transform_veloctiy_to_nodes, jnp.array(ux[:, i]), jnp.array(vy[:, i]),
                                                    self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
                 executor.shutdown(wait=True)
 
         elif type(ux) is list:
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
                 for i in range(len(ux)):
-                    futures.append(
-                        executor.submit(transform_veloctiy_to_nodes, jnp.array(ux[i]), jnp.array(vy[i]),
-                                        self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
+                    futures.append(executor.submit(transform_veloctiy_to_nodes, jnp.array(ux[i]), jnp.array(vy[i]),
+                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
                 executor.shutdown(wait=True)
         else:
             raise ValueError("Input data is of incorrect type")
@@ -239,8 +237,6 @@ class JaxFilter(Filter):
             uxn.append(tmp_u)
             vyn.append(tmp_v)
 
-        ttu = []
-        ttv = []
         if self._full:
             ttu, ttv = self._many_compute_full(n, k, uxn, vyn)
         else:
