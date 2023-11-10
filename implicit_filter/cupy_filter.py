@@ -81,7 +81,6 @@ class CuPyFilter(JaxFilter):
             return tts
 
         no_gpu = cupy.cuda.runtime.getDeviceCount()
-
         futures = []
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for i in range(len(ux)):
