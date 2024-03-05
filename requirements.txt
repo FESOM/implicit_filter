@@ -5,8 +5,8 @@ contourpy==1.0.5
 cycler==0.11.0
 fastrlock==0.8
 fonttools==4.25.0
-jax==0.3.25
-jaxlib==0.3.25
+jax==0.4.25
+jaxlib==0.4.25
 kiwisolver==1.4.4
 matplotlib==3.7.1
 munkres==1.1.4
@@ -28,4 +28,3 @@ tornado==6.3.2
 typing_extensions==4.7.1
 wheel==0.38.4
 xarray==2023.6.0
-cupy==12.1.0
