@@ -6,7 +6,7 @@ from ._auxiliary import neighboring_triangles, neighbouring_nodes, areas
 from ._jax_function import make_smooth, make_smat, make_smat_full, transform_veloctiy_to_nodes
 from ._utils import VeryStupidIdeaError, SolverNotConvergedError
 from implicit_filter.filter import Filter
-from scipy.sparse import csc_matrix, identity
+from scipy.sparse import csc_matrix, identity, spdiags
 from scipy.sparse.linalg import cg
 
 
@@ -96,6 +96,8 @@ class JaxFilter(Filter):
         Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
         Smat = identity(self._n2d) + 0.5 * (Smat1 ** n)
 
+        # b = Smat.diagonal()
+        # pre = csc_matrix((b, (np.arange(self._n2d), np.arange(self._n2d))), shape=(self._n2d, self._n2d))
         ttw = ttu - Smat @ ttu  # Work with perturbations
 
         tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)

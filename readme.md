@@ -19,6 +19,29 @@ For optimal performance usage of Nvidia GPU is highly recommended.
 
 **IO:** Xarray
 
+
+## Installation 
+Currently Python version 3.10 and 3.9 are supported. Using newer version can enabled 
+```shell
+source ./path/to/enviroment/of/your/choice
+git clone https://github.com/FESOM/implicit_filter
+
+cd implicit_filter
+# CPU only installation
+pip install -e .
+# GPU installation
+pip install -e .[gpu]
+```
+### Known issues
+Installing CuPy can cause an error, in case this happens try installing it manually:
+
+```shell
+pip install cupy
+```
+
+In case it also doesn't work, check your Nvidia driver version using `nvidia-smi` and install 
+CuPy version matching your drivers.
+
 # Tutorial
 
 Lets start with loading FESOM mesh file and data that we want to filter
@@ -45,6 +68,9 @@ from implicit_filter import CuPyFilter
 flter = CuPyFilter()
 flter.prepare_from_file(path + "fesom.mesh.diag.nc")
 ```
+JAX warning might appear about GPU not being available, but it should be ignored. 
+
+If you don't have GPU support enabled importing CuPyFilter will cause an import error.
 
 Alternatively you can set arrays by yourself, but this is shown in notebooks in examples.
 
