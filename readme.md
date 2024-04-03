@@ -3,6 +3,8 @@
 
 # Implicit Filter Python Package
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10907365.svg)](https://doi.org/10.5281/zenodo.10907365)
+
 The Implicit Filter Python Package provides a collection of functions and classes for filtering data using implicit filtering techniques.
 Currently only FESOM files are supported.
 
