@@ -415,12 +415,15 @@ class JaxFilter(Filter):
     
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
-                carthesian: bool, cyclic_length: float, full: bool = False, mask: np.ndarray = None):
+                carthesian: bool, cyclic_length: float, full: bool = False, mask: np.ndarray = None, L_Ro: np.ndarray = None):
         
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
         
         if mask is None:
             mask = np.ones(e2d)
+        
+        if L_Ro is None:
+            L_Ro = np.ones(e2d)
 
         ne_num, ne_pos = neighboring_triangles(n2d, e2d, tri)
         nn_num, nn_pos = neighbouring_nodes(n2d, tri, ne_num, ne_pos)
@@ -443,24 +446,36 @@ class JaxFilter(Filter):
 
         smooth = vmap(lambda n: smooth[:, n] / self._area[n])(jnp.arange(0, n2d)).T
         metric = vmap(lambda n: metric[:, n] / self._area[n])(jnp.arange(0, n2d)).T
-        
-        ## Set rows of smooth where (node) mask is 0 (land) to 0: This enforces a Neumann BC
+
+        ## Scale by L_Ro — Then filter units are [L_Ro]  
         # AFW
-        mask_n = transform_to_nodes(mask, self._ne_pos, self._ne_num, n2d,
-                                            self._elem_area, self._area)
-        mask_n = jnp.array(mask_n)
-        smooth = vmap(lambda n: smooth[:, n] * mask_n[n])(jnp.arange(0, n2d)).T
-        
+        L_Ro_n = transform_to_nodes(L_Ro, self._ne_pos, self._ne_num, n2d,
+                                        self._elem_area, self._area)
+        L_Ro_n = jnp.array(L_Ro_n)
+        smooth = vmap(lambda n: smooth[:, n] * L_Ro_n[n]**2)(jnp.arange(0, n2d)).T
+        metric = vmap(lambda n: metric[:, n] * L_Ro_n[n]**2)(jnp.arange(0, n2d)).T
+             
         
         self._ss, self._ii, self._jj = make_smat_full(jnn_pos, jnn_num, smooth, metric, n2d, int(jnp.sum(jnn_num))) \
             if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
+        
+        ## Set rows of smooth where (node) mask is 0 (land) to 0: This enforces a Neumann BC
+        # AFW
+        
+        # Set _ss = 0 where mask_n[_ii] = 0
+        mask_n = transform_to_nodes(mask, self._ne_pos, self._ne_num, n2d, self._elem_area, self._area)
+        mask_n = jnp.array(mask_n)   
+        mask_ni = mask_n[self._ii]
+        self._ss = jnp.where(mask_ni == 0.0, 0.0, self._ss)
+        
+        
         self._n2d = n2d
         self._e2d = e2d
         self._full = full
 
 
 
-    def prepare_ICON_filter(self, grid2d: xr.DataArray, land_mask: xr.DataArray, full: bool = False):
+    def prepare_ICON_filter(self, grid2d: xr.DataArray, land_mask: xr.DataArray, full: bool = False, L_Ro: xr.DataArray = None, L_Ro_max: float = 50.0):
         
         # Prepare the mesh data
         xcoord = grid2d['vlon'].values * 180.0/np.pi
@@ -471,7 +486,23 @@ class JaxFilter(Filter):
         mask = xr.where(land_mask.values < 0.0, 1.0, 0.0)
         # NOTE: LSM is in grid2d['cell_sea_land_mask'] or in grid3d['lsm_c'].isel(depth=???)
         
-        self.prepare(len(xcoord), len(tri[:,1]), tri, xcoord , ycoord,  meshtype='r', carthesian=False, cyclic_length=2.0*np.pi, full=full, mask=mask)
+        if L_Ro is not None:
+            
+            # small: factor 5 (50-250 km)
+            # LRfactor = 5
+            # LRmax = 250
+            # large: factor 90 (900-4500 km)
+            # LRfactor = 90
+            # LRmax = 4500
+            # medium: factor 12 (120-600 km)
+            # LRfactor = 12
+            # LRmax = 600
+            
+            L_Ro = L_Ro.values   # L_Ro needs to be in units of [km]            
+            L_Ro = np.where(L_Ro > L_Ro_max, L_Ro_max, L_Ro)
+            L_Ro = np.where(L_Ro < 2.5, 2.5, L_Ro)
+        
+        self.prepare(len(xcoord), len(tri[:,1]), tri, xcoord , ycoord,  meshtype='r', carthesian=False, cyclic_length=2.0*np.pi, full=full, mask=mask, L_Ro=L_Ro)
 
 
     def filter_ICON(self, n: int, k: float, ux: xr.DataArray, vy: xr.DataArray=None, mask: float=None) -> Union[xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
@@ -490,8 +521,9 @@ class JaxFilter(Filter):
                 data = ux.values
                 filtered_x = self.compute_on_cells(n, k, data)
             
-            # Fix DataArray
             da_filtered_x = xr.DataArray(filtered_x, coords=coords, dims=dims)
+            
+            # Fix DataArray
             da_filtered_x.attrs = ux.attrs
             if mask is not None:
                 da_filtered_x = xr.where(ux == mask, mask, da_filtered_x)
