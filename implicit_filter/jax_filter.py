@@ -454,7 +454,7 @@ class JaxFilter(Filter):
         L_Ro_n = jnp.array(L_Ro_n)
         smooth = vmap(lambda n: smooth[:, n] * L_Ro_n[n]**2)(jnp.arange(0, n2d)).T
         metric = vmap(lambda n: metric[:, n] * L_Ro_n[n]**2)(jnp.arange(0, n2d)).T
-             
+        
         
         self._ss, self._ii, self._jj = make_smat_full(jnn_pos, jnn_num, smooth, metric, n2d, int(jnp.sum(jnn_num))) \
             if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
@@ -467,7 +467,9 @@ class JaxFilter(Filter):
         mask_n = jnp.array(mask_n)   
         mask_ni = mask_n[self._ii]
         self._ss = jnp.where(mask_ni == 0.0, 0.0, self._ss)
-        
+        if full:  # Remove _ii + _n2d as well
+            mask_ni = mask_n[self._ii + self._n2d]
+            self._ss = jnp.where(mask_ni == 0.0, 0.0, self._ss)
         
         self._n2d = n2d
         self._e2d = e2d
