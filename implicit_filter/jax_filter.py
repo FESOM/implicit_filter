@@ -4,11 +4,12 @@ import numpy as np
 import jax.numpy as jnp
 from jax import vmap
 from ._auxiliary import neighboring_triangles, neighbouring_nodes, areas
-from ._jax_function import make_smooth, make_smat, make_smat_full, transform_veloctiy_to_nodes
+from ._jax_function import make_smooth, make_smat, make_smat_full, transform_vector_to_nodes, transform_to_nodes, transform_vector_to_cells, transform_to_cells
 from ._utils import VeryStupidIdeaError, SolverNotConvergedError
 from implicit_filter.filter import Filter
 from scipy.sparse import csc_matrix, identity, spdiags
 from scipy.sparse.linalg import cg
+import xarray as xr
 
 
 class JaxFilter(Filter):
@@ -82,6 +83,7 @@ class JaxFilter(Filter):
         self.__transform_atribute("_elem_area", jx, None)
         self.__transform_atribute("_area", jx, None)
         self.__transform_atribute("_ne_pos", jx, None)
+        self.__transform_atribute("_en_pos", jx, None)
         self.__transform_atribute("_ne_num", jx, None)
         self.__transform_atribute("_dx", jx, None)
         self.__transform_atribute("_dy", jx, None)
@@ -91,6 +93,7 @@ class JaxFilter(Filter):
         self.__transform_atribute("_jj", jx, None)
 
         self.__transform_atribute("_n2d", it, 0)
+        self.__transform_atribute("_e2d", it, 0)
         self.__transform_atribute("_full", bl, False)
 
     def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
@@ -169,7 +172,7 @@ class JaxFilter(Filter):
         elif n > 2:
             raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
-        uxn, vyn = transform_veloctiy_to_nodes(jnp.array(ux), jnp.array(vy), self._ne_pos, self._ne_num, self._n2d,
+        uxn, vyn = transform_vector_to_nodes(jnp.array(ux), jnp.array(vy), self._ne_pos, self._ne_num, self._n2d,
                                                self._elem_area, self._area)
         if self._full:
             ttuv = self._compute_full(n, k, jnp.concatenate((uxn, vyn)))
@@ -178,6 +181,39 @@ class JaxFilter(Filter):
             ttu = self._compute(n, k, uxn)
             ttv = self._compute(n, k, vyn)
             return ttu, ttv
+    
+    def compute_on_cells(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
+        data_n = transform_to_nodes(jnp.array(data), self._ne_pos, self._ne_num, self._n2d,
+                                               self._elem_area, self._area)
+
+        data_n_filtered = self._compute(n, k, data_n)
+        data_cell_filtered = transform_to_cells(jnp.array(data_n_filtered), self._en_pos, self._e2d, self._elem_area)
+        return data_cell_filtered
+    
+    def compute_vector_on_cells(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
+        uxn, vyn = transform_vector_to_nodes(jnp.array(ux), jnp.array(vy), self._ne_pos, self._ne_num, self._n2d,
+                                               self._elem_area, self._area)
+        if self._full:
+            ttuv = self._compute_full(n, k, jnp.concatenate((uxn, vyn)))
+            ttu = ttuv[0:self._n2d]
+            ttv = ttuv[self._n2d:2*self._n2d]
+        else:
+            ttu = self._compute(n, k, uxn)
+            ttv = self._compute(n, k, vyn)
+            
+        ttu_centre, ttv_centre = transform_vector_to_cells(jnp.array(ttu), jnp.array(ttv), self._en_pos, self._e2d, self._elem_area)
+
+        return ttu_centre, ttv_centre
 
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
         if n < 1:
@@ -221,14 +257,14 @@ class JaxFilter(Filter):
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for i in range(len(ux.T)):
-                    futures.append(executor.submit(transform_veloctiy_to_nodes, jnp.array(ux[:, i]), jnp.array(vy[:, i]),
+                    futures.append(executor.submit(transform_vector_to_nodes, jnp.array(ux[:, i]), jnp.array(vy[:, i]),
                                                    self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
                 executor.shutdown(wait=True)
 
         elif type(ux) is list:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for i in range(len(ux)):
-                    futures.append(executor.submit(transform_veloctiy_to_nodes, jnp.array(ux[i]), jnp.array(vy[i]),
+                    futures.append(executor.submit(transform_vector_to_nodes, jnp.array(ux[i]), jnp.array(vy[i]),
                                                    self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
                 executor.shutdown(wait=True)
         else:
@@ -246,14 +282,150 @@ class JaxFilter(Filter):
             ttv = self._many_compute(n, k, vyn)
 
         return ttu, ttv
+    
+    
+    def many_compute_on_cells(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
+        data_n = []
+        futures = []
+        ttu_centre = []
+        
+        # Put onto nodes...
+        if type(data) is np.ndarray:
+            if len(data.shape) != 2:
+                raise ValueError("Input NumPy array must be 2D")
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for i in range(len(data.T)):
+                    futures.append(executor.submit(transform_to_nodes, jnp.array(data[:, i]),
+                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
+                executor.shutdown(wait=True)
+        
+        elif type(data) is list:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for i in range(len(data)):
+                    futures.append(executor.submit(transform_to_nodes, jnp.array(data[i]),
+                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
+                executor.shutdown(wait=True)
+        else:
+            raise ValueError("Input data is of incorrect type")
+        
+        for f in futures:
+            tmp_data = f.result()
+            data_n.append(tmp_data)
+        
+
+        ttu = self._many_compute(n, k, data_n)
+        
+        # Put back onto cell centres...
+        if type(ttu) is np.ndarray:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for i in range(len(ttu.T)):
+                    futures.append(executor.submit(transform_to_cells, jnp.array(ttu[:, i]),
+                                                   self._en_pos, self._e2d, self._elem_area))
+                executor.shutdown(wait=True)
+        
+        elif type(ttu) is list:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for i in range(len(ttu)):
+                    futures.append(executor.submit(transform_to_cells, jnp.array(ttu[i]),
+                                                   self._en_pos, self._e2d, self._elem_area))
+                executor.shutdown(wait=True)
+        else:
+            raise ValueError("Input data is of incorrect type")
+        
+        for f in futures:
+            tmp_data_c = f.result()
+            ttu_centre.append(tmp_data_c)
+        
+        return ttu_centre
+    
+    
+    def many_compute_vector_on_cells(self, n: int, k: float, ux: Union[np.ndarray, List[np.ndarray]], vy: Union[np.ndarray, List[np.ndarray]]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
+        uxn = []
+        vyn = []
+        futures = []
+        ttu_centre = []
+        ttv_centre = []
+        
+        # Put onto nodes...
+        if type(ux) is np.ndarray:
+            if len(ux.shape) != 2:
+                raise ValueError("Input NumPy array must be 2D")
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for i in range(len(ux.T)):
+                    futures.append(executor.submit(transform_vector_to_nodes, jnp.array(ux[:, i]), jnp.array(vy[:, i]),
+                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
+                executor.shutdown(wait=True)
+        
+        elif type(ux) is list:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for i in range(len(ux)):
+                    futures.append(executor.submit(transform_vector_to_nodes, jnp.array(ux[i]), jnp.array(vy[i]),
+                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
+                executor.shutdown(wait=True)
+        else:
+            raise ValueError("Input data is of incorrect type")
+        
+        for f in futures:
+            tmp_u, tmp_v = f.result()
+            uxn.append(tmp_u)
+            vyn.append(tmp_v)
+        
+        if self._full:
+            ttu, ttv = self._many_compute_full(n, k, uxn, vyn)
+        else:
+            ttu = self._many_compute(n, k, uxn)
+            ttv = self._many_compute(n, k, vyn)
+        
+        # Put back onto cell centres...
+        if type(ttu) is np.ndarray:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for i in range(len(ttu.T)):
+                    futures.append(executor.submit(transform_vector_to_cells, jnp.array(ttu[:, i]), jnp.array(ttv[:, i]),
+                                                   self._en_pos, self._e2d, self._elem_area))
+                executor.shutdown(wait=True)
+        
+        elif type(ttu) is list:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for i in range(len(ttu)):
+                    futures.append(executor.submit(transform_vector_to_cells, jnp.array(ttu[i]), jnp.array(ttv[i]),
+                                                   self._en_pos, self._e2d, self._elem_area))
+                executor.shutdown(wait=True)
+        else:
+            raise ValueError("Input data is of incorrect type")
+        
+        for f in futures:
+            tmp_u_c, tmp_v_c = f.result()
+            ttu_centre.append(tmp_u_c)
+            ttv_centre.append(tmp_v_c)
+        
+        return ttu_centre, ttv_centre
+    
+    
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
-                carthesian: bool, cyclic_length: float, full: bool = False):
+                carthesian: bool, cyclic_length: float, full: bool = False, mask: np.ndarray = None):
+        
+        # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
+        
+        if mask is None:
+            mask = np.ones(e2d)
 
         ne_num, ne_pos = neighboring_triangles(n2d, e2d, tri)
         nn_num, nn_pos = neighbouring_nodes(n2d, tri, ne_num, ne_pos)
         area, elem_area, dx, dy, Mt = areas(n2d, e2d, tri, xcoord, ycoord, ne_num, ne_pos, meshtype, carthesian,
-                                        cyclic_length)
+                                        cyclic_length, mask)
 
         self._elem_area = jnp.array(elem_area)
         self._dx = jnp.array(dx)
@@ -262,16 +434,97 @@ class JaxFilter(Filter):
         jnn_num = jnp.array(nn_num)
         jnn_pos = jnp.array(nn_pos)
         jtri = jnp.array(tri)
+        self._en_pos = jnp.array(tri.T)  # element positions in terms of nodes
         self._ne_num = jnp.array(ne_num)
         self._ne_pos = jnp.array(ne_pos)
         self._area = jnp.array(area)
-
+        
         smooth, metric = make_smooth(jMt, self._elem_area, self._dx, self._dy, jnn_num, jnn_pos, jtri, n2d, e2d, full)
 
         smooth = vmap(lambda n: smooth[:, n] / self._area[n])(jnp.arange(0, n2d)).T
         metric = vmap(lambda n: metric[:, n] / self._area[n])(jnp.arange(0, n2d)).T
-
+        
+        ## Set rows of smooth where (node) mask is 0 (land) to 0: This enforces a Neumann BC
+        # AFW
+        mask_n = transform_to_nodes(mask, self._ne_pos, self._ne_num, n2d,
+                                            self._elem_area, self._area)
+        mask_n = jnp.array(mask_n)
+        smooth = vmap(lambda n: smooth[:, n] * mask_n[n])(jnp.arange(0, n2d)).T
+        
+        
         self._ss, self._ii, self._jj = make_smat_full(jnn_pos, jnn_num, smooth, metric, n2d, int(jnp.sum(jnn_num))) \
             if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
         self._n2d = n2d
+        self._e2d = e2d
         self._full = full
+
+
+
+    def prepare_ICON_filter(self, grid2d: xr.DataArray, land_mask: xr.DataArray, full: bool = False):
+        
+        # Prepare the mesh data
+        xcoord = grid2d['vlon'].values * 180.0/np.pi
+        ycoord = grid2d['vlat'].values * 180.0/np.pi  # Location of nodes, in degrees
+        tri = grid2d['vertex_of_cell'].values.T - 1
+        tri = tri.astype(int)
+        
+        mask = xr.where(land_mask.values < 0.0, 1.0, 0.0)
+        # NOTE: LSM is in grid2d['cell_sea_land_mask'] or in grid3d['lsm_c'].isel(depth=???)
+        
+        self.prepare(len(xcoord), len(tri[:,1]), tri, xcoord , ycoord,  meshtype='r', carthesian=False, cyclic_length=2.0*np.pi, full=full, mask=mask)
+
+
+    def filter_ICON(self, n: int, k: float, ux: xr.DataArray, vy: xr.DataArray=None, mask: float=None) -> Union[xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
+        dims = ux.dims
+        coords = ux.coords
+        
+        if vy is None:  # ux is scalar data...
+        
+            if 'time' in dims:
+                # Cycle through each time step in parallel
+                data = ux.values
+                filtered_x = self.many_compute_on_cells(n, k, data) # Returns list of np.array...
+                filtered_x = np.array(filtered_x)
+            else:
+                # Just the one timestep...
+                data = ux.values
+                filtered_x = self.compute_on_cells(n, k, data)
+            
+            # Fix DataArray
+            da_filtered_x = xr.DataArray(filtered_x, coords=coords, dims=dims)
+            da_filtered_x.attrs = ux.attrs
+            if mask is not None:
+                da_filtered_x = xr.where(ux == mask, mask, da_filtered_x)
+            
+            return da_filtered_x
+        
+        else:  # ux and uy are vector data, so apply metric terms
+            
+            if 'time' in dims:
+                # Cycle through each time step in parallel
+                uxd = ux.values
+                vyd = vy.values
+                filtered_x, filtered_y = self.many_compute_vector_on_cells(n, k, uxd, vyd) # Returns list of np.array...
+                filtered_x = np.array(filtered_x)
+                filtered_y = np.array(filtered_y)
+            else:
+                # Just the one timestep...
+                uxd = ux.values
+                vyd = vy.values
+                filtered_x, filtered_y = self.compute_vector_on_cells(n, k, uxd, vyd)
+                
+            da_filtered_x = xr.DataArray(filtered_x, coords=coords, dims=dims)
+            da_filtered_y = xr.DataArray(filtered_y, coords=coords, dims=dims)
+            
+            # Fix DataArray
+            da_filtered_x.attrs = ux.attrs
+            da_filtered_y.attrs = vy.attrs
+            if mask is not None:
+                da_filtered_x = xr.where(ux == mask, mask, da_filtered_x)
+                da_filtered_y = xr.where(vy == mask, mask, da_filtered_y)
+        
+            return da_filtered_x, da_filtered_y
+    
+
+
+

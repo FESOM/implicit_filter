@@ -26,19 +26,7 @@ dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
 gpu = [
-    "cupy"
+    "cupy==12.3.0"
 ]
-
-[project.urls]
-Homepage = "https://github.com/FESOM/implicit_filter"
-
-[tool.setuptools]
-platforms = ["any"]
-zip-safe  = false
-include-package-data = true
-
-[tool.setuptools.packages.find]
-where = ["implicit_filter"]
-include = ["implicit_filter*"]
 
 
