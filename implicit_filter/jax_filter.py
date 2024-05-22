@@ -96,7 +96,7 @@ class JaxFilter(Filter):
         self.__transform_atribute("_e2d", it, 0)
         self.__transform_atribute("_full", bl, False)
 
-    def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
+    def _compute(self, n, kl, ttu, tol=1e-5, maxiter=150000) -> np.ndarray:
         Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
         Smat = identity(self._n2d) + 0.5 * (Smat1 ** n)
 
@@ -112,7 +112,7 @@ class JaxFilter(Filter):
         tts += ttu
         return np.array(tts)
 
-    def _many_compute(self, n, kl, data, tol=1e-6, maxiter=150000) -> List[np.ndarray]:
+    def _many_compute(self, n, kl, data, tol=1e-5, maxiter=150000) -> List[np.ndarray]:
         Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
         Smat = identity(self._n2d) + 0.5 * (Smat1 ** n)
         output: List[np.ndarray] = list()
@@ -128,8 +128,25 @@ class JaxFilter(Filter):
             output.append(tts)
 
         return output
+    
+    def _spectra_compute(self, n, kl, ttu, tol=1e-5, maxiter=150000) -> List[np.ndarray]:
+        output: List[np.ndarray] = list()
+        for kl_i in kl:
+            Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl_i)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
+            Smat = identity(self._n2d) + 0.5 * (Smat1 ** n)
+            ttw = ttu - Smat @ ttu  # Work with perturbations
+            tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)
+            
+            if code != 0:
+                raise SolverNotConvergedError("Solver has not converged without metric terms",
+                                              [f"output code with code: {code}"])
 
-    def _compute_full(self, n, kl, ttuv, tol=1e-6, maxiter=150000) -> np.ndarray:
+            tts += ttu
+            output.append(tts)
+
+        return output
+
+    def _compute_full(self, n, kl, ttuv, tol=1e-5, maxiter=150000) -> np.ndarray:
         Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(2 * self._n2d, 2 * self._n2d))
         Smat = identity(2 * self._n2d) + 0.5 * (Smat1 ** n)
 
@@ -143,7 +160,7 @@ class JaxFilter(Filter):
         tts += ttuv
         return np.array(tts)
 
-    def _many_compute_full(self, n, kl, ux, vy, tol=1e-6, maxiter=150000) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    def _many_compute_full(self, n, kl, ux, vy, tol=1e-5, maxiter=150000) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(2 * self._n2d, 2 * self._n2d))
         Smat = identity(2 * self._n2d) + 0.5 * (Smat1 ** n)
 
@@ -152,6 +169,30 @@ class JaxFilter(Filter):
 
         for i in range(len(ux)):
             ttuv = jnp.concatenate((ux[i], vy[i]))
+            ttw = ttuv - Smat @ ttuv  # Work with perturbations
+
+            tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)
+            if code != 0:
+                raise SolverNotConvergedError("Solver has not converged with metric terms",
+                                              [f"output code with code: {code}"])
+
+            tts += ttuv
+
+            oux.append(tts[0:self._n2d])
+            ovy.append(tts[self._n2d:2 * self._n2d])
+
+        return oux, ovy
+    
+    def _spectra_compute_full(self, n, kl, ux, vy, tol=1e-5, maxiter=150000) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        oux: List[np.ndarray] = list()
+        ovy: List[np.ndarray] = list()
+        
+        ttuv = jnp.concatenate((ux, vy))
+
+        for kl_i in kl:
+            Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl_i)), (self._ii, self._jj)), shape=(2 * self._n2d, 2 * self._n2d))
+            Smat = identity(2 * self._n2d) + 0.5 * (Smat1 ** n)
+            
             ttw = ttuv - Smat @ ttuv  # Work with perturbations
 
             tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)
@@ -344,6 +385,36 @@ class JaxFilter(Filter):
         
         return ttu_centre
     
+    def spectra_compute_on_cells(self, n: int, k: np.ndarray, data: np.ndarray) -> List[np.ndarray]:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
+        data_n = []
+        futures = []
+        ttu_centre = []
+        
+        # Put onto nodes...
+        data_n = transform_to_nodes(jnp.array(data), self._ne_pos, self._ne_num, self._n2d,
+                                               self._elem_area, self._area)
+
+        
+        ttu = self._spectra_compute(n, k, data_n)
+        
+        # Put back onto cell centres...
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for i in range(len(ttu)):
+                futures.append(executor.submit(transform_to_cells, jnp.array(ttu[i]),
+                                                self._en_pos, self._e2d, self._elem_area))
+            executor.shutdown(wait=True)
+        
+        for f in futures:
+            tmp_data_c = f.result()
+            ttu_centre.append(tmp_data_c)
+        
+        return ttu_centre
+    
     
     def many_compute_vector_on_cells(self, n: int, k: float, ux: Union[np.ndarray, List[np.ndarray]], vy: Union[np.ndarray, List[np.ndarray]]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         if n < 1:
@@ -413,6 +484,44 @@ class JaxFilter(Filter):
         return ttu_centre, ttv_centre
     
     
+    def spectra_compute_vector_on_cells(self, n: int, k: np.ndarray, ux: np.ndarray, vy: np.ndarray) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        if n < 1:
+            raise ValueError("Filter order must be positive")
+        elif n > 2:
+            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+
+        uxn = []
+        vyn = []
+        futures = []
+        ttu_centre = []
+        ttv_centre = []
+        
+        # Put onto nodes...
+        uxn, vyn = transform_vector_to_nodes(jnp.array(ux), jnp.array(vy), self._ne_pos, self._ne_num, self._n2d,
+                                               self._elem_area, self._area)
+        
+        
+        if self._full:
+            ttu, ttv = self._spectra_compute_full(n, k, uxn, vyn)
+        else:
+            ttu = self._spectra_compute(n, k, uxn)
+            ttv = self._spectra_compute(n, k, vyn)
+        
+        # Put back onto cell centres...
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for i in range(len(ttu)):
+                futures.append(executor.submit(transform_vector_to_cells, jnp.array(ttu[i]), jnp.array(ttv[i]),
+                                                self._en_pos, self._e2d, self._elem_area))
+            executor.shutdown(wait=True)
+        
+        for f in futures:
+            tmp_u_c, tmp_v_c = f.result()
+            ttu_centre.append(tmp_u_c)
+            ttv_centre.append(tmp_v_c)
+        
+        return ttu_centre, ttv_centre
+    
+    
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
                 carthesian: bool, cyclic_length: float, full: bool = False, mask: np.ndarray = None, L_Ro: np.ndarray = None):
@@ -460,16 +569,22 @@ class JaxFilter(Filter):
             if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
         
         ## Set rows of smooth where (node) mask is 0 (land) to 0: This enforces a Neumann BC
+        #   i.e. Set _ss = 0 where mask_n[_ii] = 0 && mask_n[_jj] = 0
         # AFW
-        
-        # Set _ss = 0 where mask_n[_ii] = 0
         mask_n = transform_to_nodes(mask, self._ne_pos, self._ne_num, n2d, self._elem_area, self._area)
-        mask_n = jnp.array(mask_n)   
-        mask_ni = mask_n[self._ii]
-        self._ss = jnp.where(mask_ni == 0.0, 0.0, self._ss)
-        if full:  # Remove _ii + _n2d as well
-            mask_ni = mask_n[self._ii + self._n2d]
-            self._ss = jnp.where(mask_ni == 0.0, 0.0, self._ss)
+        mask_n = jnp.where(mask_n > 0.5, 1.0, 0.0)
+        mask_n = mask_n.astype(bool)
+        
+        # Create a mask where both _ii and _jj are not 0
+        if full:
+            mask = (mask_n[self._ii%n2d] & mask_n[self._jj%n2d])
+        else:
+            mask = (mask_n[self._ii] & mask_n[self._jj])
+
+        self._ss = self._ss[mask]
+        self._ii = self._ii[mask]
+        self._jj = self._jj[mask]        
+        
         
         self._n2d = n2d
         self._e2d = e2d
@@ -507,7 +622,7 @@ class JaxFilter(Filter):
         self.prepare(len(xcoord), len(tri[:,1]), tri, xcoord , ycoord,  meshtype='r', carthesian=False, cyclic_length=2.0*np.pi, full=full, mask=mask, L_Ro=L_Ro)
 
 
-    def filter_ICON(self, n: int, k: float, ux: xr.DataArray, vy: xr.DataArray=None, mask: float=None) -> Union[xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
+    def filter_ICON(self, n: int, k: Union[float, np.ndarray], ux: xr.DataArray, vy: xr.DataArray=None, mask: float=None) -> Union[xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
         dims = ux.dims
         coords = ux.coords
         
@@ -517,6 +632,13 @@ class JaxFilter(Filter):
                 # Cycle through each time step in parallel
                 data = ux.values
                 filtered_x = self.many_compute_on_cells(n, k, data) # Returns list of np.array...
+                filtered_x = np.array(filtered_x)
+            elif isinstance(k, np.ndarray):
+                # Cycle through each wavenumber in parallel
+                dims = ('k', dims[0])
+                coords = coords.assign({'k': k})
+                data = ux.values
+                filtered_x = self.spectra_compute_on_cells(n, k, data) # Returns list of np.array...
                 filtered_x = np.array(filtered_x)
             else:
                 # Just the one timestep...
@@ -541,6 +663,13 @@ class JaxFilter(Filter):
                 filtered_x, filtered_y = self.many_compute_vector_on_cells(n, k, uxd, vyd) # Returns list of np.array...
                 filtered_x = np.array(filtered_x)
                 filtered_y = np.array(filtered_y)
+            elif isinstance(k, np.ndarray):
+                # Cycle through each wavenumber in parallel
+                dims = ('k', dims[0])
+                coords = coords.assign({'k': k})
+                uxd = ux.values
+                vyd = vy.values
+                filtered_x, filtered_y = self.spectra_compute_vector_on_cells(n, k, uxd, vyd)
             else:
                 # Just the one timestep...
                 uxd = ux.values
