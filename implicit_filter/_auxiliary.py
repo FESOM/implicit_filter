@@ -1,5 +1,8 @@
 import math
 import numpy as np
+import pandas as pd
+import xarray as xr
+from sklearn.linear_model import LinearRegression
 
 
 def neighboring_triangles(n2d: int, e2d: int, tri: np.ndarray):
@@ -352,4 +355,84 @@ def convert_to_wavenumbers(dist, dxm):
 
     size = 3.5 * (dist / dxm)
     return 2 * math.pi / size
+
+
+def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees: float = None) -> pd.Series:
+    """
+    Fix rounding erros in NEMO grid using linear regression
+
+    Author: Willi Rath
+
+    Parameters:
+    -----------
+    mesh_mask_path : str
+        Path to the mesh mask file.
+    lon_lat_prec_degrees : float
+        Rounding precision for longitude and latitude coordinates.
+
+    Returns:
+    --------
+    pd.Series
+        Pandas Series containing the indices of adjacent points.
+
+    """
+    # load mesh mask
+    ds_mm = xr.open_dataset(mesh_mask_path)
+    ds_mm = ds_mm.squeeze(drop=True)
+    ds_mm = ds_mm.assign_coords(
+        x=np.arange(ds_mm.sizes["x"]),
+        y=np.arange(ds_mm.sizes["y"]),
+    )
+
+    # extract T-point lon and lat
+    lon, lat = ds_mm.glamt, ds_mm.gphit
+
+    # Cast lon lat to int
+    ilon = (lon / lon_lat_prec_degrees).astype(int)
+    ilat = (lat / lon_lat_prec_degrees).astype(int)
+
+    # Find out which row corresponds to the last one y
+    if (
+            abs(np.sort(ilon.isel(y=-1)) - np.sort(ilon.isel(y=-2))).mean()
+            < abs(np.sort(ilon.isel(y=-1)) - np.sort(ilon.isel(y=-3))).mean()
+    ):
+        corresponds_to_redundant = -2
+    else:
+        corresponds_to_redundant = -3
+    print("corresponding row is at y = ", corresponds_to_redundant)
+
+    # extract redundant (last row) and correspoding row coords
+    ilon_redundant = ilon.isel(x=slice(1, -1)).isel(y=-1, drop=True)
+    ilon_corresponds = ilon.isel(x=slice(1, -1)).isel(y=corresponds_to_redundant, drop=True)
+    ilat_redundant = ilon.isel(x=slice(1, -1)).isel(y=-1, drop=True)
+    ilat_corresponds = ilon.isel(x=slice(1, -1)).isel(y=corresponds_to_redundant, drop=True)
+
+    # find corresponding x
+    x_corr = []
+    for x_r, lon_r, lat_r in list(zip(ilon_redundant.x.data, ilon_redundant.data, ilat_redundant.data)):
+        for x_c, lon_c, lat_c in zip(ilon_corresponds.x.data, ilon_corresponds.data, ilat_corresponds.data):
+            if lon_r.data[()] == lon_c.data[()]:
+                if lat_r.data[()] == lat_c.data[()]:
+                    if x_c not in x_corr:
+                        x_corr.append(x_c)
+                        break
+
+    # filter adjacent x for outliers
+    adjacent_x = pd.Series(x_corr, name="adjacent_x", index=pd.Series(ilon_redundant.x.data, name="reference_x"))
+    adjacent_x_sanitized = adjacent_x.where(abs(adjacent_x.diff()) < 1.5 * abs(adjacent_x.diff()).mean()).dropna()
+
+    # fit clean adjacent indices
+    lr = LinearRegression()
+    lr.fit(np.array(adjacent_x_sanitized.index).reshape(-1, 1), np.array(adjacent_x_sanitized).reshape(-1, 1))
+    adjacent_x_fit = pd.Series(lr.predict(np.array(adjacent_x.index).reshape(-1, 1)).reshape(-1),
+                               index=adjacent_x.index, name="adjacent_x").round().astype(int)
+
+    # test if we were successful
+    np.testing.assert_array_almost_equal(
+        ds_mm.glamt.isel(y=corresponds_to_redundant).sel(x=adjacent_x_fit.to_xarray()),
+        ds_mm.glamt.isel(y=-1).sel(x=adjacent_x_fit.index.to_series().to_xarray()),
+    )
+
+    # return adjacent indices
+    return adjacent_x_fit
 
