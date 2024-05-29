@@ -2,6 +2,7 @@ import concurrent
 from typing import Tuple, Union, List
 import numpy as np
 import jax.numpy as jnp
+import xarray as xr
 from jax import vmap
 from ._auxiliary import neighboring_triangles, neighbouring_nodes, areas
 from ._jax_function import make_smooth, make_smat, make_smat_full, transform_veloctiy_to_nodes
@@ -275,3 +276,33 @@ class JaxFilter(Filter):
             if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
         self._n2d = n2d
         self._full = full
+
+    def prepare_from_file(self, file: str, meshtype: str = 'r', carthesian: bool = False,
+                          cyclic_length: float = 360.0 * math.pi / 180.0, metric: bool = False):
+        """
+        Prepare the filter to be used with a mesh provided in the given file path.
+
+        Parameters:
+        -----------
+        file : str
+            Path to the FESOM mesh file.
+
+        meshtype : str
+        Mesh type, either 'm' (metric) or 'r' (radial). Default is radial
+
+        carthesian : bool
+            Boolean indicating whether the mesh is in Cartesian coordinates. Default is False
+
+        cyclic_length : float
+            The length of the cyclic boundary if the mesh is cyclic (for 'r' meshtype). Default is 360 * pi / 180
+
+        metric : bool, optional
+            A flag indicating whether to use the calculation including metric terms (True) or not (False).
+            Default is False.
+        """
+        mesh = xr.open_dataset(file)
+        xcoord = mesh['lon'].values
+        ycoord = mesh['lat'].values
+        tri = mesh['elements'].values.T - 1
+
+        self.prepare(len(xcoord), len(tri[:, 1]), tri, xcoord, ycoord, meshtype, carthesian, cyclic_length, metric)
