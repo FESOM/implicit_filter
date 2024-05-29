@@ -341,8 +341,8 @@ class JaxFilter(Filter):
                 raise ValueError("Input NumPy array must be 2D")
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                for i in range(len(data.T)):
-                    futures.append(executor.submit(transform_to_nodes, jnp.array(data[:, i]),
+                for i in range(len(data)):
+                    futures.append(executor.submit(transform_to_nodes, jnp.array(data[i, :]),
                                                    self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
                 executor.shutdown(wait=True)
         
@@ -362,6 +362,7 @@ class JaxFilter(Filter):
 
         ttu = self._many_compute(n, k, data_n)
         
+        futures = []
         # Put back onto cell centres...
         if type(ttu) is np.ndarray:
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -434,8 +435,8 @@ class JaxFilter(Filter):
                 raise ValueError("Input NumPy array must be 2D")
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                for i in range(len(ux.T)):
-                    futures.append(executor.submit(transform_vector_to_nodes, jnp.array(ux[:, i]), jnp.array(vy[:, i]),
+                for i in range(len(ux)):
+                    futures.append(executor.submit(transform_vector_to_nodes, jnp.array(ux[i, :]), jnp.array(vy[i, :]),
                                                    self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
                 executor.shutdown(wait=True)
         
@@ -459,6 +460,7 @@ class JaxFilter(Filter):
             ttu = self._many_compute(n, k, uxn)
             ttv = self._many_compute(n, k, vyn)
         
+        futures = []
         # Put back onto cell centres...
         if type(ttu) is np.ndarray:
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -487,8 +489,8 @@ class JaxFilter(Filter):
     def spectra_compute_vector_on_cells(self, n: int, k: np.ndarray, ux: np.ndarray, vy: np.ndarray) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         if n < 1:
             raise ValueError("Filter order must be positive")
-        elif n > 2:
-            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
+        # elif n > 2:
+        #     raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
         uxn = []
         vyn = []
@@ -524,7 +526,7 @@ class JaxFilter(Filter):
     
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
-                carthesian: bool, cyclic_length: float, full: bool = False, mask: np.ndarray = None, L_Ro: np.ndarray = None):
+                carthesian: bool, cyclic_length: float, resolution: float, full: bool = False, mask: np.ndarray = None, L_Ro: np.ndarray = None):
         
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
         
@@ -561,9 +563,16 @@ class JaxFilter(Filter):
         L_Ro_n = transform_to_nodes(L_Ro, self._ne_pos, self._ne_num, n2d,
                                         self._elem_area, self._area)
         L_Ro_n = jnp.array(L_Ro_n)
-        smooth = vmap(lambda n: smooth[:, n] * L_Ro_n[n]**2)(jnp.arange(0, n2d)).T
-        metric = vmap(lambda n: metric[:, n] * L_Ro_n[n]**2)(jnp.arange(0, n2d)).T
+        smooth = vmap(lambda n: smooth[:, n] * L_Ro_n[n]**2 / resolution**2)(jnp.arange(0, n2d)).T
+        metric = vmap(lambda n: metric[:, n] * L_Ro_n[n]**2 / resolution**2)(jnp.arange(0, n2d)).T
         
+        
+        ## Set smooth to zero (also for BCs) (?)
+        mask_n = transform_to_nodes(mask, self._ne_pos, self._ne_num, n2d, self._elem_area, self._area)
+        mask_n = jnp.where(mask_n > 0.5, 1.0, 0.0)
+        
+        # smooth = vmap(lambda n: smooth[:, n] * mask_n[n])(jnp.arange(0, n2d)).T
+        # metric = vmap(lambda n: metric[:, n] * mask_n[n])(jnp.arange(0, n2d)).T
         
         self._ss, self._ii, self._jj = make_smat_full(jnn_pos, jnn_num, smooth, metric, n2d, int(jnp.sum(jnn_num))) \
             if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
@@ -571,8 +580,7 @@ class JaxFilter(Filter):
         ## Set rows of smooth where (node) mask is 0 (land) to 0: This enforces a Neumann BC
         #   i.e. Set _ss = 0 where mask_n[_ii] = 0 && mask_n[_jj] = 0
         # AFW
-        mask_n = transform_to_nodes(mask, self._ne_pos, self._ne_num, n2d, self._elem_area, self._area)
-        mask_n = jnp.where(mask_n > 0.5, 1.0, 0.0)
+        
         mask_n = mask_n.astype(bool)
         
         # Create a mask where both _ii and _jj are not 0
@@ -592,7 +600,7 @@ class JaxFilter(Filter):
 
 
 
-    def prepare_ICON_filter(self, grid2d: xr.DataArray, land_mask: xr.DataArray, full: bool = False, L_Ro: xr.DataArray = None, L_Ro_max: float = 50.0):
+    def prepare_ICON_filter(self, grid2d: xr.DataArray, land_mask: xr.DataArray = None, full: bool = False, L_Ro: xr.DataArray = None, L_Ro_max: float = 50.0, resolution: float = 5.0):
         
         # Prepare the mesh data
         xcoord = grid2d['vlon'].values * 180.0/np.pi
@@ -600,8 +608,11 @@ class JaxFilter(Filter):
         tri = grid2d['vertex_of_cell'].values.T - 1
         tri = tri.astype(int)
         
-        mask = xr.where(land_mask.values < 0.0, 1.0, 0.0)
-        # NOTE: LSM is in grid2d['cell_sea_land_mask'] or in grid3d['lsm_c'].isel(depth=???)
+        if land_mask is None:
+            mask = np.ones(len(tri[:,1]))
+        else:
+            mask = xr.where(land_mask.values < 0.0, 1.0, 0.0)
+            # NOTE: LSM is in grid2d['cell_sea_land_mask'] or in grid3d['lsm_c'].isel(depth=???)
         
         if L_Ro is not None:
             
@@ -619,12 +630,14 @@ class JaxFilter(Filter):
             L_Ro = np.where(L_Ro > L_Ro_max, L_Ro_max, L_Ro)
             L_Ro = np.where(L_Ro < 2.5, 2.5, L_Ro)
         
-        self.prepare(len(xcoord), len(tri[:,1]), tri, xcoord , ycoord,  meshtype='r', carthesian=False, cyclic_length=2.0*np.pi, full=full, mask=mask, L_Ro=L_Ro)
+        self.prepare(len(xcoord), len(tri[:,1]), tri, xcoord , ycoord,  meshtype='r', carthesian=False, cyclic_length=2.0*np.pi, resolution=resolution, full=full, mask=mask, L_Ro=L_Ro)
 
 
-    def filter_ICON(self, n: int, k: Union[float, np.ndarray], ux: xr.DataArray, vy: xr.DataArray=None, mask: float=None) -> Union[xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
+    def filter_ICON(self, n: int, filter_length: Union[float, np.ndarray], ux: xr.DataArray, vy: xr.DataArray=None, mask: float=None) -> Union[xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
         dims = ux.dims
         coords = ux.coords
+        
+        k = 1.0 / filter_length
         
         if vy is None:  # ux is scalar data...
         
@@ -638,8 +651,8 @@ class JaxFilter(Filter):
                 dims = ('k', dims[0])
                 coords = coords.assign({'k': k})
                 data = ux.values
-                filtered_x = self.spectra_compute_on_cells(n, k, data) # Returns list of np.array...
-                filtered_x = np.array(filtered_x)
+                filtered_x = self.spectra_compute_on_cells(n, k[::-1], data) # Returns list of np.array...
+                filtered_x = filtered_x[::-1]   #np.array(filtered_x)
             else:
                 # Just the one timestep...
                 data = ux.values
@@ -669,7 +682,9 @@ class JaxFilter(Filter):
                 coords = coords.assign({'k': k})
                 uxd = ux.values
                 vyd = vy.values
-                filtered_x, filtered_y = self.spectra_compute_vector_on_cells(n, k, uxd, vyd)
+                filtered_x, filtered_y = self.spectra_compute_vector_on_cells(n, k[::-1], uxd, vyd)  # Invert k because last (smallest) k is the slowest, and want to do this first on GPUs
+                filtered_x = filtered_x[::-1]
+                filtered_y = filtered_y[::-1]
             else:
                 # Just the one timestep...
                 uxd = ux.values
