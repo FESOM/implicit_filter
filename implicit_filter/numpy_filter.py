@@ -7,7 +7,7 @@ from scipy.sparse.linalg import cg
 
 from implicit_filter._auxiliary import neighbouring_nodes, neighboring_triangles, areas
 from implicit_filter._numpy_functions import make_smooth, make_smat
-from implicit_filter._utils import VeryStupidIdeaError, SolverNotConvergedError
+from implicit_filter._utils import VeryStupidIdeaError, SolverNotConvergedError, transform_attribute
 from implicit_filter.filter import Filter
 
 
@@ -77,20 +77,11 @@ class NumpyFilter(Filter):
         self._n2d = n2d
         self._full = full
 
-    def __transform_atribute(self, atr: str, lmbd, fill=None):
-        """
-        If atribute atr exists then transform it using given Callable lmbd, otherwise it set with fill value
-        """
-        if hasattr(self, atr):
-            setattr(self, atr, lmbd(getattr(self, atr)))
-        else:
-            setattr(self, atr, fill)
-
     def __init__(self, *initial_data, **kwargs):
         super().__init__(initial_data, kwargs)
         # Transform from Numpy array
-        self.__transform_atribute("_n2d", lambda x: int(x), 0)
-        self.__transform_atribute("_full", lambda x: bool(x), False)
+        transform_attribute(self, "_n2d", lambda x: int(x), 0)
+        transform_attribute(self, "_full", lambda x: bool(x), False)
 
     def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
         Smat1 = csc_matrix((self._ss * (1.0 / np.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
