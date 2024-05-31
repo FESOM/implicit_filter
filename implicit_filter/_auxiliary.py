@@ -1,7 +1,10 @@
 import math
+from typing import Tuple
+
 import numpy as np
 import pandas as pd
 import xarray as xr
+from pandas import Series
 from sklearn.linear_model import LinearRegression
 
 
@@ -357,7 +360,7 @@ def convert_to_wavenumbers(dist, dxm):
     return 2 * math.pi / size
 
 
-def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees: float = None) -> pd.Series:
+def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees: float = None) -> tuple[Series, int]:
     """
     Fix rounding erros in NEMO grid using linear regression
 
@@ -373,7 +376,7 @@ def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees:
     Returns:
     --------
     pd.Series
-        Pandas Series containing the indices of adjacent points.
+        Pandas Series containing the indices of adjacent points at northern border.
 
     """
     # load mesh mask
@@ -399,7 +402,7 @@ def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees:
         corresponds_to_redundant = -2
     else:
         corresponds_to_redundant = -3
-    print("corresponding row is at y = ", corresponds_to_redundant)
+    # print("corresponding row is at y = ", corresponds_to_redundant)
 
     # extract redundant (last row) and correspoding row coords
     ilon_redundant = ilon.isel(x=slice(1, -1)).isel(y=-1, drop=True)
@@ -434,5 +437,5 @@ def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees:
     )
 
     # return adjacent indices
-    return adjacent_x_fit
+    return adjacent_x_fit, corresponds_to_redundant
 
