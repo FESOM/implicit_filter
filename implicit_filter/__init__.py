@@ -7,3 +7,5 @@ try:
     from .cupy_filter import CuPyFilter
 except ModuleNotFoundError:
     pass
+
+from .amgx_filter import AMGXFilter
