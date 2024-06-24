@@ -1,4 +1,7 @@
+from typing import Tuple
+
 import numpy as np
+import pandas as pd
 
 
 def make_smooth(elem_area: np.ndarray, dx: np.ndarray, dy: np.ndarray, nn_num: np.ndarray,
@@ -113,3 +116,108 @@ def make_smat(nn_pos: np.ndarray, nn_num: np.ndarray, smooth_m: np.ndarray, n2d:
             nz += 1
 
     return ss, ii, jj
+
+
+def calculate_global_nemo_neighbourhood(e2d: int, nx: int, ny: int, north_adj: pd.Series) -> Tuple[np.ndarray, int]:
+    """
+    Calculate neighbourhood of each cell in NEMO global mesh
+
+    Parameters:
+    ----------
+    e2d : int
+        The total number of cells (elements) in the mesh.
+
+    nx : int
+        Number of cells in X direction.
+
+    ny : int
+        Number of cells in Y direction.
+
+    north_adj : pd.Series
+        Pandas Series containing the indices of adjacent points at northern border.
+
+    Returns:
+    -------
+    ee_pos : np.ndarray
+        2D NumPy array of shape (4, e2d) containing indexes of neighboring cells.
+
+    nza : int
+        The total number of unique elements in ee_pos.
+    """
+
+    ee_pos = np.zeros((4, e2d), dtype=np.int32)
+    # ids = set()
+    # Initialize nza
+    nza = 0
+
+    yc = ny  # Numer of cells in y axis
+    xc = nx  # Number of cells in x axis
+
+    # Fill ee_pos, arrangement is W;N;E;S
+    ee_pos[:, 0] = np.array([xc * (yc - 1), 1, yc, 0])  # Corner
+    # print(f"x: {0} y: {0} ni: {0}")
+    # ids.add(0)
+    nza += 3
+    for m in range(1, yc - 1):
+        ee_pos[:, m] = [xc * (yc - 1) + m, m + 1, m + yc, m - 1]  # Left border
+        # ids.add(m)
+        # print(f"x: {0} y: {m} ni: {m}")
+        nza += 4
+    # print("Left")
+    m = yc - 1
+    # print(f"Northern neighbour of {1} is {north_adj[1]}")
+    ee_pos[:, m] = [xc * yc - 1, yc * north_adj[1] - 1, m + yc, m - 1]  # Second corner
+    # ids.add(m)
+    # print(f"x: {0} y: {m} ni: {ni}")
+    nza += 4
+
+    for n in range(1, xc - 1):  # Center
+        # print("Bottom border")
+        no = yc * n
+        ni = no
+        ee_pos[:, ni] = [ni - yc, ni + 1, ni + yc, ni]
+        # if not ni in ids: ids.add(ni)
+        # print(f"x: {n} y: {0} ni: {ni}")
+        nza += 3
+        # print("Inner center")
+        for m in range(1, yc - 1):
+            ni = no + m
+            ee_pos[:, ni] = [ni - yc, ni + 1, ni + yc, ni - 1]
+            # if not ni in ids: ids.add(ni)
+            # print(f"x: {n} y: {m} ni: {ni}")
+            nza += 4
+
+        # print("Top border")
+        # ni = no + (yc - 1)
+        # print(f"Northern neighbour of {n + 1} is {north_adj[n + 1]}")
+        ee_pos[:, ni] = [ni - yc, north_adj[n + 1] * yc - 1, ni + yc, ni - 1]
+
+        # if not ni in ids: ids.add(ni)
+        # print(f"x: {n} y: {yc-1} ni: {ni}")
+        nza += 4
+
+    no = yc * (xc - 1)
+    ni = no
+    ee_pos[:, ni] = [ni - yc, ni + 1, 0, ni]  # Third corner
+    # if not ni in ids: ids.add(ni)
+    # print(f"x: {xc-1} y: {0} ni: {ni}")
+    nza += 3
+    # print("Right")
+    for m in range(1, yc - 1):  # Right border
+        ni = no + m
+        ee_pos[:, ni] = [ni - yc, ni + 1, m, ni - 1]
+        # if not ni in ids: ids.add(ni)
+        # print(f"x: {xc-1} y: {m} ni: {ni}")
+        nza += 4
+
+    ni = no + (yc - 1)
+    # print(f"Northern neighbour of {xc} is {north_adj[xc]}")
+    ee_pos[:, ni] = [ni - yc, north_adj[xc] * yc - 1, yc - 1, ni - 1]  # Fourth border
+    # if not ni in ids: ids.add(ni)
+    # print(f"x: {xc-1} y: {yc-1} ni: {ni}")
+    nza += 4
+
+    # Final adjustment for nza
+    nza += e2d
+
+    return ee_pos, nza

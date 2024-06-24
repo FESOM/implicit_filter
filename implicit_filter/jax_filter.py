@@ -1,13 +1,15 @@
 import concurrent
+import math
 from typing import Tuple, Union, List
 import numpy as np
 import jax.numpy as jnp
+import xarray as xr
 from jax import vmap
 from ._auxiliary import neighboring_triangles, neighbouring_nodes, areas
 from ._jax_function import make_smooth, make_smat, make_smat_full, transform_veloctiy_to_nodes
-from ._utils import VeryStupidIdeaError, SolverNotConvergedError
+from ._utils import VeryStupidIdeaError, SolverNotConvergedError, transform_attribute
 from implicit_filter.filter import Filter
-from scipy.sparse import csc_matrix, identity, spdiags
+from scipy.sparse import csc_matrix, identity
 from scipy.sparse.linalg import cg
 
 
@@ -53,15 +55,6 @@ class JaxFilter(Filter):
 
     """
 
-    def __transform_atribute(self, atr: str, lmbd, fill=None):
-        """
-        If atribute atr exists then transform it using given Callable lmbd, otherwise it set with fill value
-        """
-        if hasattr(self, atr):
-            setattr(self, atr, lmbd(getattr(self, atr)))
-        else:
-            setattr(self, atr, fill)
-
     def __init__(self, *initial_data, **kwargs):
         """
         Initialize the JaxFilter instance.
@@ -79,26 +72,24 @@ class JaxFilter(Filter):
         bl = lambda ar: bool(ar)
         it = lambda ar: int(ar)
 
-        self.__transform_atribute("_elem_area", jx, None)
-        self.__transform_atribute("_area", jx, None)
-        self.__transform_atribute("_ne_pos", jx, None)
-        self.__transform_atribute("_ne_num", jx, None)
-        self.__transform_atribute("_dx", jx, None)
-        self.__transform_atribute("_dy", jx, None)
+        transform_attribute(self, "_elem_area", jx, None)
+        transform_attribute(self, "_area", jx, None)
+        transform_attribute(self, "_ne_pos", jx, None)
+        transform_attribute(self, "_ne_num", jx, None)
+        transform_attribute(self, "_dx", jx, None)
+        transform_attribute(self, "_dy", jx, None)
 
-        self.__transform_atribute("_ss", jx, None)
-        self.__transform_atribute("_ii", jx, None)
-        self.__transform_atribute("_jj", jx, None)
+        transform_attribute(self, "_ss", jx, None)
+        transform_attribute(self, "_ii", jx, None)
+        transform_attribute(self, "_jj", jx, None)
 
-        self.__transform_atribute("_n2d", it, 0)
-        self.__transform_atribute("_full", bl, False)
+        transform_attribute(self, "_n2d", it, 0)
+        transform_attribute(self, "_full", bl, False)
 
     def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
         Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
         Smat = identity(self._n2d) + 0.5 * (Smat1 ** n)
 
-        # b = Smat.diagonal()
-        # pre = csc_matrix((b, (np.arange(self._n2d), np.arange(self._n2d))), shape=(self._n2d, self._n2d))
         ttw = ttu - Smat @ ttu  # Work with perturbations
 
         tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)
@@ -275,3 +266,33 @@ class JaxFilter(Filter):
             if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
         self._n2d = n2d
         self._full = full
+
+    def prepare_from_file(self, file: str, meshtype: str = 'r', carthesian: bool = False,
+                          cyclic_length: float = 360.0 * math.pi / 180.0, metric: bool = False):
+        """
+        Prepare the filter to be used with a mesh provided in the given file path.
+
+        Parameters:
+        -----------
+        file : str
+            Path to the FESOM mesh file.
+
+        meshtype : str
+        Mesh type, either 'm' (metric) or 'r' (radial). Default is radial
+
+        carthesian : bool
+            Boolean indicating whether the mesh is in Cartesian coordinates. Default is False
+
+        cyclic_length : float
+            The length of the cyclic boundary if the mesh is cyclic (for 'r' meshtype). Default is 360 * pi / 180
+
+        metric : bool, optional
+            A flag indicating whether to use the calculation including metric terms (True) or not (False).
+            Default is False.
+        """
+        mesh = xr.open_dataset(file)
+        xcoord = mesh['lon'].values
+        ycoord = mesh['lat'].values
+        tri = mesh['elements'].values.T - 1
+
+        self.prepare(len(xcoord), len(tri[:, 1]), tri, xcoord, ycoord, meshtype, carthesian, cyclic_length, metric)
