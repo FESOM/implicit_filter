@@ -4,24 +4,16 @@
 # Implicit Filter Python Package
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10907365.svg)](https://doi.org/10.5281/zenodo.10907365)
+[![arXiv](https://img.shields.io/badge/arXiv-2404.07398-b31b1b.svg)](https://arxiv.org/abs/2404.07398)
 
-The Implicit Filter Python Package provides a collection of functions and classes for filtering data using implicit filtering techniques.
-Currently only FESOM files are supported.
+The Implicit Filter Python Package provides a collection of classes for filtering data using implicit filtering techniques.
+Currently FESOM and NEMO meshes are supported.
 
 For optimal performance usage of Nvidia GPU is highly recommended.
 
+For details of the implementation please read out paper on [arXiv](https://arxiv.org/abs/2404.07398)
 
-## Dependencies
-
-**CPU only:** NumPy, ScipPy, JAX
-
-**GPU accelerated:** NumPy, CuPy, JAX
-
-**Visualization:** Matplotlib
-
-**IO:** Xarray
-
-
+For full mathematical formulation of the implicit filter please refer to [this paper](http://dx.doi.org/10.1029/2023MS003946)
 ## Installation 
 Currently Python version 3.10 and 3.9 are supported. Using newer version can enabled 
 ```shell
@@ -117,3 +109,12 @@ Finally you can filter your data
 filtered = flter.compute(1, k, unfiltered)
 ```
 
+## Dependencies
+
+**CPU only:** NumPy, ScipPy, JAX
+
+**GPU accelerated:** NumPy, CuPy, JAX
+
+**Visualization:** Matplotlib
+
+**IO:** Xarray
