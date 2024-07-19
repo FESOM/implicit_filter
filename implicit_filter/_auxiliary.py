@@ -263,7 +263,7 @@ def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.nd
     for n in range(n2d):
         area[n] = np.sum(elem_area[ne_pos[0:ne_num[n], n]]) / 3.0
         if area[n] == 0.0:
-            area[n] = 1.0e-6
+            area[n] = 1.0e-5
 
     return area, elem_area, dx, dy, Mt
 

@@ -294,7 +294,7 @@ def transform_to_nodes(u: jnp.ndarray, ne_pos: jnp.ndarray, ne_num: jnp.ndarray,
     """
         Project velocity components to vertices (nodes) based on the given elements' information.
 
-        This function calculates the projected velocity components (u and v) onto the vertices (nodes) of a mesh. The
+        This function calculates the projected scalar onto the vertices (nodes) of a mesh. The
         projection is done based on the element information, including element positions, numbers, areas, and overall area.
 
         Parameters:

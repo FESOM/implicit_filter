@@ -577,7 +577,7 @@ class JaxFilter(Filter):
         self._ss, self._ii, self._jj = make_smat_full(jnn_pos, jnn_num, smooth, metric, n2d, int(jnp.sum(jnn_num))) \
             if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
         
-        ## Set rows of smooth where (node) mask is 0 (land) to 0: This enforces a Neumann BC
+        ## Set rows (and columns!) of smooth where (node) mask is 0 (land) to 0: This enforces a Neumann BC
         #   i.e. Set _ss = 0 where mask_n[_ii] = 0 && mask_n[_jj] = 0
         # AFW
         
