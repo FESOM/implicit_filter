@@ -603,7 +603,7 @@ class JaxFilter(Filter):
 
 
 
-    def prepare_ICON_filter(self, grid2d: xr.DataArray, land_mask: xr.DataArray = None, full: bool = False, L_Ro: xr.DataArray = None, L_Ro_max: float = 50.0, resolution: float = 5.0):
+    def prepare_ICON_filter(self, grid2d: xr.DataArray, land_mask: xr.DataArray = None, full: bool = False, L_Ro: xr.DataArray = None, L_Ro_min: float = 5.0, L_Ro_max: float = 50.0, resolution: float = 5.0):
         
         # Prepare the mesh data
         xcoord = grid2d['vlon'].values * 180.0/np.pi
@@ -631,7 +631,7 @@ class JaxFilter(Filter):
             
             L_Ro = L_Ro.values   # L_Ro needs to be in units of [km]            
             L_Ro = np.where(L_Ro > L_Ro_max, L_Ro_max, L_Ro)
-            L_Ro = np.where(L_Ro < 2.5, 2.5, L_Ro)
+            L_Ro = np.where(L_Ro < L_Ro_min, L_Ro_min, L_Ro)
         
         self.prepare(len(xcoord), len(tri[:,1]), tri, xcoord , ycoord,  meshtype='r', carthesian=False, cyclic_length=2.0*np.pi, resolution=resolution, full=full, mask=mask, L_Ro=L_Ro)
 
