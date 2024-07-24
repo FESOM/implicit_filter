@@ -4,7 +4,7 @@ import numpy as np
 import jax.numpy as jnp
 from jax import vmap
 from ._auxiliary import neighboring_triangles, neighbouring_nodes, areas
-from ._jax_function import make_smooth, make_smat, make_smat_full, transform_vector_to_nodes, transform_to_nodes, transform_vector_to_cells, transform_to_cells
+from ._jax_function import make_smooth, make_smat, make_smat_full, transform_vector_to_nodes, transform_to_nodes, transform_vector_to_cells, transform_to_cells, transform_mask_to_nodes
 from ._utils import VeryStupidIdeaError, SolverNotConvergedError
 from implicit_filter.filter import Filter
 from scipy.sparse import csc_matrix, identity, spdiags
@@ -80,6 +80,7 @@ class JaxFilter(Filter):
         bl = lambda ar: bool(ar)
         it = lambda ar: int(ar)
 
+        self.__transform_atribute("_mask_n", jx, None)
         self.__transform_atribute("_elem_area", jx, None)
         self.__transform_atribute("_area", jx, None)
         self.__transform_atribute("_ne_pos", jx, None)
@@ -230,7 +231,7 @@ class JaxFilter(Filter):
             raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
         data_n = transform_to_nodes(jnp.array(data), self._ne_pos, self._ne_num, self._n2d,
-                                               self._elem_area, self._area)
+                                               self._elem_area, self._area, self._mask_n)
 
         data_n_filtered = self._compute(n, k, data_n)
         data_cell_filtered = transform_to_cells(jnp.array(data_n_filtered), self._en_pos, self._e2d, self._elem_area)
@@ -343,14 +344,14 @@ class JaxFilter(Filter):
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for i in range(len(data)):
                     futures.append(executor.submit(transform_to_nodes, jnp.array(data[i, :]),
-                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
+                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area, self._mask_n))
                 executor.shutdown(wait=True)
         
         elif type(data) is list:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for i in range(len(data)):
                     futures.append(executor.submit(transform_to_nodes, jnp.array(data[i]),
-                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area))
+                                                   self._ne_pos, self._ne_num, self._n2d, self._elem_area, self._area, self._mask_n))
                 executor.shutdown(wait=True)
         else:
             raise ValueError("Input data is of incorrect type")
@@ -398,7 +399,7 @@ class JaxFilter(Filter):
         
         # Put onto nodes...
         data_n = transform_to_nodes(jnp.array(data), self._ne_pos, self._ne_num, self._n2d,
-                                               self._elem_area, self._area)
+                                               self._elem_area, self._area, self._mask_n)
 
         
         ttu = self._spectra_compute(n, k, data_n)
@@ -541,6 +542,7 @@ class JaxFilter(Filter):
         area, elem_area, dx, dy, Mt = areas(n2d, e2d, tri, xcoord, ycoord, ne_num, ne_pos, meshtype, carthesian,
                                         cyclic_length, mask)
 
+        
         self._elem_area = jnp.array(elem_area)
         self._dx = jnp.array(dx)
         self._dy = jnp.array(dy)
@@ -553,6 +555,10 @@ class JaxFilter(Filter):
         self._ne_pos = jnp.array(ne_pos)
         self._area = jnp.array(area)
         
+        mask_n = transform_mask_to_nodes(mask, self._ne_pos, self._ne_num, n2d)
+        mask_n = jnp.where(mask_n > 0.5, 1.0, 0.0) # Where there's ocean
+        self._mask_n = jnp.array(mask_n)
+        
         smooth, metric = make_smooth(jMt, self._elem_area, self._dx, self._dy, jnn_num, jnn_pos, jtri, n2d, e2d, full)
 
         smooth = vmap(lambda n: smooth[:, n] / self._area[n])(jnp.arange(0, n2d)).T
@@ -561,16 +567,13 @@ class JaxFilter(Filter):
         ## Scale by L_Ro — Then filter units are [L_Ro]  
         # AFW
         L_Ro_n = transform_to_nodes(L_Ro, self._ne_pos, self._ne_num, n2d,
-                                        self._elem_area, self._area)
+                                        self._elem_area, self._area, self._mask_n)
         L_Ro_n = jnp.array(L_Ro_n)
         smooth = vmap(lambda n: smooth[:, n] * L_Ro_n[n]**2 / resolution**2)(jnp.arange(0, n2d)).T
         metric = vmap(lambda n: metric[:, n] * L_Ro_n[n]**2 / resolution**2)(jnp.arange(0, n2d)).T
         
         
         ## Set smooth to zero (also for BCs) (?)
-        mask_n = transform_to_nodes(mask, self._ne_pos, self._ne_num, n2d, self._elem_area, self._area)
-        mask_n = jnp.where(mask_n > 0.5, 1.0, 0.0)
-        
         # smooth = vmap(lambda n: smooth[:, n] * mask_n[n])(jnp.arange(0, n2d)).T
         # metric = vmap(lambda n: metric[:, n] * mask_n[n])(jnp.arange(0, n2d)).T
         
@@ -585,13 +588,13 @@ class JaxFilter(Filter):
         
         # Create a mask where both _ii and _jj are not 0
         if full:
-            mask = (mask_n[self._ii%n2d] & mask_n[self._jj%n2d])
+            mask_sp = (mask_n[self._ii%n2d] & mask_n[self._jj%n2d])
         else:
-            mask = (mask_n[self._ii] & mask_n[self._jj])
+            mask_sp = (mask_n[self._ii] & mask_n[self._jj])
 
-        self._ss = self._ss[mask]
-        self._ii = self._ii[mask]
-        self._jj = self._jj[mask]        
+        self._ss = self._ss[mask_sp]
+        self._ii = self._ii[mask_sp]
+        self._jj = self._jj[mask_sp]        
         
         
         self._n2d = n2d
