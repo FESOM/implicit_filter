@@ -213,7 +213,7 @@ class AMGXFilter(JaxFilter):
     
     def split_data(self, data, n_gpu):
         # Split data into n_gpu chunks
-        chunk_size = len(data) // n_gpu
+        chunk_size = len(data) // n_gpu + 1 # Add 1 to ensure all data is split
         return [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
     
     def split_data_future(self, data, n_gpu, client):
@@ -248,7 +248,7 @@ class AMGXFilter(JaxFilter):
     def _many_compute(self, n, kl, data, tol=1e-5, maxiter=150000) -> List[np.ndarray]:   
 
         n_gpu = cupy.cuda.runtime.getDeviceCount()
-        client = Client(n_workers=n_gpu)
+        client = Client(n_workers=n_gpu, set_as_default=False)
         
         #data_futures = self.split_data_future(data, n_gpu, client)
         data_split = self.split_data(data, n_gpu)
@@ -263,6 +263,7 @@ class AMGXFilter(JaxFilter):
         for future in futures:
             results.extend(future.result())
 
+        client.close()
         return results
 
 
