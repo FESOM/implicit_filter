@@ -248,23 +248,20 @@ class AMGXFilter(JaxFilter):
     def _many_compute(self, n, kl, data, tol=1e-5, maxiter=150000) -> List[np.ndarray]:   
 
         n_gpu = cupy.cuda.runtime.getDeviceCount()
-        client = Client(n_workers=n_gpu, set_as_default=False)
+        client = Client(n_workers=n_gpu, set_as_default=False, timeout=240)
         
-        #data_futures = self.split_data_future(data, n_gpu, client)
         data_split = self.split_data(data, n_gpu)
         
-        #futures = client.map(self.many_compute_helper, data_split, range(n_gpu), [n]*n_gpu, [kl]*n_gpu, [tol]*n_gpu, [maxiter]*n_gpu, pure=False)
         futures = []
         for j in range(n_gpu):
             futures.append(client.submit(self.many_compute_helper, data_split[j], j, n, kl, tol, maxiter, pure=False))
         
-        
-        results = []
-        for future in futures:
-            results.extend(future.result())
+        # Gather the results from all futures
+        results = client.gather(futures)
+        flattened_results = [item for sublist in results for item in sublist]
 
         client.close()
-        return results
+        return flattened_results
 
 
 
