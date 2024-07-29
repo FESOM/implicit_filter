@@ -603,7 +603,7 @@ class JaxFilter(Filter):
 
 
 
-    def prepare_ICON_filter(self, grid2d: xr.DataArray, land_mask: xr.DataArray = None, full: bool = False, L_Ro: xr.DataArray = None, L_Ro_min: float = 5.0, L_Ro_max: float = 50.0, resolution: float = 5.0):
+    def prepare_ICON_filter(self, grid2d: xr.DataArray, ocean_mask: xr.DataArray = None, full: bool = False, L_Ro: xr.DataArray = None, L_Ro_min: float = 5.0, L_Ro_max: float = 50.0, resolution: float = 5.0):
         
         # Prepare the mesh data
         xcoord = grid2d['vlon'].values * 180.0/np.pi
@@ -611,10 +611,11 @@ class JaxFilter(Filter):
         tri = grid2d['vertex_of_cell'].values.T - 1
         tri = tri.astype(int)
         
-        if land_mask is None:
+        if ocean_mask is None:
             mask = np.ones(len(tri[:,1]))
         else:
-            mask = xr.where(land_mask.values < 0.0, 1.0, 0.0)
+            # mask = xr.where(ocean_mask.values < 0.0, 1.0, 0.0)
+            mask = ocean_mask.values
             # NOTE: LSM is in grid2d['cell_sea_land_mask'] or in grid3d['lsm_c'].isel(depth=???)
         
         if L_Ro is not None:
