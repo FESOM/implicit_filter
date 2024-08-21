@@ -188,7 +188,7 @@ def calculate_global_nemo_neighbourhood(e2d: int, nx: int, ny: int, north_adj: p
             nza += 4
 
         # print("Top border")
-        # ni = no + (yc - 1)
+        ni = no + (yc - 1)
         # print(f"Northern neighbour of {n + 1} is {north_adj[n + 1]}")
         ee_pos[:, ni] = [ni - yc, north_adj[n + 1] * yc - 1, ni + yc, ni - 1]
 
