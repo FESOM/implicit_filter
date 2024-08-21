@@ -2,7 +2,7 @@ from typing import Tuple, Union, List
 
 import numpy as np
 import xarray as xr
-from scipy.sparse import csc_matrix
+from scipy.sparse import csc_matrix, identity
 from scipy.sparse.linalg import cg
 
 from implicit_filter._auxiliary import find_adjacent_points_north
@@ -88,10 +88,10 @@ class NemoNumpyFilter(Filter):
 
     def _compute(self, n: int, k: float, data: np.ndarray, maxiter: int = 150_000, tol: float = 1e-6) -> np.ndarray:
         Smat1 = csc_matrix((self._ss * (1.0 / k ** 2), (self._ii, self._jj)), shape=(self._e2d, self._e2d))
-        Smat2 = csc_matrix((self._area, (np.arange(self._e2d), np.arange(self._e2d))), shape=(self._e2d, self._e2d))
+        Smat2 = identity(self._e2d)
 
-        Smat = Smat2 - 0.5 * Smat1 ** n
-        ttw = (data * self._area).T - Smat @ data.T  # Work with perturbations
+        Smat = Smat2 + 0.5 * (-1 * Smat1) ** n
+        ttw = data.T - Smat @ data.T  # Work with perturbations
 
         # b = 1. / Smat.diagonal()  # Simple preconditioner
         # pre = csc_matrix((b, (np.arange(self._e2d), np.arange(self._e2d))), shape=(self._e2d, self._e2d))
@@ -185,7 +185,8 @@ class NemoNumpyFilter(Filter):
                     nn += 1
                     # print(f"nn: {nn} m: {m} n: {n}")
                     ss[nn] = (hh[m, n] * h3u[n]) / (hc[m, n] * h3t[n]) if m % 2 == 0 else (hh[m, n] * h3v[n]) / (
-                            hc[m, n] * h3t[n])  # Add division on cell area if you prefer
+                            hc[m, n] * h3t[n])
+                    ss[nn] /= self._area[n]  # Add division on cell area if you prefer
                     ii[nn] = n
                     jj[nn] = ee_pos[m, n]
 
