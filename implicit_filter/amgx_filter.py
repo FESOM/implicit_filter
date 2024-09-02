@@ -100,7 +100,7 @@ class AMGXFilter(JaxFilter):
                                 "coarse_solver": "NOSOLVER", 
                                 "max_iters": 2,
                                 "min_coarse_rows": 16, 
-                                "relaxation_factor": 0.85,   # 0.8
+                                "relaxation_factor": 0.8,   # 0.8
                                 "scope": "amg", 
                                 "max_levels": 10, 
                                 "postsweeps": 4,
@@ -137,6 +137,9 @@ class AMGXFilter(JaxFilter):
         
     
     def _compute(self, n, kl, ttu, tol=1e-5, maxiter=150000, solver_resources=None, setup=True, cleanup=True, gpu_device=None) -> np.ndarray:
+        
+        # Replace NaNs in ttu with 0.0 (we put it back when returning)
+        ttu = jnp.nan_to_num(ttu, copy=False)
         
         if setup:  pyamgx.initialize()
         
@@ -181,6 +184,9 @@ class AMGXFilter(JaxFilter):
     
     
     def _compute_full(self, n, kl, ttuv, tol=1e-5, maxiter=1500000, solver_resources=None, setup=True, cleanup=True, gpu_device=None) -> np.ndarray:
+        
+        # Replace NaNs in ttuv with 0.0 (we put it back when returning)
+        ttuv = jnp.nan_to_num(ttuv, copy=False)
         
         if setup:  pyamgx.initialize()
         

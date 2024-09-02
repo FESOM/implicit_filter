@@ -644,7 +644,7 @@ class JaxFilter(Filter):
         k = 1.0 / filter_length
         
         if vy is None:  # ux is scalar data...
-        
+            
             if 'time' in dims:
                 # Cycle through each time step in parallel
                 data = ux.values
@@ -666,6 +666,7 @@ class JaxFilter(Filter):
             
             # Fix DataArray
             da_filtered_x.attrs = ux.attrs
+            da_filtered_x = xr.where(np.isnan(ux), np.nan, da_filtered_x)
             if mask is not None:
                 da_filtered_x = xr.where(ux == mask, mask, da_filtered_x)
             
@@ -701,6 +702,8 @@ class JaxFilter(Filter):
             # Fix DataArray
             da_filtered_x.attrs = ux.attrs
             da_filtered_y.attrs = vy.attrs
+            da_filtered_x = xr.where(np.isnan(ux), np.nan, da_filtered_x)
+            da_filtered_y = xr.where(np.isnan(vy), np.nan, da_filtered_y)
             if mask is not None:
                 da_filtered_x = xr.where(ux == mask, mask, da_filtered_x)
                 da_filtered_y = xr.where(vy == mask, mask, da_filtered_y)

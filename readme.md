@@ -6,7 +6,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10907365.svg)](https://doi.org/10.5281/zenodo.10907365)
 
 The Implicit Filter Python Package provides a collection of functions and classes for filtering data using implicit filtering techniques.
-Currently only FESOM files are supported.
+Currently FESOM and now ICON models are supported.
 
 For optimal performance usage of Nvidia GPU is highly recommended.
 
@@ -15,11 +15,17 @@ For optimal performance usage of Nvidia GPU is highly recommended.
 
 **CPU only:** NumPy, ScipPy, JAX
 
-**GPU accelerated:** NumPy, CuPy, JAX
+**GPU accelerated:** NumPy, CuPy, JAX, AMGX, pyAMGX
 
 **Visualization:** Matplotlib
 
 **IO:** Xarray
+
+## ICON Version Change Notes
+
+Other Notes:
+- AMGX Filter does not handle nans within the domain well (e.g. if large values are masked)
+- Batch processing in time (or spectrally) requires that dimension to be in a single chunk 
 
 
 ## Installation 
