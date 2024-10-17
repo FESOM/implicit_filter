@@ -6,120 +6,57 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10907365.svg)](https://doi.org/10.5281/zenodo.10907365)
 
 The Implicit Filter Python Package provides a collection of functions and classes for filtering data using implicit filtering techniques.
-Currently FESOM and now ICON models are supported.
+Originally FESOM, and now ICON models are supported.
 
 For optimal performance usage of Nvidia GPU is highly recommended.
+
+## ICON Version Change Notes
+_Aaron Wienkers, 2024_
+
+1. Built-in support for the `ICON` grid
+    - Uses new JAX routines for vertex- and cell-centred transformations
+2. Support for spatially-varying length-scale filters, e.g. $\Delta \propto \mathcal{L}_\mathrm{Ro}$
+3. Implements _Neumann_ Boundary Conditions in a conservative fashion
+    - This is necessary when filtering deeper layers in the ocean when the sea-floor boundaries change
+    - These BCs ensure no artificial mass/energy/tracer leakage through the boundaries, and which otherwise produces halos in the high-pass fields
+4. Adds MPI support for multi-GPU machines
+    - Batches GPU computations (in time & wavenumber space) to avoid running out of memory
+5. Improves convergence properties of 2nd Order filter using a fine-tuned Algebriac Multigrid Solver (AMGX)
+    - CG Convergence of the 2nd Order filter with the original block-wise structure was either slow or (for larger filter length-scales $\sim 100$ km) divergent
+    - AMGX Solver Converges faster on 2nd Order Filter compared to `cupy` CG implementation of 1st Order Filter, even up to $\Delta \approx 10^4$ km
+    - N.B.: Using 2nd Order filter is necessary for many higher-order filtered statistics and when a sharp(er) filter cutoff is required
+
+Other Notes:
+- AMGX Filter cannot handle un-masked NaNs within the domain (e.g. if large values are dropped)
+- Batch processing in time (or spectrally) requires that dimension to be in a single chunk 
+
+## Tutorial for ICON Data
+
+See the attached Jupyter Notebook, `./examples/intro_icon_filtering.ipynb` for a short introduction to using specifically `implicit_filter_ICON` with ICON model data.
 
 
 ## Dependencies
 
-**CPU only:** NumPy, ScipPy, JAX
+**Base:** NumPy, ScipPy, JAX, CuPy, AMGX, pyAMGX
 
-**GPU accelerated:** NumPy, CuPy, JAX, AMGX, pyAMGX
+**IO:** Xarray, Dask
 
 **Visualization:** Matplotlib
 
-**IO:** Xarray
 
-## ICON Version Change Notes
+## Installation
+Easiest:
+```shell
+pip install git+https://github.com/wienkers/implicit_filter_ICON.git
+```
 
-Other Notes:
-- AMGX Filter does not handle nans within the domain well (e.g. if large values are masked)
-- Batch processing in time (or spectrally) requires that dimension to be in a single chunk 
-
-
-## Installation 
-Currently Python version 3.10 and 3.9 are supported. Using newer version can enabled 
+Development Installation: 
 ```shell
 source ./path/to/enviroment/of/your/choice
-git clone https://github.com/FESOM/implicit_filter
+git clone https://github.com/wienkers/implicit_filter_ICON.git
 
 cd implicit_filter
-# CPU only installation
 pip install -e .
-# GPU installation
-pip install -e .[gpu]
-```
-### Known issues
-Installing CuPy can cause an error, in case this happens try installing it manually:
-
-```shell
-pip install cupy
 ```
 
-In case it also doesn't work, check your Nvidia driver version using `nvidia-smi` and install 
-CuPy version matching your drivers.
-
-# Tutorial
-
-Lets start with loading FESOM mesh file and data that we want to filter
-
-This is basic example with only scalar data.
-```python
-import xarray as xr
-
-path = "your path"
-mesh = xr.open_dataset(path + "fesom.mesh.diag.nc")
-data = xr.open_dataset(path + "ssh.nc")
-
-unfiltered = data['ssh'].values[0, :]
-```
-
-Now we can create filter.
-
-The easiest way to do it is by using mesh file path
-
-```python
-from implicit_filter import CuPyFilter 
-# if you don't have GPU use JaxFilter instead
-
-flter = CuPyFilter()
-flter.prepare_from_file(path + "fesom.mesh.diag.nc")
-```
-JAX warning might appear about GPU not being available, but it should be ignored. 
-
-If you don't have GPU support enabled importing CuPyFilter will cause an import error.
-
-Alternatively you can set arrays by yourself, but this is shown in notebooks in examples.
-
-It is highly recommended to save filter's auxiliary arrays as it can take significant amount of time to compute them.
-Auxiliary arrays are specific to each mesh, so they only need to be computed once.
-
-```python
-flter.save_to_file("filter_cash")
-```
-
-Later filter can be created based on this file
-
-```python
-flter = CuPyFilter.load_from_file("filter_cash.npz")
-```
-
-Now you can define wavenumber of the filter in two ways.
-
-Using function from the package:
-
-```python
-from implicit_filter import convert_to_wavenumbers
-
-distance = 100 # filter size 
-dxm = 5 # mesh resolution 
-# Units has to be consistent among mesh file and distance and dxm
-
-k = convert_to_wavenumbers(distance, dxm)
-```
-
-or manually:
-
-```python
-wavelength = 70
-Kc = wavelength * dxm
-k = 2 * math.pi / Kc
-```
-
-Finally you can filter your data
-
-```python
-filtered = flter.compute(1, k, unfiltered)
-```
 

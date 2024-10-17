@@ -7,10 +7,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "implicit_filter"
-version = "0.1.0"
+version = "0.3.0"
 description = "Python package implementing implicit filtering method on any type of mesh."
 readme = "readme.md"
-authors = [{ name = "Kacper Nowak", email = "kacper.nowak@awi.de" }]
+authors = [{ name = "Kacper Nowak", email = "kacper.nowak@awi.de" },
+           { name = "Aaron Wienkers", email = awienkers@ethz.ch"}]
 
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -23,10 +24,4 @@ requires-python = ">=3.9,<3.11"
 dynamic = ["dependencies"]
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
-
-[project.optional-dependencies]
-gpu = [
-    "cupy==12.3.0"
-]
-
 

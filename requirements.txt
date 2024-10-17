@@ -3,6 +3,7 @@ certifi
 cftime
 contourpy
 cycler
+cupy==12.3.0
 fastrlock
 fonttools
 jax==0.4.25
@@ -19,6 +20,7 @@ pandas
 Pillow
 pip
 pyparsing
+pyamgx
 python-dateutil
 pytz
 scipy
