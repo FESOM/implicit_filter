@@ -140,6 +140,7 @@ class AMGXFilter(JaxFilter):
         
         # Replace NaNs in ttu with 0.0 (we put it back when returning)
         ttu = jnp.nan_to_num(ttu, copy=False)
+        num_nans = jnp.sum(ttu)
         
         if setup:  pyamgx.initialize()
         
@@ -158,22 +159,23 @@ class AMGXFilter(JaxFilter):
         # Use perturbations (Initial Guess = 0)
         ttw = ttu - solver_resources.Smat @ ttu
         sol = np.zeros(self._n2d, dtype=np.float64) 
-            
-        # Upload Transient Data:
-        solver_resources.vec.upload(ttw._value.astype(np.float64))
-
-        # Solve System
-        solver_resources.solver.solve(solver_resources.vec, solver_resources.x, zero_initial_guess=True)
         
-        # If solver.status is 'failed' or 'diverged', then make error message
-        #print(solver.status)
-        if solver_resources.solver.status == 'failed' or solver_resources.solver.status == 'diverged':
-            raise SolverNotConvergedError(f"AMGX Solver failed at iteration {solver_resources.solver.iterations_number}. Residual={solver_resources.solver.get_residual}. Solver status: {solver.status}", [])
+        if num_nans != 0:  # Ensure it's not just a bunch of nans...
+            # Upload Transient Data:
+            solver_resources.vec.upload(ttw._value.astype(np.float64))
+
+            # Solve System
+            solver_resources.solver.solve(solver_resources.vec, solver_resources.x, zero_initial_guess=True)
+        
+            # If solver.status is 'failed' or 'diverged', then make error message
+            #print(solver.status)
+            if solver_resources.solver.status == 'failed' or solver_resources.solver.status == 'diverged':
+                raise SolverNotConvergedError(f"AMGX Solver failed at iteration {solver_resources.solver.iterations_number}. Residual={solver_resources.solver.get_residual}. Solver status: {solver.status}", [])
 
         
-        # Download Solution
-        solver_resources.x.download(sol)
-        sol += ttu
+            # Download Solution
+            solver_resources.x.download(sol)
+            sol += ttu
         
         if cleanup:
             self.finalize_solver(solver_resources)
@@ -187,6 +189,7 @@ class AMGXFilter(JaxFilter):
         
         # Replace NaNs in ttuv with 0.0 (we put it back when returning)
         ttuv = jnp.nan_to_num(ttuv, copy=False)
+        num_nans = jnp.sum(ttuv)
         
         if setup:  pyamgx.initialize()
         
@@ -207,22 +210,23 @@ class AMGXFilter(JaxFilter):
         # Use perturbations (Initial Guess = 0)
         ttw = ttuv - solver_resources.Smat @ ttuv
         sol = np.zeros(2 * self._n2d, dtype=np.float64) 
-            
-        # Upload Transient Data:
-        solver_resources.vec.upload(ttw._value.astype(np.float64), block_dim=2)
-
-        # Solve System
-        solver_resources.solver.solve(solver_resources.vec, solver_resources.x, zero_initial_guess=True)
         
-        # If solver.status is 'failed' or 'diverged', then make error message
-        #print(solver.status)
-        if solver_resources.solver.status == 'failed' or solver_resources.solver.status == 'diverged':
-            raise SolverNotConvergedError(f"AMGX Solver failed at iteration {solver_resources.solver.iterations_number}. Residual={solver_resources.solver.get_residual}. Solver status: {solver.status}", [])
+        if num_nans != 0:  # Ensure it's not just a bunch of nans...
+            # Upload Transient Data:
+            solver_resources.vec.upload(ttw._value.astype(np.float64), block_dim=2)
 
+            # Solve System
+            solver_resources.solver.solve(solver_resources.vec, solver_resources.x, zero_initial_guess=True)
         
-        # Download Solution
-        solver_resources.x.download(sol)
-        sol += ttuv
+            # If solver.status is 'failed' or 'diverged', then make error message
+            #print(solver.status)
+            if solver_resources.solver.status == 'failed' or solver_resources.solver.status == 'diverged':
+                raise SolverNotConvergedError(f"AMGX Solver failed at iteration {solver_resources.solver.iterations_number}. Residual={solver_resources.solver.get_residual}. Solver status: {solver.status}", [])
+        
+        
+            # Download Solution
+            solver_resources.x.download(sol)
+            sol += ttuv
         
         # Extract / Un-interleave sol and then concatenate
         sol = np.concatenate((sol[0::2], sol[1::2]))
