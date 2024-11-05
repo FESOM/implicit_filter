@@ -37,11 +37,22 @@ See the attached Jupyter Notebook, `./examples/intro_icon_filtering.ipynb` for a
 
 ## Dependencies
 
-**Base:** NumPy, ScipPy, JAX, CuPy, AMGX, pyAMGX
+**Base:** 
+- NumPy & ScipPy
+- JAX
+- CuPy — _Most success when installing from `pip`_
+- AMGX — _Build from [source](https://github.com/NVIDIA/AMGX/tree/main)_
+- pyAMGX — _Define `AMGX_DIR` (location above), and then `pip install pyamgx`_
+    - Alternatively, point to build on DKRZ Levante `AMGX_DIR=/home/b/b382615/opt/AMGX`
 
-**IO:** Xarray, Dask
+**IO:** 
+- Xarray
+- Dask
 
-**Visualization:** Matplotlib
+**Visualization:** 
+- Matplotlib
+
+
 
 
 ## Installation
