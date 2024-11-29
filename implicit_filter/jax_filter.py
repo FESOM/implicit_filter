@@ -645,9 +645,16 @@ class JaxFilter(Filter):
         
         if vy is None:  # ux is scalar data...
             
-            if 'time' in dims:
+            if 'time' in dims and ux.time.shape[0] > 1:
                 # Cycle through each time step in parallel
-                data = ux.values
+                ux = ux.transpose('time',...)  # Ensure iterated (time) dimension is first
+                data = ux.values  # Ensure iterated (time) dimension is first
+                filtered_x = self.many_compute_on_cells(n, k, data) # Returns list of np.array...
+                filtered_x = np.array(filtered_x)
+            elif 'depth' in dims and ux.depth.shape[0] > 1:
+                # Cycle through each depth level in parallel
+                ux = ux.transpose('depth',...)
+                data = ux.values  # Ensure iterated (depth) dimension is first
                 filtered_x = self.many_compute_on_cells(n, k, data) # Returns list of np.array...
                 filtered_x = np.array(filtered_x)
             elif isinstance(k, np.ndarray):
