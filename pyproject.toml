@@ -41,8 +41,4 @@ platforms = ["any"]
 zip-safe  = false
 include-package-data = true
 
-[tool.setuptools.packages.find]
-where = ["implicit_filter"]
-include = ["implicit_filter*"]
-
 
