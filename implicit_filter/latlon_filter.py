@@ -1,5 +1,5 @@
 import math
-from typing import Tuple
+from typing import Tuple, Union, List
 
 import numpy as np
 from scipy.sparse import csc_matrix, identity
@@ -75,6 +75,7 @@ class LatLonNumpyFilter(Filter):
         self._nx = nx
         self._ny = ny
 
+
         xcoord = np.zeros((nx, ny))
         ycoord = xcoord.copy()
 
@@ -97,7 +98,7 @@ class LatLonNumpyFilter(Filter):
         if cartesian:
             Mt = np.ones(e2d)
         else:
-            Mt = np.cos(rad * ycoord[ee_pos])
+            Mt = np.cos(np.sum(rad * ycoord[ee_pos], axis=0) / 4.0)
 
         hh = np.ones((4, e2d))  # Edge lengths
         hc = np.ones((4, e2d))  # Distance to next cell centers
@@ -196,7 +197,7 @@ class LatLonNumpyFilter(Filter):
 
         return np.reshape(self._compute(n, k, np.reshape(data, self._e2d)), (self._nx, self._ny))
 
-    def compute_velocity(self, n: int, k: float, ux: np.ndarray, uy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if n < 1:
             raise ValueError("Filter order must be positive")
         elif n > 2:
