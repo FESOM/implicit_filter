@@ -154,12 +154,12 @@ def calculate_global_nemo_neighbourhood(e2d: int, nx: int, ny: int, north_adj: p
     xc = nx  # Number of cells in x axis
 
     # Fill ee_pos, arrangement is W;N;E;S
-    ee_pos[:, 0] = np.array([xc * (yc - 1), 1, yc, 0])  # Corner
+    ee_pos[:, 0] = np.array([yc * (xc - 1), 1, yc, 0])  # Corner
     # print(f"x: {0} y: {0} ni: {0}")
     # ids.add(0)
     nza += 3
     for m in range(1, yc - 1):
-        ee_pos[:, m] = [xc * (yc - 1) + m, m + 1, m + yc, m - 1]  # Left border
+        ee_pos[:, m] = [yc * (xc - 1) + m, m + 1, m + yc, m - 1]  # Left border
         # ids.add(m)
         # print(f"x: {0} y: {m} ni: {m}")
         nza += 4
@@ -257,12 +257,12 @@ def calculate_global_regular_neighbourhood(e2d: int, nx: int, ny: int) -> Tuple[
     xc = nx  # Number of cells in x axis
 
     # Fill ee_pos, arrangement is W;N;E;S
-    ee_pos[:, 0] = np.array([xc * (yc - 1), 1, yc, 0])  # Corner
+    ee_pos[:, 0] = np.array([yc * (xc - 1), 1, yc, 0])  # Corner
     # print(f"x: {0} y: {0} ni: {0}")
     # ids.add(0)
     nza += 3
     for m in range(1, yc - 1):
-        ee_pos[:, m] = [xc * (yc - 1) + m, m + 1, m + yc, m - 1]  # Left border
+        ee_pos[:, m] = [yc * (xc - 1) + m, m + 1, m + yc, m - 1]  # Left border
         # ids.add(m)
         # print(f"x: {0} y: {m} ni: {m}")
         nza += 4
