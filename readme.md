@@ -7,7 +7,10 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2404.07398-b31b1b.svg)](https://arxiv.org/abs/2404.07398)
 
 The Implicit Filter Python Package provides a collection of classes for filtering data using implicit filtering techniques.
-Currently FESOM and NEMO meshes are supported.
+Currently FESOM, NEMO and longitude-latitude meshes are supported.
+
+For ICON please use this [fork](https://github.com/wienkers/implicit_filter_ICON) made by Aaron Wienkers.
+In the future it will be integrated into the main repository.
 
 For optimal performance usage of Nvidia GPU is highly recommended.
 
