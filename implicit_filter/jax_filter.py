@@ -651,7 +651,7 @@ class JaxFilter(Filter):
                 data = ux.values  # Ensure iterated (time) dimension is first
                 filtered_x = self.many_compute_on_cells(n, k, data) # Returns list of np.array...
                 filtered_x = np.array(filtered_x)
-            elif 'depth' in dims and ux.depth.shape[0] > 1:
+            elif 'depth' in dims and ux.depth.shape[0] > 1:  ## N.B.: If you use the same filter file, then BCs will not be enforced at the varying depths due to bathymetry
                 # Cycle through each depth level in parallel
                 ux = ux.transpose('depth',...)
                 data = ux.values  # Ensure iterated (depth) dimension is first

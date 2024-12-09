@@ -11,7 +11,7 @@ version = "0.3.0"
 description = "Python package implementing implicit filtering method on any type of mesh."
 readme = "readme.md"
 authors = [{ name = "Kacper Nowak", email = "kacper.nowak@awi.de" },
-           { name = "Aaron Wienkers", email = awienkers@ethz.ch"}]
+           { name = "Aaron Wienkers", email = "awienkers@ethz.ch"}]
 
 classifiers = [
     "Development Status :: 3 - Alpha",
