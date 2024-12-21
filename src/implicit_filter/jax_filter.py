@@ -293,6 +293,13 @@ class JaxFilter(Filter):
         mesh = xr.open_dataset(file)
         xcoord = mesh['lon'].values
         ycoord = mesh['lat'].values
-        tri = mesh['elements'].values.T - 1
+
+        keys = mesh.keys()
+        if 'elements' in keys:
+            tri = mesh['elements'].values.T - 1
+        elif 'face_nodes' in keys:
+            tri = mesh['face_nodes'].values.T - 1
+        else:
+            raise RuntimeError("In FESOM mesh file triangulation data was not found. It should be either named as elements or face_nodes")
 
         self.prepare(len(xcoord), len(tri[:, 1]), tri, xcoord, ycoord, meshtype, carthesian, cyclic_length, metric)
