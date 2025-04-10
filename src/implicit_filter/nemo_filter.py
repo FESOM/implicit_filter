@@ -183,7 +183,6 @@ class NemoNumpyFilter(Filter):
             for m in range(4):
                 if ee_pos[m, n] != n and mask[ee_pos[m, n]] != 0:
                     nn += 1
-                    # print(f"nn: {nn} m: {m} n: {n}")
                     ss[nn] = (hh[m, n] * h3u[n]) / (hc[m, n] * h3t[n]) if m % 2 == 0 else (hh[m, n] * h3v[n]) / (
                             hc[m, n] * h3t[n])
                     ss[nn] /= self._area[n]  # Add division on cell area if you prefer
