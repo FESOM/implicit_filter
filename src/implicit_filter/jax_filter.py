@@ -1,13 +1,13 @@
 import concurrent
 import math
-from typing import Tuple, Union, List
+from typing import Tuple, List
 import numpy as np
 import jax.numpy as jnp
 import xarray as xr
 from jax import vmap
 from ._auxiliary import neighboring_triangles, neighbouring_nodes, areas
 from ._jax_function import make_smooth, make_smat, make_smat_full, transform_veloctiy_to_nodes
-from ._utils import VeryStupidIdeaError, SolverNotConvergedError, transform_attribute
+from ._utils import VeryStupidIdeaError, SolverNotConvergedError, TheHollyHandErrorOfAntioch, transform_attribute
 from implicit_filter.filter import Filter
 from scipy.sparse import csc_matrix, identity
 from scipy.sparse.linalg import cg
@@ -157,6 +157,8 @@ class JaxFilter(Filter):
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if n < 1:
             raise ValueError("Filter order must be positive")
+        elif n == 3:
+            raise TheHollyHandErrorOfAntioch()
         elif n > 2:
             raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
@@ -178,7 +180,7 @@ class JaxFilter(Filter):
 
         return np.array(self._compute_full(n, k, data) if self._full else self._compute(n, k, data))
 
-    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+    def many_compute(self, n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
         if n < 1:
             raise ValueError("Filter order must be positive")
         elif n > 2:
@@ -195,8 +197,8 @@ class JaxFilter(Filter):
             raise ValueError("Input data is of incorrect type")
 
 
-    def many_compute_velocity(self, n: int, k: float, ux: Union[np.ndarray, List[np.ndarray]],
-                              vy: Union[np.ndarray, List[np.ndarray]]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    def many_compute_velocity(self, n: int, k: float, ux: np.ndarray | List[np.ndarray],
+                              vy: np.ndarray | List[np.ndarray]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         if n < 1:
             raise ValueError("Filter order must be positive")
         elif n > 2:

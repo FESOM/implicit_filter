@@ -1,5 +1,5 @@
 import math
-from typing import Tuple, List, Union
+from typing import Tuple, List
 
 import numpy as np
 from scipy.sparse import csc_matrix, identity
@@ -27,7 +27,7 @@ class NumpyFilter(Filter):
         self._check_filter_order(n)
         return self._compute(n, k, data)
 
-    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+    def many_compute(self, n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
         output = []
         if type(data) is np.ndarray:
             if len(data.shape) != 2:
@@ -47,8 +47,8 @@ class NumpyFilter(Filter):
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError("Filtering non-scalar values are not supported with NumPy Filer")
 
-    def many_compute_velocity(self, n: int, k: float, ux: Union[np.ndarray, List[np.ndarray]],
-                              vy: Union[np.ndarray, List[np.ndarray]]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    def many_compute_velocity(self, n: int, k: float, ux: np.ndarray | List[np.ndarray],
+                              vy: np.ndarray | List[np.ndarray]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         raise NotImplementedError("Filtering non-scalar values are not supported with NumPy Filer")
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str = 'r',

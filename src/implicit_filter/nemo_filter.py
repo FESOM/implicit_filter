@@ -1,4 +1,4 @@
-from typing import Tuple, Union, List
+from typing import Tuple, List
 
 import numpy as np
 import xarray as xr
@@ -17,7 +17,7 @@ class NemoNumpyFilter(Filter):
 
     Methods
     -------
-    many_compute(n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+    many_compute(n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
         Placeholder method to compute filtering on multiple datasets. Not implemented yet.
 
     compute_velocity(n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -51,7 +51,7 @@ class NemoNumpyFilter(Filter):
         transform_attribute(self, "_nx", it, 0)
         transform_attribute(self, "_ny", it, 0)
 
-    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+    def many_compute(self, n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
         raise NotImplementedError("This method is not yet implemented.")
 
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:

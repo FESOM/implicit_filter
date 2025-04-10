@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, List, Union
+from typing import Tuple, List, Iterable
 
 import numpy as np
 
@@ -43,8 +43,8 @@ class Filter(ABC):
         """
         Compute the filtered velocity data using a specified filter size.
 
-        It performs implicit interpolates it from elements to nodes. Currently, filtering directly on elements
-        is not supported.
+        It performs interpolates it from elements to nodes if requested.
+        Output is always based on mesh nodes.
 
         Parameters:
         -----------
@@ -63,12 +63,12 @@ class Filter(ABC):
         Returns:
         --------
         Tuple[np.ndarray, np.ndarray]:
-            Tuple containing NumPy arrays with filtered data ux and uy velocities.
+            Tuple containing NumPy arrays with filtered data ux and uy velocities on mesh nodes.
         """
         pass
 
     @abstractmethod
-    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+    def many_compute(self, n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
         """
         Computes multiple inputs, which are scalar data
 
@@ -82,7 +82,7 @@ class Filter(ABC):
 
         data : Union[np.ndarray, List[np.ndarray]]
             It can be either a list of 1D NumPy arrays to be processed or
-            a 2D NumPy array which 2nd dimension will be iterated over.
+            a 2D NumPy array which second dimension will be iterated over.
 
         Returns:
         --------
@@ -91,8 +91,8 @@ class Filter(ABC):
         """
         pass
 
-    def many_compute_velocity(self, n: int, k: float, ux: Union[np.ndarray, List[np.ndarray]],
-                              vy: Union[np.ndarray, List[np.ndarray]]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    def many_compute_velocity(self, n: int, k: float, ux: np.ndarray | List[np.ndarray],
+                              vy: np.ndarray | List[np.ndarray]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         """
         Computes multiple velocity inputs
 
@@ -120,7 +120,7 @@ class Filter(ABC):
         pass
 
     def save_to_file(self, file: str):
-        """Save auxiliary arrays to file, as they are mesh specific"""
+        """Save auxiliary arrays to file, as they're mesh-specific"""
         np.savez(file, **vars(self))
 
     @classmethod

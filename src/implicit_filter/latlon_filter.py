@@ -1,5 +1,5 @@
 import math
-from typing import Tuple, Union, List
+from typing import Tuple, List
 
 import numpy as np
 from scipy.sparse import csc_matrix, identity
@@ -206,5 +206,5 @@ class LatLonNumpyFilter(Filter):
         return (np.reshape(self._compute(n, k, np.reshape(ux, self._e2d)), (self._nx, self._ny)),
                 np.reshape(self._compute(n, k, np.reshape(vy, self._e2d)), (self._nx, self._ny)))
 
-    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+    def many_compute(self, n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
         raise NotImplementedError("This method is not yet implemented.")
