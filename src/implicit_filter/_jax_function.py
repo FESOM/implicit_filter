@@ -229,7 +229,7 @@ def make_smat_full(nn_pos: jnp.ndarray, nn_num: jnp.ndarray, smooth_m: jnp.ndarr
     return ss, ii, jj
 
 
-def transform_veloctiy_to_nodes(u: jnp.ndarray, v: jnp.ndarray, ne_pos: jnp.ndarray, ne_num: jnp.ndarray, n2d: int,
+def transform_vector_to_nodes(u: jnp.ndarray, v: jnp.ndarray, ne_pos: jnp.ndarray, ne_num: jnp.ndarray, n2d: int,
                                 elem_area: jnp.ndarray, area: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
         Project velocity components to vertices (nodes) based on the given elements' information.
@@ -286,3 +286,212 @@ def transform_veloctiy_to_nodes(u: jnp.ndarray, v: jnp.ndarray, ne_pos: jnp.ndar
     vyn = vmap(lambda n: calculate(ne_pos[:, n], ne_num[n], elem_area, area[n], v))(jnp.arange(0, n2d))
 
     return uxn, vyn
+
+
+
+def transform_to_nodes(u: jnp.ndarray, ne_pos: jnp.ndarray, ne_num: jnp.ndarray, n2d: int,
+                                elem_area: jnp.ndarray, area: jnp.ndarray, mask_n: jnp.ndarray) -> jnp.ndarray:
+    """
+        Project velocity components to vertices (nodes) based on the given elements' information.
+
+        This function calculates the projected scalar onto the vertices (nodes) of a mesh. The
+        projection is done based on the element information, including element positions, numbers, areas, and overall area.
+
+        Parameters:
+        ----------
+        u : jnp.ndarray
+            JAX array containing the eastward velocity component.
+
+        ne_pos : jnp.ndarray
+            JAX array of shape (ne_num, n2d) containing the indices of elements (triangles) in terms of nodes.
+
+        ne_num : jnp.ndarray
+            JAX array of shape (n2d,) containing the number of elements connected to each node.
+
+        n2d : int
+            The total number of nodes in the mesh.
+
+        elem_area : jnp.ndarray
+            JAX array of shape (e2d,) containing the areas of elements (triangles).
+
+        area : jnp.ndarray
+            JAX array of shape (n2d,) containing the areas of vertices (nodes).
+
+        Returns:
+        -------
+        Tuple[jnp.ndarray, jnp.ndarray]
+            A tuple containing two JAX arrays: the eastward velocity component projected to nodes (uxn) and
+            the northward velocity component projected to nodes (vyn).
+
+        Notes:
+        ------
+        - This function uses JAX operations to efficiently calculate the projected velocity components onto nodes.
+        - The function iterates through each node and its associated elements to compute the projection.
+    """
+    @jit
+    def calculate(ne_pos: jnp.ndarray, ne_num: int, elem_area: jnp.ndarray, area: float, mask_n: float, vel: jnp.ndarray):
+        def helper(i, val):
+            out = val
+            pos = ne_pos[i]
+            out += vel[pos] * elem_area[pos] / 3.0
+            return out
+
+        out = fori_loop(0, ne_num, helper, (0)) / area * mask_n
+        return out
+
+    # For every node, run calculate (which then goes through each element)
+    uxn = vmap(lambda n: calculate(ne_pos[:, n], ne_num[n], elem_area, area[n], mask_n[n], u))(jnp.arange(0, n2d))
+
+    return uxn
+
+
+
+
+def transform_to_cells(data: jnp.ndarray, en_pos: jnp.ndarray, e2d: int,
+                                elem_area: jnp.ndarray) -> jnp.ndarray:
+    """
+        AFW: Project data to cell centers based on the given elements' information.
+
+        Just takes the average — So the cell centres are on the centroids...
+
+        Parameters:
+        ----------
+        u : jnp.ndarray
+            JAX array containing the eastward velocity component.
+
+        en_pos : jnp.ndarray
+            JAX array of shape (ne_num, n2d) containing the indices of nodes in terms of elements.
+
+        e2d : int
+            The total number of elements in the mesh.
+
+        Returns:
+        -------
+        jnp.ndarray
+            A JAX array: the eastward velocity component projected to cell centers (uxc).
+
+        Notes:
+        ------
+        - This function uses JAX operations to efficiently calculate the projected velocity components onto cell centers.
+        - The function iterates through each cell and its associated elements to compute the projection.
+    """
+    @jit
+    def calculate(en_pos: jnp.ndarray, elem_area: jnp.ndarray, vel: jnp.ndarray):
+        def helper(i, val):
+            out = val
+            pos = en_pos[i]
+            out += vel[pos] / 3.0 * (elem_area > 0.0) # Don't interpolate over land elements (i.e. masked with elem_area = 0.0)
+            return out
+
+        out = fori_loop(0, 3, helper, (0))
+        return out
+
+    # For every cell, run calculate (which goes through each of the 3 nodes)
+    uxc = vmap(lambda n: calculate(en_pos[:, n], elem_area[n], data))(jnp.arange(0, e2d))
+
+    return uxc
+
+
+def transform_vector_to_cells(u: jnp.ndarray, v: jnp.ndarray, en_pos: jnp.ndarray, e2d: int,
+                                elem_area: jnp.ndarray) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    """
+        AFW: Project velocity components to cell centers based on the given elements' information.
+
+        Just takes the average — So the cell centres are on the centroids...
+
+        Parameters:
+        ----------
+        u : jnp.ndarray
+            JAX array containing the eastward velocity component.
+
+        en_pos : jnp.ndarray
+            JAX array of shape (ne_num, n2d) containing the indices of nodes in terms of elements.
+
+        e2d : int
+            The total number of elements in the mesh.
+
+        Returns:
+        -------
+        jnp.ndarray
+            A JAX array: the eastward velocity component projected to cell centers (uxc).
+
+        Notes:
+        ------
+        - This function uses JAX operations to efficiently calculate the projected velocity components onto cell centers.
+        - The function iterates through each cell and its associated elements to compute the projection.
+    """
+    @jit
+    def calculate(en_pos: jnp.ndarray, elem_area: jnp.ndarray, vel: jnp.ndarray):
+        def helper(i, val):
+            out = val
+            pos = en_pos[i]
+            out += vel[pos] / 3.0 * (elem_area > 0.0)
+            return out
+
+        out = fori_loop(0, 3, helper, (0))
+        return out
+
+    # For every cell, run calculate (which goes through each of the 3 nodes)
+    uxc = vmap(lambda n: calculate(en_pos[:, n], elem_area[n], u))(jnp.arange(0, e2d))
+    vyc = vmap(lambda n: calculate(en_pos[:, n], elem_area[n], v))(jnp.arange(0, e2d))
+
+    return uxc, vyc
+
+
+
+
+
+def transform_mask_to_nodes(mask: jnp.ndarray, ne_pos: jnp.ndarray, ne_num: jnp.ndarray, n2d: int) -> jnp.ndarray:
+    """
+        Project _mask_ components to vertices (nodes) based on the given elements' information.
+
+        NB: Using the normal transform function explicitly will disregard the mask !
+
+        Parameters:
+        ----------
+        mask : jnp.ndarray
+            JAX array containing the mask
+
+        ne_pos : jnp.ndarray
+            JAX array of shape (ne_num, n2d) containing the indices of elements (triangles) in terms of nodes.
+
+        ne_num : jnp.ndarray
+            JAX array of shape (n2d,) containing the number of elements connected to each node.
+
+        n2d : int
+            The total number of nodes in the mesh.
+
+        elem_area : jnp.ndarray
+            JAX array of shape (e2d,) containing the areas of elements (triangles).
+
+        area : jnp.ndarray
+            JAX array of shape (n2d,) containing the areas of vertices (nodes).
+
+        Returns:
+        -------
+        Tuple[jnp.ndarray, jnp.ndarray]
+            A tuple containing two JAX arrays: the eastward velocity component projected to nodes (uxn) and
+            the northward velocity component projected to nodes (vyn).
+
+        Notes:
+        ------
+        - This function uses JAX operations to efficiently calculate the projected velocity components onto nodes.
+        - The function iterates through each node and its associated elements to compute the projection.
+    """
+    @jit
+    def calculate(ne_pos: jnp.ndarray, ne_num: int, mask_ocean: jnp.ndarray):
+        def helper(i, val):
+            out = val
+            pos = ne_pos[i]
+            out += (mask_ocean[pos] > 0.5) * 1.0   # mask = 1 for ocean
+            return out
+
+        out = (fori_loop(0, ne_num, helper, (0)) > 0.5) * 1.0  # i.e. if there's at least one ocean cell that touches the node --> mask_n = 1
+        return out
+
+    # For every node, run calculate (which then goes through each element)
+    uxn = vmap(lambda n: calculate(ne_pos[:, n], ne_num[n], mask))(jnp.arange(0, n2d))
+
+    return uxn
+
+

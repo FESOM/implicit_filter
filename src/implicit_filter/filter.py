@@ -71,6 +71,32 @@ class Filter(ABC):
         pass
 
     @abstractmethod
+    def compute_on_cells(self, n: int, k: float, ux: np.ndarray) -> np.ndarray:
+        """
+        Compute the filtered velocity data using a specified filter size.
+
+        It performs implicit interpolates it from elements to nodes. Currently, filtering directly on elements
+        is not supported.
+
+        Parameters:
+        -----------
+        n : int
+            Order of filter, one is recommended
+
+        k : float
+            Wavelength of the filter.
+
+        ux : np.ndarray
+            NumPy array containing eastward velocity component to be filtered.
+
+        Returns:
+        --------
+        Tuple[np.ndarray, np.ndarray]:
+            Tuple containing NumPy arrays with filtered data ux and uy velocities.
+        """
+        pass
+
+    @abstractmethod
     def many_compute(self, n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
         """
         Computes multiple inputs, which are scalar data
