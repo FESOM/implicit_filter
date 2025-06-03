@@ -3,6 +3,8 @@ channels:
   - conda-forge
 dependencies:
   - python
+  - cupy
+  - ipykernel
   - pip
   - pip:
     - -r requirements.txt
