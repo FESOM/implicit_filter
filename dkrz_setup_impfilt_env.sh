@@ -2,8 +2,8 @@
 
 # init conda dirs to avoid filling up $HOME
 module load python3
-conda config --add envs_dirs /work/bk1450/$USER/conda/envs
-conda config --add pkgs_dirs /work/bk1450/$USER/conda/pkgs
+conda config --add envs_dirs $WORK/conda/envs
+conda config --add pkgs_dirs $WORK/conda/pkgs
 conda config --set auto_activate_base false
 eval "$(conda shell.bash activate base)"
 
