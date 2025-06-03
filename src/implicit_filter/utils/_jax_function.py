@@ -439,11 +439,9 @@ def transform_vector_to_cells(u: jnp.ndarray, v: jnp.ndarray, en_pos: jnp.ndarra
 
 
 
-
-
 def transform_mask_to_nodes(mask: jnp.ndarray, ne_pos: jnp.ndarray, ne_num: jnp.ndarray, n2d: int) -> jnp.ndarray:
     """
-        Project _mask_ components to vertices (nodes) based on the given elements' information.
+        Project mask components to vertices (nodes) based on the given elements' information.
 
         NB: Using the normal transform function explicitly will disregard the mask !
 
@@ -461,22 +459,10 @@ def transform_mask_to_nodes(mask: jnp.ndarray, ne_pos: jnp.ndarray, ne_num: jnp.
         n2d : int
             The total number of nodes in the mesh.
 
-        elem_area : jnp.ndarray
-            JAX array of shape (e2d,) containing the areas of elements (triangles).
-
-        area : jnp.ndarray
-            JAX array of shape (n2d,) containing the areas of vertices (nodes).
-
         Returns:
         -------
-        Tuple[jnp.ndarray, jnp.ndarray]
-            A tuple containing two JAX arrays: the eastward velocity component projected to nodes (uxn) and
-            the northward velocity component projected to nodes (vyn).
-
-        Notes:
-        ------
-        - This function uses JAX operations to efficiently calculate the projected velocity components onto nodes.
-        - The function iterates through each node and its associated elements to compute the projection.
+        jnp.ndarray
+            A JAX array containing mask projected to vertices.
     """
     @jit
     def calculate(ne_pos: jnp.ndarray, ne_num: int, mask_ocean: jnp.ndarray):
