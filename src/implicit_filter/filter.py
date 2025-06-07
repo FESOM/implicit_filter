@@ -8,6 +8,7 @@ class Filter(ABC):
     """
     Abstract base class for filters
     """
+
     def __init__(self, *initial_data, **kwargs):
         for dictionary in initial_data:
             for key in dictionary:
@@ -19,6 +20,7 @@ class Filter(ABC):
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
         """
         Compute the filtered data using a specified filter size.
+        Data must be placed on mesh nodes
 
         Parameters:
         ------------
@@ -42,6 +44,7 @@ class Filter(ABC):
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, uy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the filtered velocity data using a specified filter size.
+        Data must be placed on mesh nodes
 
         Parameters:
         -----------
@@ -57,9 +60,6 @@ class Filter(ABC):
         uy : np.ndarray
             NumPy array containing northwards velocity component to be filtered.
 
-        interp : bool
-            If true, interpolate data from elements to nodes.
-
         Returns:
         --------
         Tuple[np.ndarray, np.ndarray]:
@@ -67,14 +67,13 @@ class Filter(ABC):
         """
         pass
 
-
     @abstractmethod
-    def compute_spectra_scalar(self, n: int, k: Iterable | np.ndarray, data : np.ndarray, highpass : bool,
+    def compute_spectra_scalar(self, n: int, k: Iterable | np.ndarray, data: np.ndarray,
                                mask: np.ndarray | None = None) -> np.ndarray:
         """
         Computes power spectra for given wavelengths.
+        Data must be placed on mesh nodes
 
-        The spectra can be computed using highpass or lowpass filtering technique.
         For details refer to https://arxiv.org/abs/2404.07398
         Parameters:
         -----------
@@ -86,9 +85,6 @@ class Filter(ABC):
 
         data : np.ndarray
             NumPy array containing data to be filtered.
-
-        highpass : bool
-            If true, highpass filtering is used.
 
         mask : np.ndarray | None
             Mask applied to data while computing spectra.
@@ -104,11 +100,11 @@ class Filter(ABC):
 
     @abstractmethod
     def compute_spectra_velocity(self, n: int, k: Iterable | np.ndarray, ux: np.ndarray, vy: np.ndarray,
-                                 highpass: bool, mask: np.ndarray | None = None, interp: bool = True) -> np.ndarray:
+                                 mask: np.ndarray | None = None) -> np.ndarray:
         """
         Computes power spectra for given wavelengths.
+        Data must be placed on mesh nodes
 
-        The spectra can be computed using highpass or lowpass filtering technique.
         For details refer to https://arxiv.org/abs/2404.07398
         Parameters:
         -----------
@@ -124,16 +120,10 @@ class Filter(ABC):
         uy : np.ndarray
             NumPy array containing a northwards velocity component to be filtered.
 
-        highpass : bool
-            If true, highpass filtering is used.
-
         mask : np.ndarray | None
             Mask applied to data while computing spectra.
             True means selected data won't be used for computing spectra.
             This mask won't be used during filtering.
-
-        interp : bool
-            If true, interpolate data from elements to nodes.
 
         Returns:
         --------

@@ -8,7 +8,8 @@ from scipy.sparse import csc_matrix, identity
 from scipy.sparse.linalg import cg
 
 from implicit_filter.utils._auxiliary import neighboring_triangles, neighbouring_nodes, areas
-from implicit_filter.utils._jax_function import make_smooth, make_smat, make_smat_full, transform_mask_to_nodes, transform_vector_to_nodes
+from implicit_filter.utils._jax_function import make_smooth, make_smat, make_smat_full, transform_mask_to_nodes, \
+    transform_vector_to_nodes
 from .utils.utils import SolverNotConvergedError, transform_attribute
 from .filter import Filter
 
@@ -51,10 +52,10 @@ class TriangularFilter(Filter):
     --------
     compute_velocity(n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         Compute filtered velocity components (u, v) using implicit filtering.
-    compute(n: int, k: float, data: np.ndarray) -> np.ndarray:
+    Compute(n: int, k: float, data: np.ndarray) -> np.ndarray:
         Compute filtered data using implicit filtering.
-    prepare(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
-            carthesian: bool, cyclic_length: float, full: bool = False):
+    Prepare(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,
+            cartesian: bool, cyclic_length: float, full: bool = False):
         Prepare the filter for a specific mesh.
 
     """
@@ -88,10 +89,8 @@ class TriangularFilter(Filter):
         transform_attribute(self, "_jj", jx, None)
         transform_attribute(self, "_mask_n", jx, None)
 
-
         transform_attribute(self, "_n2d", it, 0)
         transform_attribute(self, "_full", bl, False)
-
 
     def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
         Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
@@ -107,11 +106,10 @@ class TriangularFilter(Filter):
         tts += ttu
         return np.array(tts)
 
-
     def _compute_full(self, n, kl, ttuv, tol=1e-5, maxiter=150000) -> np.ndarray:
         Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)),
                            shape=(2 * self._n2d, 2 * self._n2d))
-        Smat = identity(2 * self._n2d) + 0.5 * (Smat1 ** n)
+        Smat = identity(2 * self._n2d) + 2.0 * (Smat1 ** n)
 
         ttw = ttuv - Smat @ ttuv  # Work with perturbations
 
@@ -123,17 +121,12 @@ class TriangularFilter(Filter):
         tts += ttuv
         return np.array(tts)
 
-
-    def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray, interp: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if n < 1:
             raise ValueError("Filter order must be positive")
 
-        if interp:
-            uxn, vyn = transform_vector_to_nodes(jnp.array(ux), jnp.array(vy), self._en_pos, self._ne_num, self._n2d,
-                                                 self._elem_area, self._area)
-        else:
-            uxn = ux
-            vyn = vy
+        uxn = ux
+        vyn = vy
 
         if self._full:
             ttuv = self._compute_full(n, k, jnp.concatenate((uxn, vyn)))
@@ -143,16 +136,15 @@ class TriangularFilter(Filter):
             ttv = self._compute(n, k, vyn)
             return ttu, ttv
 
-
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
         if n < 1:
             raise ValueError("Filter order must be positive")
 
         return np.array(self._compute_full(n, k, data) if self._full else self._compute(n, k, data))
 
-
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str = "m",
-                cartesian: bool = True, cyclic_length: float = 360. * pi / 180., full: bool = False, mask: np.ndarray = None):
+                cartesian: bool = True, cyclic_length: float = 360. * pi / 180., full: bool = False,
+                mask: np.ndarray = None):
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
 
         if mask is None:
@@ -204,7 +196,7 @@ class TriangularFilter(Filter):
         self._e2d = e2d
         self._full = full
 
-    def compute_spectra_scalar(self, n: int, k: Iterable | np.ndarray, data: np.ndarray, highpass: bool,
+    def compute_spectra_scalar(self, n: int, k: Iterable | np.ndarray, data: np.ndarray,
                                mask: np.ndarray | None = None) -> np.ndarray:
         nr = len(k)
         spectra = np.zeros(nr + 1)
@@ -223,39 +215,34 @@ class TriangularFilter(Filter):
                 ttu -= data
 
             ttu[mask] = 0.0
-            spectra[i+1] = np.sum(selected_area * (np.square(ttu))[not_mask]) / np.sum(selected_area)
+            spectra[i + 1] = np.sum(selected_area * (np.square(ttu))[not_mask]) / np.sum(selected_area)
 
         return spectra
 
     def compute_spectra_velocity(self, n: int, k: Iterable | np.ndarray, ux: np.ndarray, vy: np.ndarray,
-                                 highpass: bool, mask: np.ndarray | None = None,  interp: bool = True) -> np.ndarray:
+                                 mask: np.ndarray | None = None) -> np.ndarray:
         nr = len(k)
         spectra = np.zeros(nr + 1)
         if mask is None:
             mask = np.zeros(ux.shape, dtype=bool)
 
-        if interp:
-            unod, vnod = transform_vector_to_nodes(jnp.array(ux), jnp.array(vy), self._ne_pos, self._ne_num, self._n2d,
-                                             self._elem_area, self._area)
-            mask = transform_mask_to_nodes(jnp.array(mask), self._ne_pos, self._ne_num, self._n2d)
-        else:
-            unod = ux
-            vnod = vy
+        unod = ux
+        vnod = vy
 
         not_mask = ~mask
         selected_area = self._area[not_mask]
         spectra[0] = np.sum(selected_area * (np.square(unod) + np.square(vnod))[not_mask]) / np.sum(selected_area)
 
         for i in range(nr):
-            ttu, ttv = self.compute(n, k[i], unod)
-            if highpass:
-                ttu -= unod
-                ttv -= vnod
+            ttu = self.compute(n, k[i], unod)
+            ttv = self.compute(n, k[i], vnod)
+
+            ttu -= unod
+            ttv -= vnod
 
             ttu[mask] = 0.0
             ttv[mask] = 0.0
 
-            spectra[i+1] = np.sum(selected_area * (np.square(ttu) + np.square(ttv))[not_mask]) / np.sum(selected_area)
+            spectra[i + 1] = np.sum(selected_area * (np.square(ttu) + np.square(ttv))[not_mask]) / np.sum(selected_area)
 
         return spectra
-    
