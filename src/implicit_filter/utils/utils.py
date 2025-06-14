@@ -4,7 +4,6 @@ class SolverNotConvergedError(Exception):
         super().__init__(message)
         self.errors = errors
 
-
 class VeryStupidIdeaError(Exception):
     def __init__(self, message, errors):
         super().__init__(message)
@@ -16,9 +15,14 @@ class TheHollyHandErrorOfAntioch(Exception):
         super().__init__(message)
         self.errors = ["Three shalt thou not count,"]
 
+class SizeMissmatchError(Exception):
+    def __init__(self, message, errors):
+        super().__init__(message)
+        self.errors = errors
+
 def transform_attribute(self, atr: str, lmbd, fill=None):
     """
-    If atribute atr exists, then transform it using given Callable lmbd; otherwise it set with fill value
+    If attribute atr exists, then transform it using given Callable lmbd; otherwise it set with fill value
     """
     if hasattr(self, atr):
         setattr(self, atr, lmbd(getattr(self, atr)))

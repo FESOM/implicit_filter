@@ -5,10 +5,10 @@ import numpy as np
 from scipy.sparse import csc_matrix, identity
 from scipy.sparse.linalg import cg
 
-from implicit_filter._numpy_functions import calculate_local_regular_neighbourhood, \
+from implicit_filter.utils._numpy_functions import calculate_local_regular_neighbourhood, \
     calculate_global_regular_neighbourhood
 from implicit_filter.filter import Filter
-from implicit_filter._utils import SolverNotConvergedError, VeryStupidIdeaError, transform_attribute
+from implicit_filter.utils.utils import SolverNotConvergedError, transform_attribute
 
 
 class LatLonNumpyFilter(Filter):
@@ -51,6 +51,8 @@ class LatLonNumpyFilter(Filter):
         transform_attribute(self, "_ss", ar, None)
         transform_attribute(self, "_ii", ar, None)
         transform_attribute(self, "_jj", ar, None)
+        transform_attribute(self, "_area", ar, None)
+
 
     def prepare(self, latitude: np.ndarray, longitude: np.ndarray, cartesian: bool = False, local: bool = True):
         """
@@ -170,13 +172,14 @@ class LatLonNumpyFilter(Filter):
         self._ss = ss
         self._ii = ii
         self._jj = jj
+        self._area = area
 
     def _compute(self, n, k, data: np.ndarray, maxiter=150_000, tol=1e-6) -> np.ndarray:
         e2d = self._e2d
 
         Smat1 = csc_matrix((self._ss * (1.0 / k ** 2), (self._ii, self._jj)), shape=(e2d, e2d))
         Smat2 = identity(e2d)
-        Smat = Smat2 + 0.5 * (-1 * Smat1) ** n
+        Smat = Smat2 + 2.0 * (-1 * Smat1) ** n
         ttw = data.T - Smat @ data.T  # Work with perturbations
 
         b = 1. / Smat.diagonal()  # Simple preconditioner
@@ -192,19 +195,13 @@ class LatLonNumpyFilter(Filter):
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
         if n < 1:
             raise ValueError("Filter order must be positive")
-        elif n > 2:
-            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
         return np.reshape(self._compute(n, k, np.reshape(data, self._e2d)), (self._nx, self._ny))
 
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if n < 1:
             raise ValueError("Filter order must be positive")
-        elif n > 2:
-            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
         return (np.reshape(self._compute(n, k, np.reshape(ux, self._e2d)), (self._nx, self._ny)),
                 np.reshape(self._compute(n, k, np.reshape(vy, self._e2d)), (self._nx, self._ny)))
 
-    def many_compute(self, n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
-        raise NotImplementedError("This method is not yet implemented.")

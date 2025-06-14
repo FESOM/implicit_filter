@@ -67,7 +67,6 @@ class Filter(ABC):
         """
         pass
 
-    @abstractmethod
     def compute_spectra_scalar(self, n: int, k: Iterable | np.ndarray, data: np.ndarray,
                                mask: np.ndarray | None = None) -> np.ndarray:
         """
@@ -96,9 +95,25 @@ class Filter(ABC):
         np.ndarray:
             Array containing power spectra for given wavelengths.
         """
-        pass
+        nr = len(k)
+        spectra = np.zeros(nr + 1)
+        if mask is None:
+            mask = np.zeros(data.shape, dtype=bool)
 
-    @abstractmethod
+        not_mask = ~mask
+        selected_area = self._area[not_mask]
+
+        spectra[0] = np.sum(selected_area * (np.square(data))[not_mask]) / np.sum(selected_area)
+
+        for i in range(nr):
+            ttu = self.compute(n, k[i], data)
+            ttu -= data
+
+            ttu[mask] = 0.0
+            spectra[i + 1] = np.sum(selected_area * (np.square(ttu))[not_mask]) / np.sum(selected_area)
+
+        return spectra
+
     def compute_spectra_velocity(self, n: int, k: Iterable | np.ndarray, ux: np.ndarray, vy: np.ndarray,
                                  mask: np.ndarray | None = None) -> np.ndarray:
         """
@@ -130,7 +145,31 @@ class Filter(ABC):
         np.ndarray:
             Array containing power spectra for given wavelengths.
         """
-        pass
+        nr = len(k)
+        spectra = np.zeros(nr + 1)
+        if mask is None:
+            mask = np.zeros(ux.shape, dtype=bool)
+
+        unod = ux
+        vnod = vy
+
+        not_mask = ~mask
+        selected_area = self._area[not_mask]
+        spectra[0] = np.sum(selected_area * (np.square(unod) + np.square(vnod))[not_mask]) / np.sum(selected_area)
+
+        for i in range(nr):
+            ttu = self.compute(n, k[i], unod)
+            ttv = self.compute(n, k[i], vnod)
+
+            ttu -= unod
+            ttv -= vnod
+
+            ttu[mask] = 0.0
+            ttv[mask] = 0.0
+
+            spectra[i + 1] = np.sum(selected_area * (np.square(ttu) + np.square(ttv))[not_mask]) / np.sum(selected_area)
+
+        return spectra
 
     def save_to_file(self, file: str):
         """Save auxiliary arrays to file, as they're mesh-specific"""
@@ -140,3 +179,5 @@ class Filter(ABC):
     def load_from_file(cls, file: str):
         """Load auxiliary arrays from a file"""
         return cls(**dict(np.load(file)))
+
+

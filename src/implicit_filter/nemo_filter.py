@@ -5,9 +5,9 @@ import xarray as xr
 from scipy.sparse import csc_matrix, identity
 from scipy.sparse.linalg import cg
 
-from implicit_filter._auxiliary import find_adjacent_points_north
-from implicit_filter._numpy_functions import calculate_global_nemo_neighbourhood
-from implicit_filter._utils import SolverNotConvergedError, VeryStupidIdeaError, transform_attribute
+from implicit_filter.utils._auxiliary import find_adjacent_points_north
+from implicit_filter.utils._numpy_functions import calculate_global_nemo_neighbourhood
+from implicit_filter.utils.utils import SolverNotConvergedError, transform_attribute
 from implicit_filter.filter import Filter
 
 
@@ -51,14 +51,9 @@ class NemoNumpyFilter(Filter):
         transform_attribute(self, "_nx", it, 0)
         transform_attribute(self, "_ny", it, 0)
 
-    def many_compute(self, n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
-        raise NotImplementedError("This method is not yet implemented.")
-
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if n < 1:
             raise ValueError("Filter order must be positive")
-        elif n > 2:
-            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
         v = np.zeros((4, self._e2d))  # N, W, E, S
         v[0, :] = np.reshape(ux, self._e2d)  # West
@@ -80,8 +75,6 @@ class NemoNumpyFilter(Filter):
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
         if n < 1:
             raise ValueError("Filter order must be positive")
-        elif n > 2:
-            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
         tt = np.reshape(data, self._e2d)
         return np.reshape(self._compute(n, k, tt), (self._nx, self._ny))
@@ -90,7 +83,7 @@ class NemoNumpyFilter(Filter):
         Smat1 = csc_matrix((self._ss * (1.0 / k ** 2), (self._ii, self._jj)), shape=(self._e2d, self._e2d))
         Smat2 = identity(self._e2d)
 
-        Smat = Smat2 + 0.5 * (-1 * Smat1) ** n
+        Smat = Smat2 + 2.0 * (-1 * Smat1) ** n
         ttw = data.T - Smat @ data.T  # Work with perturbations
 
         # b = 1. / Smat.diagonal()  # Simple preconditioner
@@ -109,7 +102,7 @@ class NemoNumpyFilter(Filter):
         ds = xr.open_dataset(file)
 
         nx, ny = ds.gphit.isel(t=0, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values.shape
-        north_adj, red = find_adjacent_points_north(file, 1e-5)
+        north_adj, _ = find_adjacent_points_north(file, 1e-5)
         e2d = nx * ny
 
         self._nx = nx
