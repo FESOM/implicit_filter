@@ -179,9 +179,13 @@ class Filter(ABC):
 
         return spectra
 
+    def __getstate__(self):
+        # Only include names that start with '_'
+        return {k: v for k, v in vars(self).items() if k.startswith("_")}
+
     def save_to_file(self, file: str):
         """Save auxiliary arrays to file, as they're mesh-specific"""
-        np.savez(file, **vars(self))
+        np.savez(file, **self.__getstate__())
 
     @classmethod
     def load_from_file(cls, file: str):

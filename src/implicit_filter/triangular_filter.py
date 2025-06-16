@@ -80,6 +80,7 @@ class TriangularFilter(Filter):
         transform_attribute(self, "_elem_area", jx, None)
         transform_attribute(self, "_area", jx, None)
         transform_attribute(self, "_ne_pos", jx, None)
+        transform_attribute(self, "_en_pos", jx, None)
         transform_attribute(self, "_ne_num", jx, None)
         transform_attribute(self, "_dx", jx, None)
         transform_attribute(self, "_dy", jx, None)
@@ -90,6 +91,7 @@ class TriangularFilter(Filter):
         transform_attribute(self, "_mask_n", jx, None)
 
         transform_attribute(self, "_n2d", it, 0)
+        transform_attribute(self, "_e2d", it, 0)
         transform_attribute(self, "_full", bl, False)
         self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = get_backend("cpu")
         self.backend = "cpu"
@@ -209,7 +211,7 @@ class TriangularFilter(Filter):
         self._e2d = e2d
         self._full = full
 
-        if gpu == True:
+        if gpu:
             self.set_backend("gpu")
 
     def get_backend(self) -> str:
