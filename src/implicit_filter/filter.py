@@ -17,6 +17,14 @@ class Filter(ABC):
             setattr(self, key, kwargs[key])
 
     @abstractmethod
+    def set_backend(self, backend: str):
+        pass
+    
+    @abstractmethod
+    def get_backend(self) -> str:
+        pass
+
+    @abstractmethod
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
         """
         Compute the filtered data using a specified filter size.
@@ -41,7 +49,7 @@ class Filter(ABC):
         pass
 
     @abstractmethod
-    def compute_velocity(self, n: int, k: float, ux: np.ndarray, uy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the filtered velocity data using a specified filter size.
         Data must be placed on mesh nodes
@@ -57,7 +65,7 @@ class Filter(ABC):
         ux : np.ndarray
             NumPy array containing eastward velocity component to be filtered.
 
-        uy : np.ndarray
+        vy : np.ndarray
             NumPy array containing northwards velocity component to be filtered.
 
         Returns:
@@ -103,14 +111,14 @@ class Filter(ABC):
         not_mask = ~mask
         selected_area = self._area[not_mask]
 
-        spectra[0] = np.sum(selected_area * (np.square(data))[not_mask]) / np.sum(selected_area)
+        spectra[-1] = np.sum(selected_area * (np.square(data))[not_mask]) / np.sum(selected_area)
 
         for i in range(nr):
             ttu = self.compute(n, k[i], data)
             ttu -= data
 
             ttu[mask] = 0.0
-            spectra[i + 1] = np.sum(selected_area * (np.square(ttu))[not_mask]) / np.sum(selected_area)
+            spectra[i] = np.sum(selected_area * (np.square(ttu))[not_mask]) / np.sum(selected_area)
 
         return spectra
 
@@ -132,7 +140,7 @@ class Filter(ABC):
         ux : np.ndarray
             NumPy array containing an eastward velocity component to be filtered.
 
-        uy : np.ndarray
+        vy : np.ndarray
             NumPy array containing a northwards velocity component to be filtered.
 
         mask : np.ndarray | None
@@ -155,7 +163,7 @@ class Filter(ABC):
 
         not_mask = ~mask
         selected_area = self._area[not_mask]
-        spectra[0] = np.sum(selected_area * (np.square(unod) + np.square(vnod))[not_mask]) / np.sum(selected_area)
+        spectra[-1] = np.sum(selected_area * (np.square(unod) + np.square(vnod))[not_mask]) / np.sum(selected_area)
 
         for i in range(nr):
             ttu = self.compute(n, k[i], unod)
@@ -167,7 +175,7 @@ class Filter(ABC):
             ttu[mask] = 0.0
             ttv[mask] = 0.0
 
-            spectra[i + 1] = np.sum(selected_area * (np.square(ttu) + np.square(ttv))[not_mask]) / np.sum(selected_area)
+            spectra[i] = np.sum(selected_area * (np.square(ttu) + np.square(ttv))[not_mask]) / np.sum(selected_area)
 
         return spectra
 

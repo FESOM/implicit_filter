@@ -4,14 +4,14 @@ from typing import Tuple, Iterable
 import numpy as np
 import jax.numpy as jnp
 from jax import vmap
-from scipy.sparse import csc_matrix, identity
-from scipy.sparse.linalg import cg
+import jax
+jax.config.update("jax_platforms", "cpu")
 
 from implicit_filter.utils._auxiliary import neighboring_triangles, neighbouring_nodes, areas
 from implicit_filter.utils._jax_function import make_smooth, make_smat, make_smat_full, transform_mask_to_nodes, \
     transform_vector_to_nodes
-from .utils.utils import SolverNotConvergedError, transform_attribute
-from .filter import Filter
+from implicit_filter.utils.utils import SolverNotConvergedError, transform_attribute, get_backend
+from implicit_filter.filter import Filter
 
 
 class TriangularFilter(Filter):
@@ -91,35 +91,48 @@ class TriangularFilter(Filter):
 
         transform_attribute(self, "_n2d", it, 0)
         transform_attribute(self, "_full", bl, False)
+        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = get_backend("cpu")
+        self.backend = "cpu"
 
     def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
-        Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)), shape=(self._n2d, self._n2d))
-        Smat = identity(self._n2d) + 2.0 * (Smat1 ** n)
+        Smat1 = self.csc_matrix((self.convers(self._ss) * (1.0 / np.square(kl)), (self.convers(self._ii), self.convers(self._jj))), 
+                                shape=(self._n2d, self._n2d))
+        Smat = self.identity(self._n2d) + 2.0 * (Smat1 ** n)
 
+        ttu = self.convers(ttu)
         ttw = ttu - Smat @ ttu  # Work with perturbations
 
-        tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)
+        b = 1. / Smat.diagonal()  # Simple preconditioner
+        arr = self.convers(np.arange(self._n2d))
+        pre = self.csc_matrix((b, (arr, arr)), shape=(self._n2d, self._n2d))
+
+        tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
         if code != 0:
             raise SolverNotConvergedError("Solver has not converged without metric terms",
                                           [f"output code with code: {code}"])
 
         tts += ttu
-        return np.array(tts)
+        return self.tonumpy(tts)
 
     def _compute_full(self, n, kl, ttuv, tol=1e-5, maxiter=150000) -> np.ndarray:
-        Smat1 = csc_matrix((self._ss * (1.0 / jnp.square(kl)), (self._ii, self._jj)),
-                           shape=(2 * self._n2d, 2 * self._n2d))
-        Smat = identity(2 * self._n2d) + 2.0 * (Smat1 ** n)
+        Smat1 = self.csc_matrix((self.convers(self._ss) * (1.0 / np.square(kl)), (self.convers(self._ii), self.convers(self._jj))),
+                                shape=(2 * self._n2d, 2 * self._n2d))
+        Smat = self.identity(2 * self._n2d) + 2.0 * (Smat1 ** n)
 
+        ttuv = self.convers(ttuv)
         ttw = ttuv - Smat @ ttuv  # Work with perturbations
 
-        tts, code = cg(Smat, ttw, tol=tol, maxiter=maxiter)
+        b = 1. / Smat.diagonal()  # Simple preconditioner
+        arr = self.convers(np.arange(2 * self._n2d))
+        pre = self.csc_matrix((b, (arr, arr)), shape=(2 * self._n2d, 2 * self._n2d))
+
+        tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
         if code != 0:
             raise SolverNotConvergedError("Solver has not converged with metric terms",
                                           [f"output code with code: {code}"])
 
         tts += ttuv
-        return np.array(tts)
+        return self.tonumpy(tts)
 
     def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if n < 1:
@@ -129,7 +142,7 @@ class TriangularFilter(Filter):
         vyn = vy
 
         if self._full:
-            ttuv = self._compute_full(n, k, jnp.concatenate((uxn, vyn)))
+            ttuv = self._compute_full(n, k, np.concatenate((uxn, vyn)))
             return ttuv[0:self._n2d], ttuv[self._n2d:2 * self._n2d]
         else:
             ttu = self._compute(n, k, uxn)
@@ -144,7 +157,7 @@ class TriangularFilter(Filter):
 
     def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str = "m",
                 cartesian: bool = True, cyclic_length: float = 360. * pi / 180., full: bool = False,
-                mask: np.ndarray = None):
+                mask: np.ndarray = None, gpu: bool = False):
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
 
         if mask is None:
@@ -195,4 +208,14 @@ class TriangularFilter(Filter):
         self._n2d = n2d
         self._e2d = e2d
         self._full = full
+
+        if gpu == True:
+            self.set_backend("gpu")
+
+    def get_backend(self) -> str:
+        return self.backend
+    
+    def set_backend(self, backend: str):
+        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = get_backend(backend)
+        self.backend = backend
 

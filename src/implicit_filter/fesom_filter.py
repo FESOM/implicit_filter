@@ -12,7 +12,7 @@ class FesomFilter(TriangularFilter):
 
     def prepare_from_file(self, file: str, meshtype: str = 'm', carthesian: bool = False,
                           cyclic_length: float = 360.0 * math.pi / 180.0, metric: bool = False,
-                          mask: np.ndarray = None):
+                          mask: np.ndarray = None, gpu: bool = False):
         """
         Prepare the filter to be used with a mesh provided in the given file path.
 
@@ -34,6 +34,7 @@ class FesomFilter(TriangularFilter):
         metric : bool, optional
             A flag indicating whether to use the calculation including metric terms (True) or not (False).
             Default is False.
+
         """
         mesh = xr.open_dataset(file)
         xcoord = mesh['lon'].values
@@ -49,4 +50,4 @@ class FesomFilter(TriangularFilter):
                 "In FESOM mesh file triangulation data was not found. It should be either named as elements or face_nodes"
             )
 
-        self.prepare(len(xcoord), len(tri[:, 1]), tri, xcoord, ycoord, meshtype, carthesian, cyclic_length, metric)
+        self.prepare(len(xcoord), len(tri[:, 1]), tri, xcoord, ycoord, meshtype, carthesian, cyclic_length, metric, mask, gpu)
