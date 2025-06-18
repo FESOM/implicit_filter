@@ -5,12 +5,26 @@ import numpy as np
 import jax.numpy as jnp
 from jax import vmap
 import jax
+
 jax.config.update("jax_platforms", "cpu")
 
-from implicit_filter.utils._auxiliary import neighboring_triangles, neighbouring_nodes, areas
-from implicit_filter.utils._jax_function import make_smooth, make_smat, make_smat_full, transform_mask_to_nodes, \
-    transform_vector_to_nodes
-from implicit_filter.utils.utils import SolverNotConvergedError, transform_attribute, get_backend
+from implicit_filter.utils._auxiliary import (
+    neighboring_triangles,
+    neighbouring_nodes,
+    areas,
+)
+from implicit_filter.utils._jax_function import (
+    make_smooth,
+    make_smat,
+    make_smat_full,
+    transform_mask_to_nodes,
+    transform_vector_to_nodes,
+)
+from implicit_filter.utils.utils import (
+    SolverNotConvergedError,
+    transform_attribute,
+    get_backend,
+)
 from implicit_filter.filter import Filter
 
 
@@ -71,11 +85,13 @@ class TriangularFilter(Filter):
         **kwargs : keyword arguments
             Keyword arguments passed to the base class constructor.
         """
+        self.backend = "cpu"  # If initial_data doesn't contain backend, cpu is used
         super().__init__(initial_data, kwargs)
         # Transform to JAX array
         jx = lambda ar: jnp.array(ar)
         bl = lambda ar: bool(ar)
         it = lambda ar: int(ar)
+        st = lambda ar: str(ar)
 
         transform_attribute(self, "_elem_area", jx, None)
         transform_attribute(self, "_area", jx, None)
@@ -93,50 +109,67 @@ class TriangularFilter(Filter):
         transform_attribute(self, "_n2d", it, 0)
         transform_attribute(self, "_e2d", it, 0)
         transform_attribute(self, "_full", bl, False)
-        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = get_backend("cpu")
-        self.backend = "cpu"
+        transform_attribute(self, "_backend", st, "cpu")
+
+        self.set_backend(self.backend)
 
     def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
-        Smat1 = self.csc_matrix((self.convers(self._ss) * (1.0 / np.square(kl)), (self.convers(self._ii), self.convers(self._jj))), 
-                                shape=(self._n2d, self._n2d))
-        Smat = self.identity(self._n2d) + 2.0 * (Smat1 ** n)
+        Smat1 = self.csc_matrix(
+            (
+                self.convers(self._ss) * (1.0 / np.square(kl)),
+                (self.convers(self._ii), self.convers(self._jj)),
+            ),
+            shape=(self._n2d, self._n2d),
+        )
+        Smat = self.identity(self._n2d) + 2.0 * (Smat1**n)
 
         ttu = self.convers(ttu)
         ttw = ttu - Smat @ ttu  # Work with perturbations
 
-        b = 1. / Smat.diagonal()  # Simple preconditioner
+        b = 1.0 / Smat.diagonal()  # Simple preconditioner
         arr = self.convers(np.arange(self._n2d))
         pre = self.csc_matrix((b, (arr, arr)), shape=(self._n2d, self._n2d))
 
         tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
         if code != 0:
-            raise SolverNotConvergedError("Solver has not converged without metric terms",
-                                          [f"output code with code: {code}"])
+            raise SolverNotConvergedError(
+                "Solver has not converged without metric terms",
+                [f"output code with code: {code}"],
+            )
 
         tts += ttu
         return self.tonumpy(tts)
 
     def _compute_full(self, n, kl, ttuv, tol=1e-5, maxiter=150000) -> np.ndarray:
-        Smat1 = self.csc_matrix((self.convers(self._ss) * (1.0 / np.square(kl)), (self.convers(self._ii), self.convers(self._jj))),
-                                shape=(2 * self._n2d, 2 * self._n2d))
-        Smat = self.identity(2 * self._n2d) + 2.0 * (Smat1 ** n)
+        Smat1 = self.csc_matrix(
+            (
+                self.convers(self._ss) * (1.0 / np.square(kl)),
+                (self.convers(self._ii), self.convers(self._jj)),
+            ),
+            shape=(2 * self._n2d, 2 * self._n2d),
+        )
+        Smat = self.identity(2 * self._n2d) + 2.0 * (Smat1**n)
 
         ttuv = self.convers(ttuv)
         ttw = ttuv - Smat @ ttuv  # Work with perturbations
 
-        b = 1. / Smat.diagonal()  # Simple preconditioner
+        b = 1.0 / Smat.diagonal()  # Simple preconditioner
         arr = self.convers(np.arange(2 * self._n2d))
         pre = self.csc_matrix((b, (arr, arr)), shape=(2 * self._n2d, 2 * self._n2d))
 
         tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
         if code != 0:
-            raise SolverNotConvergedError("Solver has not converged with metric terms",
-                                          [f"output code with code: {code}"])
+            raise SolverNotConvergedError(
+                "Solver has not converged with metric terms",
+                [f"output code with code: {code}"],
+            )
 
         tts += ttuv
         return self.tonumpy(tts)
 
-    def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_velocity(
+        self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         if n < 1:
             raise ValueError("Filter order must be positive")
 
@@ -145,7 +178,7 @@ class TriangularFilter(Filter):
 
         if self._full:
             ttuv = self._compute_full(n, k, np.concatenate((uxn, vyn)))
-            return ttuv[0:self._n2d], ttuv[self._n2d:2 * self._n2d]
+            return ttuv[0 : self._n2d], ttuv[self._n2d : 2 * self._n2d]
         else:
             ttu = self._compute(n, k, uxn)
             ttv = self._compute(n, k, vyn)
@@ -155,11 +188,24 @@ class TriangularFilter(Filter):
         if n < 1:
             raise ValueError("Filter order must be positive")
 
-        return np.array(self._compute_full(n, k, data) if self._full else self._compute(n, k, data))
+        return np.array(
+            self._compute_full(n, k, data) if self._full else self._compute(n, k, data)
+        )
 
-    def prepare(self, n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str = "m",
-                cartesian: bool = True, cyclic_length: float = 360. * pi / 180., full: bool = False,
-                mask: np.ndarray = None, gpu: bool = False):
+    def prepare(
+        self,
+        n2d: int,
+        e2d: int,
+        tri: np.ndarray,
+        xcoord: np.ndarray,
+        ycoord: np.ndarray,
+        meshtype: str = "m",
+        cartesian: bool = True,
+        cyclic_length: float = 360.0 * pi / 180.0,
+        full: bool = False,
+        mask: np.ndarray = None,
+        gpu: bool = False,
+    ):
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
 
         if mask is None:
@@ -167,8 +213,19 @@ class TriangularFilter(Filter):
 
         ne_num, ne_pos = neighboring_triangles(n2d, e2d, tri)
         nn_num, nn_pos = neighbouring_nodes(n2d, tri, ne_num, ne_pos)
-        area, elem_area, dx, dy, Mt = areas(n2d, e2d, tri, xcoord, ycoord, ne_num, ne_pos, meshtype, cartesian,
-                                            cyclic_length, mask)
+        area, elem_area, dx, dy, Mt = areas(
+            n2d,
+            e2d,
+            tri,
+            xcoord,
+            ycoord,
+            ne_num,
+            ne_pos,
+            meshtype,
+            cartesian,
+            cyclic_length,
+            mask,
+        )
 
         self._elem_area = jnp.array(elem_area)
         self._dx = jnp.array(dx)
@@ -182,16 +239,34 @@ class TriangularFilter(Filter):
         self._ne_pos = jnp.array(ne_pos)
         self._area = jnp.array(area)
 
-        self._mask_n = transform_mask_to_nodes(jnp.array(mask), self._ne_pos, self._ne_num, n2d)
-        self._mask_n = jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(bool)  # Where there's ocean
+        self._mask_n = transform_mask_to_nodes(
+            jnp.array(mask), self._ne_pos, self._ne_num, n2d
+        )
+        self._mask_n = jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(
+            bool
+        )  # Where there's ocean
 
-        smooth, metric = make_smooth(jMt, self._elem_area, self._dx, self._dy, jnn_num, jnn_pos, jtri, n2d, e2d, full)
+        smooth, metric = make_smooth(
+            jMt,
+            self._elem_area,
+            self._dx,
+            self._dy,
+            jnn_num,
+            jnn_pos,
+            jtri,
+            n2d,
+            e2d,
+            full,
+        )
 
         smooth = vmap(lambda n: smooth[:, n] / self._area[n])(jnp.arange(0, n2d)).T
         metric = vmap(lambda n: metric[:, n] / self._area[n])(jnp.arange(0, n2d)).T
 
-        self._ss, self._ii, self._jj = make_smat_full(jnn_pos, jnn_num, smooth, metric, n2d, int(jnp.sum(jnn_num))) \
-            if full else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
+        self._ss, self._ii, self._jj = (
+            make_smat_full(jnn_pos, jnn_num, smooth, metric, n2d, int(jnp.sum(jnn_num)))
+            if full
+            else make_smat(jnn_pos, jnn_num, smooth, n2d, int(jnp.sum(jnn_num)))
+        )
 
         ## Set rows (and columns!) of smooth where (node) mask is 0 (land) to 0: This enforces a Neumann BC
         #   i.e. Set _ss = 0 where mask_n[_ii] = 0 && mask_n[_jj] = 0
@@ -199,9 +274,9 @@ class TriangularFilter(Filter):
 
         # Create a mask where both _ii and _jj are not 0
         if full:
-            mask_sp = (self._mask_n[self._ii % n2d] & self._mask_n[self._jj % n2d])
+            mask_sp = self._mask_n[self._ii % n2d] & self._mask_n[self._jj % n2d]
         else:
-            mask_sp = (self._mask_n[self._ii] & self._mask_n[self._jj])
+            mask_sp = self._mask_n[self._ii] & self._mask_n[self._jj]
 
         self._ss = self._ss[mask_sp]
         self._ii = self._ii[mask_sp]
@@ -211,13 +286,13 @@ class TriangularFilter(Filter):
         self._e2d = e2d
         self._full = full
 
-        if gpu:
-            self.set_backend("gpu")
+        self.set_backend("gpu" if gpu else "cpu")
 
     def get_backend(self) -> str:
         return self.backend
-    
-    def set_backend(self, backend: str):
-        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = get_backend(backend)
-        self.backend = backend
 
+    def set_backend(self, backend: str):
+        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = (
+            get_backend(backend)
+        )
+        self.backend = backend

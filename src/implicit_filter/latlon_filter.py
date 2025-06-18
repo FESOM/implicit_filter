@@ -1,17 +1,21 @@
 import math
-from typing import Tuple, List
+from typing import Tuple
 
 import numpy as np
-from scipy.sparse import csc_matrix, identity
-from scipy.sparse.linalg import cg
 
-from implicit_filter.utils._numpy_functions import calculate_local_regular_neighbourhood, \
-    calculate_global_regular_neighbourhood
+from implicit_filter.utils._numpy_functions import (
+    calculate_local_regular_neighbourhood,
+    calculate_global_regular_neighbourhood,
+)
 from implicit_filter.filter import Filter
-from implicit_filter.utils.utils import SolverNotConvergedError, transform_attribute
+from implicit_filter.utils.utils import (
+    SolverNotConvergedError,
+    get_backend,
+    transform_attribute,
+)
 
 
-class LatLonNumpyFilter(Filter):
+class LatLonFilter(Filter):
     """
     A filter class for data based on regular latitude and longitude grids using NumPy arrays.
 
@@ -43,6 +47,7 @@ class LatLonNumpyFilter(Filter):
         super().__init__(initial_data, **kwargs)
         it = lambda ar: int(ar)
         ar = lambda ar: np.array(ar)
+        st = lambda ar: str(ar)
 
         # Transform and initialize attributes with default values
         transform_attribute(self, "_e2d", it, 0)
@@ -52,9 +57,18 @@ class LatLonNumpyFilter(Filter):
         transform_attribute(self, "_ii", ar, None)
         transform_attribute(self, "_jj", ar, None)
         transform_attribute(self, "_area", ar, None)
+        transform_attribute(self, "_backend", st, "cpu")
 
+        self.set_backend(self.backend)
 
-    def prepare(self, latitude: np.ndarray, longitude: np.ndarray, cartesian: bool = False, local: bool = True):
+    def prepare(
+        self,
+        latitude: np.ndarray,
+        longitude: np.ndarray,
+        cartesian: bool = False,
+        local: bool = True,
+        gpu: bool = False,
+    ):
         """
         Prepares the filter for latitude and longitude grids regular grids
 
@@ -76,7 +90,6 @@ class LatLonNumpyFilter(Filter):
         self._e2d = e2d
         self._nx = nx
         self._ny = ny
-
 
         xcoord = np.zeros((nx, ny))
         ycoord = xcoord.copy()
@@ -104,8 +117,10 @@ class LatLonNumpyFilter(Filter):
 
         hh = np.ones((4, e2d))  # Edge lengths
         hc = np.ones((4, e2d))  # Distance to next cell centers
-        r_earth = 6400.
-        cyclic_length = 360  # in degrees; if not cyclic, take it larger than  zonal size
+        r_earth = 6400.0
+        cyclic_length = (
+            360  # in degrees; if not cyclic, take it larger than  zonal size
+        )
         cyclic_length = cyclic_length * math.pi / 180
         # Fill ee_pos, arrangement is W;N;E;S
         for i in range(e2d):
@@ -166,7 +181,7 @@ class LatLonNumpyFilter(Filter):
 
             ii[no] = n
             jj[no] = n
-            ss[no] = -np.sum(ss[no:nn + 1])
+            ss[no] = -np.sum(ss[no : nn + 1])
             nn += 1
 
         self._ss = ss
@@ -174,34 +189,70 @@ class LatLonNumpyFilter(Filter):
         self._jj = jj
         self._area = area
 
-    def _compute(self, n, k, data: np.ndarray, maxiter=150_000, tol=1e-6) -> np.ndarray:
-        e2d = self._e2d
+        self.set_backend("gpu" if gpu else "cpu")
 
-        Smat1 = csc_matrix((self._ss * (1.0 / k ** 2), (self._ii, self._jj)), shape=(e2d, e2d))
-        Smat2 = identity(e2d)
-        Smat = Smat2 + 2.0 * (-1 * Smat1) ** n
-        ttw = data.T - Smat @ data.T  # Work with perturbations
+    def get_backend(self) -> str:
+        return self._backend
 
-        b = 1. / Smat.diagonal()  # Simple preconditioner
-        pre = csc_matrix((b, (np.arange(e2d), np.arange(e2d))), shape=(e2d, e2d))
-        tts, code = cg(Smat, ttw, maxiter=maxiter, rtol=tol, M=pre)
-        tts += data.T
+    def set_backend(self, backend: str):
+        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = (
+            get_backend(backend)
+        )
+        self._backend = backend
 
+    def _compute(
+        self,
+        n: int,
+        k: float,
+        data: np.ndarray,
+        maxiter: int = 150_000,
+        tol: float = 1e-6,
+    ) -> np.ndarray:
+        Smat1 = self.csc_matrix(
+            (
+                self.convers(self._ss) * (-1.0 / np.square(k)),
+                (self.convers(self._ii), self.convers(self._jj)),
+            ),
+            shape=(self._e2d, self._e2d),
+        )
+        Smat = self.identity(self._e2d) + 2.0 * (Smat1**n)
+
+        ttu = self.convers(data)
+        ttw = ttu - Smat @ ttu  # Work with perturbations
+
+        b = 1.0 / Smat.diagonal()  # Simple preconditioner
+        arr = self.convers(np.arange(self._e2d))
+        pre = self.csc_matrix((b, (arr, arr)), shape=(self._e2d, self._e2d))
+
+        tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
         if code != 0:
-            raise SolverNotConvergedError("Solver has not converged",
-                                          [f"output code with code: {code}"])
-        return tts
+            raise SolverNotConvergedError(
+                "Solver has not converged without metric terms",
+                [f"output code with code: {code}"],
+            )
+
+        tts += ttu
+        return self.tonumpy(tts)
 
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
         if n < 1:
             raise ValueError("Filter order must be positive")
 
-        return np.reshape(self._compute(n, k, np.reshape(data, self._e2d)), (self._nx, self._ny))
+        return np.reshape(
+            self._compute(n, k, np.reshape(data, self._e2d)), (self._nx, self._ny)
+        )
 
-    def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_velocity(
+        self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         if n < 1:
             raise ValueError("Filter order must be positive")
 
-        return (np.reshape(self._compute(n, k, np.reshape(ux, self._e2d)), (self._nx, self._ny)),
-                np.reshape(self._compute(n, k, np.reshape(vy, self._e2d)), (self._nx, self._ny)))
-
+        return (
+            np.reshape(
+                self._compute(n, k, np.reshape(ux, self._e2d)), (self._nx, self._ny)
+            ),
+            np.reshape(
+                self._compute(n, k, np.reshape(vy, self._e2d)), (self._nx, self._ny)
+            ),
+        )

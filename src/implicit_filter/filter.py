@@ -19,7 +19,7 @@ class Filter(ABC):
     @abstractmethod
     def set_backend(self, backend: str):
         pass
-    
+
     @abstractmethod
     def get_backend(self) -> str:
         pass
@@ -49,7 +49,9 @@ class Filter(ABC):
         pass
 
     @abstractmethod
-    def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_velocity(
+        self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the filtered velocity data using a specified filter size.
         Data must be placed on mesh nodes
@@ -75,8 +77,13 @@ class Filter(ABC):
         """
         pass
 
-    def compute_spectra_scalar(self, n: int, k: Iterable | np.ndarray, data: np.ndarray,
-                               mask: np.ndarray | None = None) -> np.ndarray:
+    def compute_spectra_scalar(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        data: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
         """
         Computes power spectra for given wavelengths.
         Data must be placed on mesh nodes
@@ -106,24 +113,34 @@ class Filter(ABC):
         nr = len(k)
         spectra = np.zeros(nr + 1)
         if mask is None:
-            mask = np.zeros(data.shape, dtype=bool)
+            mask: np.ndarray = np.zeros(data.shape, dtype=bool)
 
         not_mask = ~mask
         selected_area = self._area[not_mask]
 
-        spectra[-1] = np.sum(selected_area * (np.square(data))[not_mask]) / np.sum(selected_area)
+        spectra[-1] = np.sum(selected_area * (np.square(data))[not_mask]) / np.sum(
+            selected_area
+        )
 
         for i in range(nr):
             ttu = self.compute(n, k[i], data)
             ttu -= data
 
             ttu[mask] = 0.0
-            spectra[i] = np.sum(selected_area * (np.square(ttu))[not_mask]) / np.sum(selected_area)
+            spectra[i] = np.sum(selected_area * (np.square(ttu))[not_mask]) / np.sum(
+                selected_area
+            )
 
         return spectra
 
-    def compute_spectra_velocity(self, n: int, k: Iterable | np.ndarray, ux: np.ndarray, vy: np.ndarray,
-                                 mask: np.ndarray | None = None) -> np.ndarray:
+    def compute_spectra_velocity(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        ux: np.ndarray,
+        vy: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
         """
         Computes power spectra for given wavelengths.
         Data must be placed on mesh nodes
@@ -163,7 +180,9 @@ class Filter(ABC):
 
         not_mask = ~mask
         selected_area = self._area[not_mask]
-        spectra[-1] = np.sum(selected_area * (np.square(unod) + np.square(vnod))[not_mask]) / np.sum(selected_area)
+        spectra[-1] = np.sum(
+            selected_area * (np.square(unod) + np.square(vnod))[not_mask]
+        ) / np.sum(selected_area)
 
         for i in range(nr):
             ttu = self.compute(n, k[i], unod)
@@ -175,7 +194,9 @@ class Filter(ABC):
             ttu[mask] = 0.0
             ttv[mask] = 0.0
 
-            spectra[i] = np.sum(selected_area * (np.square(ttu) + np.square(ttv))[not_mask]) / np.sum(selected_area)
+            spectra[i] = np.sum(
+                selected_area * (np.square(ttu) + np.square(ttv))[not_mask]
+            ) / np.sum(selected_area)
 
         return spectra
 
@@ -191,5 +212,3 @@ class Filter(ABC):
     def load_from_file(cls, file: str):
         """Load auxiliary arrays from a file"""
         return cls(**dict(np.load(file)))
-
-
