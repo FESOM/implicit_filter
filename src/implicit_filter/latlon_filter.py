@@ -1,5 +1,5 @@
 import math
-from typing import Tuple
+from typing import Tuple, Iterable
 
 import numpy as np
 
@@ -59,7 +59,7 @@ class LatLonFilter(Filter):
         transform_attribute(self, "_area", ar, None)
         transform_attribute(self, "_backend", st, "cpu")
 
-        self.set_backend(self.backend)
+        self.set_backend(self._backend)
 
     def prepare(
         self,
@@ -256,3 +256,101 @@ class LatLonFilter(Filter):
                 self._compute(n, k, np.reshape(vy, self._e2d)), (self._nx, self._ny)
             ),
         )
+
+    def compute_spectra_scalar(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        data: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
+        nr = len(k)
+        tt = np.reshape(data, self._e2d)
+        spectra = np.zeros(nr + 1)
+        if mask is None:
+            mask: np.ndarray = np.zeros(tt.shape, dtype=bool)
+
+        not_mask = ~mask
+        selected_area = self._area[not_mask]
+
+        spectra[0] = np.sum(selected_area * (np.square(tt))[not_mask]) / np.sum(
+            selected_area
+        )
+
+        for i in range(nr):
+            ttu = self._compute(n, k[i], tt)
+            ttu -= tt
+
+            ttu[mask] = 0.0
+            spectra[i + 1] = np.sum(
+                selected_area * (np.square(ttu))[not_mask]
+            ) / np.sum(selected_area)
+
+        return spectra
+
+    def compute_spectra_velocity(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        ux: np.ndarray,
+        vy: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """
+        Computes power spectra for given wavelengths.
+        Data must be placed on mesh nodes
+
+        For details refer to https://arxiv.org/abs/2404.07398
+        Parameters:
+        -----------
+        n : int
+            Order of filter, one is recommended
+
+        k : Iterable | np.ndarray
+            List of wavelengths to be filtered.
+
+        ux : np.ndarray
+            NumPy array containing an eastward velocity component to be filtered.
+
+        vy : np.ndarray
+            NumPy array containing a northwards velocity component to be filtered.
+
+        mask : np.ndarray | None
+            Mask applied to data while computing spectra.
+            True means selected data won't be used for computing spectra.
+            This mask won't be used during filtering.
+
+        Returns:
+        --------
+        np.ndarray:
+            Array containing power spectra for given wavelengths.
+        """
+        nr = len(k)
+        unod = np.reshape(ux, self._e2d)
+        vnod = np.reshape(vy, self._e2d)
+
+        spectra = np.zeros(nr + 1)
+        if mask is None:
+            mask = np.zeros(unod.shape, dtype=bool)
+
+        not_mask = ~mask
+        selected_area = self._area[not_mask]
+        spectra[0] = np.sum(
+            selected_area * (np.square(unod) + np.square(vnod))[not_mask]
+        ) / np.sum(selected_area)
+
+        for i in range(nr):
+            ttu = self._compute(n, k[i], unod)
+            ttv = self._compute(n, k[i], vnod)
+
+            ttu -= unod
+            ttv -= vnod
+
+            ttu[mask] = 0.0
+            ttv[mask] = 0.0
+
+            spectra[i + 1] = np.sum(
+                selected_area * (np.square(ttu) + np.square(ttv))[not_mask]
+            ) / np.sum(selected_area)
+
+        return spectra
