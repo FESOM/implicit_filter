@@ -224,7 +224,7 @@ class LatLonFilter(Filter):
         arr = self.convers(np.arange(self._e2d))
         pre = self.csc_matrix((b, (arr, arr)), shape=(self._e2d, self._e2d))
 
-        tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
+        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
         if code != 0:
             raise SolverNotConvergedError(
                 "Solver has not converged without metric terms",

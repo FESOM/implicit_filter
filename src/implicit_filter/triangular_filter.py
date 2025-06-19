@@ -130,7 +130,7 @@ class TriangularFilter(Filter):
         arr = self.convers(np.arange(self._n2d))
         pre = self.csc_matrix((b, (arr, arr)), shape=(self._n2d, self._n2d))
 
-        tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
+        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
         if code != 0:
             raise SolverNotConvergedError(
                 "Solver has not converged without metric terms",
@@ -157,7 +157,7 @@ class TriangularFilter(Filter):
         arr = self.convers(np.arange(2 * self._n2d))
         pre = self.csc_matrix((b, (arr, arr)), shape=(2 * self._n2d, 2 * self._n2d))
 
-        tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
+        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
         if code != 0:
             raise SolverNotConvergedError(
                 "Solver has not converged with metric terms",
