@@ -130,7 +130,7 @@ class TriangularFilter(Filter):
         arr = self.convers(np.arange(self._n2d))
         pre = self.csc_matrix((b, (arr, arr)), shape=(self._n2d, self._n2d))
 
-        tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
+        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
         if code != 0:
             raise SolverNotConvergedError(
                 "Solver has not converged without metric terms",
@@ -157,7 +157,7 @@ class TriangularFilter(Filter):
         arr = self.convers(np.arange(2 * self._n2d))
         pre = self.csc_matrix((b, (arr, arr)), shape=(2 * self._n2d, 2 * self._n2d))
 
-        tts, code = self.cg(Smat, ttw, ttw, tol, maxiter, pre)
+        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
         if code != 0:
             raise SolverNotConvergedError(
                 "Solver has not converged with metric terms",
@@ -295,3 +295,71 @@ class TriangularFilter(Filter):
             get_backend(backend)
         )
         self.backend = backend
+
+    def compute_spectra_scalar(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        data: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
+        nr = len(k)
+        spectra = np.zeros(nr + 1)
+        if mask is None:
+            mask: np.ndarray = np.zeros(data.shape, dtype=bool)
+
+        not_mask = ~mask
+        selected_area = self._area[not_mask]
+
+        spectra[0] = np.sum(selected_area * (np.square(data))[not_mask]) / np.sum(
+            selected_area
+        )
+
+        for i in range(nr):
+            ttu = self.compute(n, k[i], data)
+            ttu -= data
+
+            ttu[mask] = 0.0
+            spectra[i + 1] = np.sum(
+                selected_area * (np.square(ttu))[not_mask]
+            ) / np.sum(selected_area)
+
+        return spectra
+
+    def compute_spectra_velocity(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        ux: np.ndarray,
+        vy: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
+        nr = len(k)
+        spectra = np.zeros(nr + 1)
+        if mask is None:
+            mask = np.zeros(ux.shape, dtype=bool)
+
+        unod = ux
+        vnod = vy
+
+        not_mask = ~mask
+        selected_area = self._area[not_mask]
+        spectra[0] = np.sum(
+            selected_area * (np.square(unod) + np.square(vnod))[not_mask]
+        ) / np.sum(selected_area)
+
+        for i in range(nr):
+            ttu = self.compute(n, k[i], unod)
+            ttv = self.compute(n, k[i], vnod)
+
+            ttu -= unod
+            ttv -= vnod
+
+            ttu[mask] = 0.0
+            ttv[mask] = 0.0
+
+            spectra[i + 1] = np.sum(
+                selected_area * (np.square(ttu) + np.square(ttv))[not_mask]
+            ) / np.sum(selected_area)
+
+        return spectra

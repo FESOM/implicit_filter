@@ -1,131 +1,15 @@
-from typing import Tuple, List
-
 import numpy as np
 import xarray as xr
-from scipy.sparse import csc_matrix, identity
-from scipy.sparse.linalg import cg
 
 from implicit_filter.utils._auxiliary import find_adjacent_points_north
 from implicit_filter.utils._numpy_functions import calculate_global_nemo_neighbourhood
-from implicit_filter.utils.utils import (
-    SolverNotConvergedError,
-    get_backend,
-    transform_attribute,
-)
-from .filter import Filter
+from .latlon_filter import LatLonFilter
 
 
-class NemoFilter(Filter):
+class NemoFilter(LatLonFilter):
     """
     A filter class for NEMO ocean model data using NumPy arrays.
-
-    Methods
-    -------
-    many_compute(n: int, k: float, data: np.ndarray | List[np.ndarray]) -> List[np.ndarray]:
-        Placeholder method to compute filtering on multiple datasets. Not implemented yet.
-
-    compute_velocity(n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        Computes the filtered velocity fields.
-
-    compute(n: int, k: float, data: np.ndarray) -> np.ndarray:
-        Computes the filtered data.
-
-    prepare_from_file(file: str, vl: int):
-        Prepares the filter using data from a specified file.
-
     """
-
-    def __init__(self, *initial_data, **kwargs):
-        """
-        Initializes the NemoNumpyFilter with the given data and keyword arguments.
-
-        Parameters
-        ----------
-        initial_data : tuple
-            Initial data to be passed to the parent class.
-        kwargs : dict
-            Additional keyword arguments.
-
-        """
-        super().__init__(initial_data, **kwargs)
-        it = lambda ar: int(ar)
-        ar = lambda ar: np.array(ar)
-        st = lambda st: str(st)
-
-        # Transform and initialize attributes with default values
-        transform_attribute(self, "_e2d", it, 0)
-        transform_attribute(self, "_nx", it, 0)
-        transform_attribute(self, "_ny", it, 0)
-        transform_attribute(self, "_area", ar, None)
-        transform_attribute(self, "_backend", st, "cpu")
-
-        self.set_backend(self._backend)
-
-    def compute_velocity(
-        self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        if n < 1:
-            raise ValueError("Filter order must be positive")
-
-        v = np.zeros((4, self._e2d))  # N, W, E, S
-        v[0, :] = np.reshape(ux, self._e2d)  # West
-        v[1, :] = np.reshape(vy, self._e2d)  # North
-
-        for i in range(self._e2d):
-            if self._ee_pos[3, i] != i:
-                v[3, i] = v[1, self._ee_pos[3, i]]
-
-            if self._ee_pos[2, i] != i:
-                v[2, i] = v[0, self._ee_pos[2, i]]
-
-        ttu = v[0, :] + v[2, :]
-        ttv = v[1, :] + v[3, :]
-
-        return (
-            np.reshape(self._compute(n, k, ttu), (self._nx, self._ny)),
-            np.reshape(self._compute(n, k, ttv), (self._nx, self._ny)),
-        )
-
-    def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
-        if n < 1:
-            raise ValueError("Filter order must be positive")
-
-        tt = np.reshape(data, self._e2d)
-        return np.reshape(self._compute(n, k, tt), (self._nx, self._ny))
-
-    def _compute(
-        self,
-        n: int,
-        k: float,
-        data: np.ndarray,
-        maxiter: int = 150_000,
-        tol: float = 1e-6,
-    ) -> np.ndarray:
-        Smat1 = self.csc_matrix(
-            (
-                self.convers(self._ss) * (-1.0 / np.square(k)),
-                (self.convers(self._ii), self.convers(self._jj)),
-            ),
-            shape=(self._e2d, self._e2d),
-        )
-        Smat = self.identity(self._e2d) + 2.0 * (Smat1**n)
-
-        ttu = self.convers(data)
-        ttw = ttu - Smat @ ttu  # Work with perturbations
-
-        b = 1.0 / Smat.diagonal()  # Simple preconditioner
-        arr = self.convers(np.arange(self._e2d))
-        pre = self.csc_matrix((b, (arr, arr)), shape=(self._e2d, self._e2d))
-
-        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
-        if code != 0:
-            raise SolverNotConvergedError(
-                "Solver has not converged without metric terms",
-                [f"output code with code: {code}"],
-            )
-
-        tts += ttu
-        return self.tonumpy(tts)
 
     def prepare_from_file(self, file: str, vl: int, gpu: bool = False):
         ds = xr.open_dataset(file)
@@ -273,12 +157,3 @@ class NemoFilter(Filter):
         self._jj = jj
 
         self.set_backend("gpu" if gpu else "cpu")
-
-    def get_backend(self) -> str:
-        return self._backend
-
-    def set_backend(self, backend: str):
-        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = (
-            get_backend(backend)
-        )
-        self._backend = backend

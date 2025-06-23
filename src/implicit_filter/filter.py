@@ -77,6 +77,7 @@ class Filter(ABC):
         """
         pass
 
+    @abstractmethod
     def compute_spectra_scalar(
         self,
         n: int,
@@ -110,29 +111,9 @@ class Filter(ABC):
         np.ndarray:
             Array containing power spectra for given wavelengths.
         """
-        nr = len(k)
-        spectra = np.zeros(nr + 1)
-        if mask is None:
-            mask: np.ndarray = np.zeros(data.shape, dtype=bool)
+        pass
 
-        not_mask = ~mask
-        selected_area = self._area[not_mask]
-
-        spectra[-1] = np.sum(selected_area * (np.square(data))[not_mask]) / np.sum(
-            selected_area
-        )
-
-        for i in range(nr):
-            ttu = self.compute(n, k[i], data)
-            ttu -= data
-
-            ttu[mask] = 0.0
-            spectra[i] = np.sum(selected_area * (np.square(ttu))[not_mask]) / np.sum(
-                selected_area
-            )
-
-        return spectra
-
+    @abstractmethod
     def compute_spectra_velocity(
         self,
         n: int,
@@ -170,35 +151,7 @@ class Filter(ABC):
         np.ndarray:
             Array containing power spectra for given wavelengths.
         """
-        nr = len(k)
-        spectra = np.zeros(nr + 1)
-        if mask is None:
-            mask = np.zeros(ux.shape, dtype=bool)
-
-        unod = ux
-        vnod = vy
-
-        not_mask = ~mask
-        selected_area = self._area[not_mask]
-        spectra[-1] = np.sum(
-            selected_area * (np.square(unod) + np.square(vnod))[not_mask]
-        ) / np.sum(selected_area)
-
-        for i in range(nr):
-            ttu = self.compute(n, k[i], unod)
-            ttv = self.compute(n, k[i], vnod)
-
-            ttu -= unod
-            ttv -= vnod
-
-            ttu[mask] = 0.0
-            ttv[mask] = 0.0
-
-            spectra[i] = np.sum(
-                selected_area * (np.square(ttu) + np.square(ttv))[not_mask]
-            ) / np.sum(selected_area)
-
-        return spectra
+        pass
 
     def __getstate__(self):
         # Only include names that start with '_'
