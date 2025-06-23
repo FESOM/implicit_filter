@@ -143,7 +143,8 @@ def areas(
     ne_pos: np.ndarray,
     meshtype: str,
     carthesian: bool,
-    cyclic_length,
+    cyclic_length: float,
+    mask: np.ndarray,
 ):
     """
     Calculate areas of triangles and derivatives of P1 basis functions.
@@ -227,7 +228,7 @@ def areas(
             dy[n, 2] = x2 / d
 
             # Calculate the area of the triangle.
-            elem_area[n] = 0.5 * abs(d)
+            elem_area[n] = 0.5 * abs(d) * mask[n]
 
     elif meshtype == "r":
         rad = math.pi / 180.0
@@ -267,7 +268,7 @@ def areas(
             dy[n, 2] = x2 / d
 
             # Calculate the area of the triangle.
-            elem_area[n] = 0.5 * abs(d)
+            elem_area[n] = 0.5 * abs(d) * mask[n]
 
         if carthesian:
             Mt = np.zeros([e2d])

@@ -226,6 +226,7 @@ class TriangularFilter(Filter):
             meshtype,
             cartesian,
             cyclic_length,
+            mask,
         )
 
         self._elem_area = jnp.array(elem_area)
@@ -242,13 +243,12 @@ class TriangularFilter(Filter):
 
         self._mask_n = jnp.array(mask)
 
-        if mask_transform:
-            self._mask_n = transform_mask_to_nodes(
-                self._mask_n, self._ne_pos, self._ne_num, self._n2d
-            )
-            self._mask_n = ~jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(
-                bool
-            )  # Where there's ocean
+        self._mask_n = transform_mask_to_nodes(
+            self._mask_n, self._ne_pos, self._ne_num, self._n2d
+        )
+        self._mask_n = ~jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(
+            bool
+        )  # Where there's ocean
 
         smooth, metric = make_smooth(
             jMt,
@@ -351,7 +351,7 @@ class TriangularFilter(Filter):
         ) / np.sum(selected_area)
 
         for i in range(nr):
-            ttu, ttv = self.compute_spectra_velocity(n, k[i], unod, vnod)
+            ttu, ttv = self.compute_velocity(n, k[i], unod, vnod)
 
             ttu -= unod
             ttv -= vnod
