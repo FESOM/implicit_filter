@@ -30,7 +30,7 @@ pip install -e .
 pip install -e .[gpu]
 ```
 ### Known issues
-Installing CuPy can cause an error, in case this happens try installing it manually:
+Installing CuPy can cause an error, in case this happens to try installing it manually:
 
 ```shell
 pip install cupy
@@ -43,7 +43,7 @@ CuPy version matching your drivers.
 
 Lets start with loading FESOM mesh file and data that we want to filter
 
-This is basic example with only scalar data.
+This is a basic example with only scalar data.
 ```python
 import xarray as xr
 
@@ -54,9 +54,9 @@ data = xr.open_dataset(path + "ssh.nc")
 unfiltered = data['ssh'].values[0, :]
 ```
 
-Now we can create filter.
+Now create filter.
 
-The easiest way to do it is by using mesh file path
+The easiest way to do it is by using mesh path
 
 ```python
 from implicit_filter import CuPyFilter 
@@ -67,11 +67,11 @@ flter.prepare_from_file(path + "fesom.mesh.diag.nc")
 ```
 JAX warning might appear about GPU not being available, but it should be ignored. 
 
-If you don't have GPU support enabled importing CuPyFilter will cause an import error.
+If you don't have GPU support enabled, importing CuPyFilter will cause an import error.
 
-Alternatively you can set arrays by yourself, but this is shown in notebooks in examples.
+Alternatively, you can set arrays by yourself, but this is shown in notebooks in examples.
 
-It is highly recommended to save filter's auxiliary arrays as it can take significant amount of time to compute them.
+It is highly recommended to save filter's auxiliary arrays as it can take a significant amount of time to compute them.
 Auxiliary arrays are specific to each mesh, so they only need to be computed once.
 
 ```python

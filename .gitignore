@@ -25,7 +25,13 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
+*.nc
+*.out
+*.png
+*.npz
+*.pt
+data/
+*.egg-info
 
 ## General
 

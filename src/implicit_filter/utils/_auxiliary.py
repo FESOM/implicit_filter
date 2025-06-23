@@ -134,7 +134,7 @@ def neighbouring_nodes(n2d: int, tri: np.ndarray, ne_num: np.ndarray, ne_pos: np
 
 
 def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, ne_num: np.ndarray,
-          ne_pos: np.ndarray, meshtype: str, carthesian: bool, cyclic_length):
+          ne_pos: np.ndarray, meshtype: str, carthesian: bool, cyclic_length, mask: np.ndarray):
     """
     Calculate areas of triangles and derivatives of P1 basis functions.
 
@@ -151,7 +151,7 @@ def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.nd
         Each row contains the indices of the three nodes that form a triangle.
 
     xcoord : np.ndarray
-        A 1D NumPy array containing the x-coordinates of nodes in the mesh.
+        A 1D NumPy array containing the x-coordinates of nodes, in the mesh.
 
     ycoord : np.ndarray
         A 1D NumPy array containing the y-coordinates of nodes in the mesh.
@@ -257,7 +257,7 @@ def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.nd
             dy[n, 2] = x2 / d
 
             # Calculate the area of the triangle.
-            elem_area[n] = 0.5 * abs(d)
+            elem_area[n] = 0.5 * abs(d) * mask[n]
 
         if carthesian:
             Mt = np.zeros([e2d])
@@ -268,6 +268,8 @@ def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.nd
     area = np.zeros([n2d])
     for n in range(n2d):
         area[n] = np.sum(elem_area[ne_pos[0:ne_num[n], n]]) / 3.0
+        if area[n] == 0.0:
+            area[n] = 1.0e-5
 
     return area, elem_area, dx, dy, Mt
 
@@ -353,7 +355,7 @@ def convert_to_wavenumbers(dist, dxm):
     - The factor 3.5 is used to make the results comparable with box-type filters.
 
     """
-    if dist <= 0 or dxm <= 0:
+    if np.any(np.logical_or(dist <= 0, dxm <= 0)):
         raise ValueError("Both dist and dxm parameters must be positive")
 
     size = 3.5 * (dist / dxm)

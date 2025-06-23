@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, List, Union
+from typing import Tuple, Iterable
 
 import numpy as np
 
@@ -8,6 +8,7 @@ class Filter(ABC):
     """
     Abstract base class for filters
     """
+
     def __init__(self, *initial_data, **kwargs):
         for dictionary in initial_data:
             for key in dictionary:
@@ -16,9 +17,18 @@ class Filter(ABC):
             setattr(self, key, kwargs[key])
 
     @abstractmethod
+    def set_backend(self, backend: str):
+        pass
+
+    @abstractmethod
+    def get_backend(self) -> str:
+        pass
+
+    @abstractmethod
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
         """
         Compute the filtered data using a specified filter size.
+        Data must be placed on mesh nodes
 
         Parameters:
         ------------
@@ -39,12 +49,12 @@ class Filter(ABC):
         pass
 
     @abstractmethod
-    def compute_velocity(self, n: int, k: float, ux: np.ndarray, uy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_velocity(
+        self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the filtered velocity data using a specified filter size.
-
-        It performs implicit interpolates it from elements to nodes. Currently, filtering directly on elements
-        is not supported.
+        Data must be placed on mesh nodes
 
         Parameters:
         -----------
@@ -57,73 +67,101 @@ class Filter(ABC):
         ux : np.ndarray
             NumPy array containing eastward velocity component to be filtered.
 
-        uy : np.ndarray
+        vy : np.ndarray
             NumPy array containing northwards velocity component to be filtered.
 
         Returns:
         --------
         Tuple[np.ndarray, np.ndarray]:
-            Tuple containing NumPy arrays with filtered data ux and uy velocities.
+            Tuple containing NumPy arrays with filtered data ux and uy velocities on mesh nodes.
         """
         pass
 
     @abstractmethod
-    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
+    def compute_spectra_scalar(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        data: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
         """
-        Computes multiple inputs, which are scalar data
+        Computes power spectra for given wavelengths.
+        Data must be placed on mesh nodes
 
+        For details refer to https://arxiv.org/abs/2404.07398
         Parameters:
         -----------
         n : int
             Order of filter, one is recommended
 
-        k : float
-            Wavelength of the filter.
+        k : Iterable | np.ndarray
+            List of wavelengths to be filtered.
 
-        data : Union[np.ndarray, List[np.ndarray]]
-            It can be either a list of 1D NumPy arrays to be processed or
-            a 2D NumPy array which 2nd dimension will be iterated over.
+        data : np.ndarray
+            NumPy array containing data to be filtered.
+
+        mask : np.ndarray | None
+            Mask applied to data while computing spectra.
+            True means selected data won't be used for computing spectra.
+            This mask won't be used during filtering.
 
         Returns:
         --------
-        List[np.ndarray]:
-            List containing NumPy arrays with filtered data
+        np.ndarray:
+            Array containing power spectra for given wavelengths.
         """
         pass
 
-    def many_compute_velocity(self, n: int, k: float, ux: Union[np.ndarray, List[np.ndarray]],
-                              vy: Union[np.ndarray, List[np.ndarray]]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    @abstractmethod
+    def compute_spectra_velocity(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        ux: np.ndarray,
+        vy: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
         """
-        Computes multiple velocity inputs
+        Computes power spectra for given wavelengths.
+        Data must be placed on mesh nodes
 
+        For details refer to https://arxiv.org/abs/2404.07398
         Parameters:
         -----------
         n : int
             Order of filter, one is recommended
 
-        k : float
-            Wavelength of the filter.
+        k : Iterable | np.ndarray
+            List of wavelengths to be filtered.
 
         ux : np.ndarray
-            Eastward velocity component to be filtered. It can be either a list of 1D NumPy arrays to be processed or
-            a 2D NumPy array which 2nd dimension will be iterated over.
+            NumPy array containing an eastward velocity component to be filtered.
 
-        uy : np.ndarray
-            Northwards velocity component to be filtered. It can be either a list of 1D NumPy arrays to be processed or
-            a 2D NumPy array which 2nd dimension will be iterated over.
+        vy : np.ndarray
+            NumPy array containing a northwards velocity component to be filtered.
+
+        mask : np.ndarray | None
+            Mask applied to data while computing spectra.
+            True means selected data won't be used for computing spectra.
+            This mask won't be used during filtering.
 
         Returns:
         --------
-        Tuple[List[np.ndarray], List[np.ndarray]]:
-            Tuple containing lists containing NumPy arrays with filtered data
+        np.ndarray:
+            Array containing power spectra for given wavelengths.
         """
         pass
 
+    def __getstate__(self):
+        # Only include names that start with '_'
+        return {k: v for k, v in vars(self).items() if k.startswith("_")}
+
     def save_to_file(self, file: str):
-        """Save auxiliary arrays to file, as they are mesh specific"""
-        np.savez(file, **vars(self))
+        """Save auxiliary arrays to file, as they're mesh-specific"""
+        np.savez(file, **self.__getstate__())
 
     @classmethod
     def load_from_file(cls, file: str):
-        """Load auxiliary arrays from file"""
+        """Load auxiliary arrays from a file"""
         return cls(**dict(np.load(file)))
