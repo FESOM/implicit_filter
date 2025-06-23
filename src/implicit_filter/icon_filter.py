@@ -8,8 +8,8 @@ class IconFilter(TriangularFilter):
     def prepare_from_file(
         self,
         grid_file: str,
-        ocean_mask: np.ndarray | bool = False,
         full: bool = False,
+        mask: np.ndarray | bool = False,
         gpu: bool = False,
     ):
         grid2d = xr.open_dataset(grid_file)
@@ -18,18 +18,20 @@ class IconFilter(TriangularFilter):
         ycoord = grid2d["vlat"].values * 180.0 / np.pi  # Location of nodes, in degrees
         tri = grid2d["vertex_of_cell"].values.T.astype(int) - 1
         tri = tri.astype(int)
+        mask_transform = False
 
-        if isinstance(ocean_mask, np.ndarray):
+        if isinstance(mask, np.ndarray):
             pass
-        elif ocean_mask:
+        elif mask:
             if "cell_sea_land_mask" in grid2d:
-                ocean_mask = grid2d["cell_sea_land_mask"].values
+                mask = grid2d["cell_sea_land_mask"].values
+                mask_transform = True
             else:
                 raise KeyError(
                     f"In the file {grid_file} there's no ocean mask under default name {'cell_sea_land_mask'}"
                 )
         else:
-            ocean_mask = np.ones(len(tri[:, 1]))
+            mask = np.ones(len(tri[:, 1]))
             # NOTE: LSM is in grid2d['cell_sea_land_mask'] or in grid3d['lsm_c'].isel(depth=???)
 
         self.prepare(
@@ -42,6 +44,7 @@ class IconFilter(TriangularFilter):
             cartesian=False,
             cyclic_length=2.0 * np.pi,
             full=full,
-            mask=ocean_mask,
+            mask=mask,
             gpu=gpu,
+            mask_transform=mask_transform,
         )

@@ -62,7 +62,9 @@ def neighboring_triangles(n2d: int, e2d: int, tri: np.ndarray):
     return ne_num, ne_pos
 
 
-def neighbouring_nodes(n2d: int, tri: np.ndarray, ne_num: np.ndarray, ne_pos: np.ndarray):
+def neighbouring_nodes(
+    n2d: int, tri: np.ndarray, ne_num: np.ndarray, ne_pos: np.ndarray
+):
     """
     Compute neighboring nodes for each node in a 2D mesh.
 
@@ -93,7 +95,6 @@ def neighbouring_nodes(n2d: int, tri: np.ndarray, ne_num: np.ndarray, ne_pos: np
         for each node. The 'nn_pos[i, j]' entry indicates the index of the i-th neighboring node for the j-th node.
     """
     # Initialize an array to store the count of neighboring nodes for each node.
-
 
     # Initialize an array to store the positions of neighboring nodes for each node.
     nn_num = np.zeros([n2d], dtype=int)
@@ -132,9 +133,18 @@ def neighbouring_nodes(n2d: int, tri: np.ndarray, ne_num: np.ndarray, ne_pos: np
     return nn_num, nn_pos
 
 
-
-def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, ne_num: np.ndarray,
-          ne_pos: np.ndarray, meshtype: str, carthesian: bool, cyclic_length, mask: np.ndarray):
+def areas(
+    n2d: int,
+    e2d: int,
+    tri: np.ndarray,
+    xcoord: np.ndarray,
+    ycoord: np.ndarray,
+    ne_num: np.ndarray,
+    ne_pos: np.ndarray,
+    meshtype: str,
+    carthesian: bool,
+    cyclic_length,
+):
     """
     Calculate areas of triangles and derivatives of P1 basis functions.
 
@@ -196,7 +206,7 @@ def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.nd
     r_earth = 6400  # Earth's radius, assuming units in kilometers
     Mt = np.ones([e2d])
 
-    if meshtype == 'm':
+    if meshtype == "m":
         for n in range(e2d):
             # Calculate differences in x and y coordinates for triangle vertices.
             x2 = xcoord[tri[n, 1]] - xcoord[tri[n, 0]]
@@ -219,7 +229,7 @@ def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.nd
             # Calculate the area of the triangle.
             elem_area[n] = 0.5 * abs(d)
 
-    elif meshtype == 'r':
+    elif meshtype == "r":
         rad = math.pi / 180.0
         if carthesian:
             Mt = np.ones([e2d])
@@ -257,7 +267,7 @@ def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.nd
             dy[n, 2] = x2 / d
 
             # Calculate the area of the triangle.
-            elem_area[n] = 0.5 * abs(d) * mask[n]
+            elem_area[n] = 0.5 * abs(d)
 
         if carthesian:
             Mt = np.zeros([e2d])
@@ -267,7 +277,7 @@ def areas(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.nd
     # Calculate scalar cell (cluster) area for each node.
     area = np.zeros([n2d])
     for n in range(n2d):
-        area[n] = np.sum(elem_area[ne_pos[0:ne_num[n], n]]) / 3.0
+        area[n] = np.sum(elem_area[ne_pos[0 : ne_num[n], n]]) / 3.0
         if area[n] == 0.0:
             area[n] = 1.0e-5
 
@@ -362,7 +372,9 @@ def convert_to_wavenumbers(dist, dxm):
     return 2 * math.pi / size
 
 
-def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees: float = None) -> tuple[Series, int]:
+def find_adjacent_points_north(
+    mesh_mask_path: str = None, lon_lat_prec_degrees: float = None
+) -> tuple[Series, int]:
     """
     Fix rounding erros in NEMO grid using linear regression
 
@@ -398,8 +410,8 @@ def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees:
 
     # Find out which row corresponds to the last one y
     if (
-            abs(np.sort(ilon.isel(y=-1)) - np.sort(ilon.isel(y=-2))).mean()
-            < abs(np.sort(ilon.isel(y=-1)) - np.sort(ilon.isel(y=-3))).mean()
+        abs(np.sort(ilon.isel(y=-1)) - np.sort(ilon.isel(y=-2))).mean()
+        < abs(np.sort(ilon.isel(y=-1)) - np.sort(ilon.isel(y=-3))).mean()
     ):
         corresponds_to_redundant = -2
     else:
@@ -408,14 +420,22 @@ def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees:
 
     # extract redundant (last row) and correspoding row coords
     ilon_redundant = ilon.isel(x=slice(1, -1)).isel(y=-1, drop=True)
-    ilon_corresponds = ilon.isel(x=slice(1, -1)).isel(y=corresponds_to_redundant, drop=True)
+    ilon_corresponds = ilon.isel(x=slice(1, -1)).isel(
+        y=corresponds_to_redundant, drop=True
+    )
     ilat_redundant = ilon.isel(x=slice(1, -1)).isel(y=-1, drop=True)
-    ilat_corresponds = ilon.isel(x=slice(1, -1)).isel(y=corresponds_to_redundant, drop=True)
+    ilat_corresponds = ilon.isel(x=slice(1, -1)).isel(
+        y=corresponds_to_redundant, drop=True
+    )
 
     # find corresponding x
     x_corr = []
-    for x_r, lon_r, lat_r in list(zip(ilon_redundant.x.data, ilon_redundant.data, ilat_redundant.data)):
-        for x_c, lon_c, lat_c in zip(ilon_corresponds.x.data, ilon_corresponds.data, ilat_corresponds.data):
+    for x_r, lon_r, lat_r in list(
+        zip(ilon_redundant.x.data, ilon_redundant.data, ilat_redundant.data)
+    ):
+        for x_c, lon_c, lat_c in zip(
+            ilon_corresponds.x.data, ilon_corresponds.data, ilat_corresponds.data
+        ):
             if lon_r.data[()] == lon_c.data[()]:
                 if lat_r.data[()] == lat_c.data[()]:
                     if x_c not in x_corr:
@@ -423,14 +443,30 @@ def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees:
                         break
 
     # filter adjacent x for outliers
-    adjacent_x = pd.Series(x_corr, name="adjacent_x", index=pd.Series(ilon_redundant.x.data, name="reference_x"))
-    adjacent_x_sanitized = adjacent_x.where(abs(adjacent_x.diff()) < 1.5 * abs(adjacent_x.diff()).mean()).dropna()
+    adjacent_x = pd.Series(
+        x_corr,
+        name="adjacent_x",
+        index=pd.Series(ilon_redundant.x.data, name="reference_x"),
+    )
+    adjacent_x_sanitized = adjacent_x.where(
+        abs(adjacent_x.diff()) < 1.5 * abs(adjacent_x.diff()).mean()
+    ).dropna()
 
     # fit clean adjacent indices
     lr = LinearRegression()
-    lr.fit(np.array(adjacent_x_sanitized.index).reshape(-1, 1), np.array(adjacent_x_sanitized).reshape(-1, 1))
-    adjacent_x_fit = pd.Series(lr.predict(np.array(adjacent_x.index).reshape(-1, 1)).reshape(-1),
-                               index=adjacent_x.index, name="adjacent_x").round().astype(int)
+    lr.fit(
+        np.array(adjacent_x_sanitized.index).reshape(-1, 1),
+        np.array(adjacent_x_sanitized).reshape(-1, 1),
+    )
+    adjacent_x_fit = (
+        pd.Series(
+            lr.predict(np.array(adjacent_x.index).reshape(-1, 1)).reshape(-1),
+            index=adjacent_x.index,
+            name="adjacent_x",
+        )
+        .round()
+        .astype(int)
+    )
 
     # test if we were successful
     np.testing.assert_array_almost_equal(
@@ -440,4 +476,3 @@ def find_adjacent_points_north(mesh_mask_path: str = None, lon_lat_prec_degrees:
 
     # return adjacent indices
     return adjacent_x_fit, corresponds_to_redundant
-

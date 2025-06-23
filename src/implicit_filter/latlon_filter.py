@@ -67,6 +67,7 @@ class LatLonFilter(Filter):
         longitude: np.ndarray,
         cartesian: bool = False,
         local: bool = True,
+        mask: np.ndarray | None = None,
         gpu: bool = False,
     ):
         """
@@ -102,6 +103,8 @@ class LatLonFilter(Filter):
 
         xcoord = np.reshape(xcoord, [nx * ny])
         ycoord = np.reshape(ycoord, [nx * ny])
+
+        self._mask_n = np.ones(self._e2d, dtype=bool) if mask is None else mask
 
         if local:
             ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
@@ -183,6 +186,13 @@ class LatLonFilter(Filter):
             jj[no] = n
             ss[no] = -np.sum(ss[no : nn + 1])
             nn += 1
+
+        # Create a mask where both _ii and _jj are not 0
+        mask_sp = self._mask_n[self._ii] & self._mask_n[self._jj]
+
+        self._ss = self._ss[mask_sp]
+        self._ii = self._ii[mask_sp]
+        self._jj = self._jj[mask_sp]
 
         self._ss = ss
         self._ii = ii
@@ -340,7 +350,7 @@ class LatLonFilter(Filter):
         ) / np.sum(selected_area)
 
         for i in range(nr):
-            ttu, ttv = self.compute_velocity(n, k[i], unod, vnod)
+            ttu, ttv = self.compute_velocity(n, k[i], unod, vyn)
 
             ttu -= unod
             ttv -= vnod

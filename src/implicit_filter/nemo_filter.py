@@ -11,7 +11,13 @@ class NemoFilter(LatLonFilter):
     A filter class for NEMO ocean model data using NumPy arrays.
     """
 
-    def prepare_from_file(self, file: str, vl: int, gpu: bool = False):
+    def prepare_from_file(
+        self,
+        file: str,
+        vl: int,
+        mask: np.ndarray | bool = True,
+        gpu: bool = False,
+    ):
         ds = xr.open_dataset(file)
 
         nx, ny = (
@@ -125,12 +131,18 @@ class NemoFilter(LatLonFilter):
         ss = np.zeros(nza, dtype="float")
         ii = np.zeros(nza, dtype="int")
         jj = np.zeros(nza, dtype="int")
-        mask = np.reshape(
-            ds.tmask.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2))
-            .transpose("x", "y")
-            .values,
-            nx * ny,
-        )
+
+        if isinstance(mask, np.ndarray):
+            pass
+        elif mask:
+            mask = np.reshape(
+                ds.tmask.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2))
+                .transpose("x", "y")
+                .values,
+                nx * ny,
+            )
+        else:
+            mask = np.ones(nx * ny, dtype=bool)
 
         nn = 0
         for n in range(e2d):

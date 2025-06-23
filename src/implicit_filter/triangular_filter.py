@@ -18,7 +18,6 @@ from implicit_filter.utils._jax_function import (
     make_smat,
     make_smat_full,
     transform_mask_to_nodes,
-    transform_vector_to_nodes,
 )
 from implicit_filter.utils.utils import (
     SolverNotConvergedError,
@@ -205,12 +204,15 @@ class TriangularFilter(Filter):
         full: bool = False,
         mask: np.ndarray = None,
         gpu: bool = False,
+        mask_transform: bool = False,
     ):
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
+        self._n2d = n2d
+        self._e2d = e2d
+        self._full = full
 
         if mask is None:
             mask = np.ones(e2d)
-
         ne_num, ne_pos = neighboring_triangles(n2d, e2d, tri)
         nn_num, nn_pos = neighbouring_nodes(n2d, tri, ne_num, ne_pos)
         area, elem_area, dx, dy, Mt = areas(
@@ -224,7 +226,6 @@ class TriangularFilter(Filter):
             meshtype,
             cartesian,
             cyclic_length,
-            mask,
         )
 
         self._elem_area = jnp.array(elem_area)
@@ -241,9 +242,13 @@ class TriangularFilter(Filter):
 
         self._mask_n = jnp.array(mask)
 
-        # self._mask_n = jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(
-        #     bool
-        # )  # Where there's ocean
+        if mask_transform:
+            self._mask_n = transform_mask_to_nodes(
+                self._mask_n, self._ne_pos, self._ne_num, self._n2d
+            )
+            self._mask_n = ~jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(
+                bool
+            )  # Where there's ocean
 
         smooth, metric = make_smooth(
             jMt,
@@ -270,20 +275,17 @@ class TriangularFilter(Filter):
         ## Set rows (and columns!) of smooth where (node) mask is 0 (land) to 0: This enforces a Neumann BC
         #   i.e. Set _ss = 0 where mask_n[_ii] = 0 && mask_n[_jj] = 0
         # AFW
-
         # Create a mask where both _ii and _jj are not 0
         if full:
-            mask_sp = self._mask_n[self._ii % n2d] & self._mask_n[self._jj % n2d]
+            mask_sp = jnp.logical_and(
+                self._mask_n[self._ii % n2d], self._mask_n[self._jj % n2d]
+            )
         else:
             mask_sp = jnp.logical_and(self._mask_n[self._ii], self._mask_n[self._jj])
 
         self._ss = self._ss[mask_sp]
         self._ii = self._ii[mask_sp]
         self._jj = self._jj[mask_sp]
-
-        self._n2d = n2d
-        self._e2d = e2d
-        self._full = full
 
         self.set_backend("gpu" if gpu else "cpu")
 
