@@ -45,6 +45,8 @@ class FesomFilter(TriangularFilter):
             tri = mesh['elements'].values.T - 1
         elif 'face_nodes' in keys:
             tri = mesh['face_nodes'].values.T - 1
+        elif 'elem' in keys:
+            tri = mesh['elem'].values.T - 1
         else:
             raise RuntimeError(
                 "In FESOM mesh file triangulation data was not found. It should be either named as elements or face_nodes"

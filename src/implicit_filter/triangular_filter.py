@@ -239,12 +239,11 @@ class TriangularFilter(Filter):
         self._ne_pos = jnp.array(ne_pos)
         self._area = jnp.array(area)
 
-        self._mask_n = transform_mask_to_nodes(
-            jnp.array(mask), self._ne_pos, self._ne_num, n2d
-        )
-        self._mask_n = jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(
-            bool
-        )  # Where there's ocean
+        self._mask_n = jnp.array(mask)
+
+        # self._mask_n = jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(
+        #     bool
+        # )  # Where there's ocean
 
         smooth, metric = make_smooth(
             jMt,
@@ -276,7 +275,7 @@ class TriangularFilter(Filter):
         if full:
             mask_sp = self._mask_n[self._ii % n2d] & self._mask_n[self._jj % n2d]
         else:
-            mask_sp = self._mask_n[self._ii] & self._mask_n[self._jj]
+            mask_sp = jnp.logical_and(self._mask_n[self._ii], self._mask_n[self._jj])
 
         self._ss = self._ss[mask_sp]
         self._ii = self._ii[mask_sp]
