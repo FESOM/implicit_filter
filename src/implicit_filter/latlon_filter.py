@@ -187,17 +187,17 @@ class LatLonFilter(Filter):
             ss[no] = -np.sum(ss[no : nn + 1])
             nn += 1
 
-        # Create a mask where both _ii and _jj are not 0
-        mask_sp = self._mask_n[self._ii] & self._mask_n[self._jj]
-
-        self._ss = self._ss[mask_sp]
-        self._ii = self._ii[mask_sp]
-        self._jj = self._jj[mask_sp]
-
         self._ss = ss
         self._ii = ii
         self._jj = jj
         self._area = area
+
+        # Create a mask where both _ii and _jj are not 0
+        mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
+
+        self._ss = self._ss[mask_sp]
+        self._ii = self._ii[mask_sp]
+        self._jj = self._jj[mask_sp]
 
         self.set_backend("gpu" if gpu else "cpu")
 
