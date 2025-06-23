@@ -1,5 +1,6 @@
-from implicit_filter import Filter, TriangularFilter
+from implicit_filter import Filter, TriangularFilter, NemoFilter
 from ._jax_function import transform_vector_to_nodes, transform_to_nodes
+from ._numpy_functions import convert_to_tcells
 
 import jax.numpy as jnp
 import numpy as np
@@ -38,3 +39,12 @@ def transform_scalar_to_nodes(data, filter: Filter) -> tuple[np.ndarray, np.ndar
         return np.array(uxn)
     else:
         raise TypeError("Only TriangularFilter and it's subclasses are supported")
+
+
+def transform_to_T_cells(
+    ux: np.ndarray, vy: np.ndarray, filter: Filter
+) -> tuple[np.ndarray, np.ndarray]:
+    if issubclass(filter.__class__, NemoFilter):
+        return convert_to_tcells(filter._e2d, filter._ee_pos, ux, uy)
+    else:
+        raise TypeError("Only NemoFilter and it's subclasses are supported")

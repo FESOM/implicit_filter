@@ -4,8 +4,16 @@ import numpy as np
 import pandas as pd
 
 
-def make_smooth(elem_area: np.ndarray, dx: np.ndarray, dy: np.ndarray, nn_num: np.ndarray,
-                nn_pos: np.ndarray, tri: np.ndarray, n2d: int, e2d: int):
+def make_smooth(
+    elem_area: np.ndarray,
+    dx: np.ndarray,
+    dy: np.ndarray,
+    nn_num: np.ndarray,
+    nn_pos: np.ndarray,
+    tri: np.ndarray,
+    n2d: int,
+    e2d: int,
+):
     """
     Calculate the smoothness matrix and metric matrix for a given mesh.
     It does not support metric terms
@@ -71,7 +79,9 @@ def make_smooth(elem_area: np.ndarray, dx: np.ndarray, dy: np.ndarray, nn_num: n
     return smooth_m
 
 
-def make_smat(nn_pos: np.ndarray, nn_num: np.ndarray, smooth_m: np.ndarray, n2d: int, nza: int):
+def make_smat(
+    nn_pos: np.ndarray, nn_num: np.ndarray, smooth_m: np.ndarray, n2d: int, nza: int
+):
     """
     Convert the smoothness matrix into a redundant sparse form (s(k), i(k), j(k)) as required by scipy.
 
@@ -118,7 +128,29 @@ def make_smat(nn_pos: np.ndarray, nn_num: np.ndarray, smooth_m: np.ndarray, n2d:
     return ss, ii, jj
 
 
-def calculate_global_nemo_neighbourhood(e2d: int, nx: int, ny: int, north_adj: pd.Series) -> Tuple[np.ndarray, int]:
+def convert_to_tcells(
+    e2d: int, ee_pos: np.ndarray, ux: np.ndarray, vy: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    v = np.zeros((4, e2d))  # N, W, E, S
+    v[0, :] = np.reshape(ux, e2d)  # West
+    v[1, :] = np.reshape(vy, e2d)  # North
+
+    for i in range(e2d):
+        if ee_pos[3, i] != i:
+            v[3, i] = v[1, ee_pos[3, i]]
+
+        if ee_pos[2, i] != i:
+            v[2, i] = v[0, ee_pos[2, i]]
+
+    ttu = v[0, :] + v[2, :]
+    ttv = v[1, :] + v[3, :]
+
+    return ttu, ttv
+
+
+def calculate_global_nemo_neighbourhood(
+    e2d: int, nx: int, ny: int, north_adj: pd.Series
+) -> tuple[np.ndarray, int]:
     """
     Calculate neighbourhood of each cell in NEMO global mesh
 
@@ -223,7 +255,9 @@ def calculate_global_nemo_neighbourhood(e2d: int, nx: int, ny: int, north_adj: p
     return ee_pos, nza
 
 
-def calculate_global_regular_neighbourhood(e2d: int, nx: int, ny: int) -> Tuple[np.ndarray, int]:
+def calculate_global_regular_neighbourhood(
+    e2d: int, nx: int, ny: int
+) -> Tuple[np.ndarray, int]:
     """
     Calculate the neighbourhood of each cell in regular global mesh.
     The Northern border is ignored
@@ -326,7 +360,9 @@ def calculate_global_regular_neighbourhood(e2d: int, nx: int, ny: int) -> Tuple[
     return ee_pos, nza
 
 
-def calculate_local_regular_neighbourhood(e2d: int, nx: int, ny: int) -> Tuple[np.ndarray, int]:
+def calculate_local_regular_neighbourhood(
+    e2d: int, nx: int, ny: int
+) -> Tuple[np.ndarray, int]:
     """
     Calculate the neighbourhood of each cell in regular local mesh.
     All periodic neighbours are ignored

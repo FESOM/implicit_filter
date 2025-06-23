@@ -349,8 +349,7 @@ class TriangularFilter(Filter):
         ) / np.sum(selected_area)
 
         for i in range(nr):
-            ttu = self.compute(n, k[i], unod)
-            ttv = self.compute(n, k[i], vnod)
+            ttu, ttv = self.compute_spectra_velocity(n, k[i], unod, vnod)
 
             ttu -= unod
             ttv -= vnod
