@@ -11,7 +11,8 @@ version = "1.1.0"
 description = "Python package implementing implicit filtering method on any type of mesh."
 readme = "readme.md"
 authors = [{ name = "Kacper Nowak", email = "kacper.nowak@awi.de" },
-           { name = "Aaron Wienkers", email = "awienkers@ethz.ch"}]
+           { name = "Aaron Wienkers", email = "awienkers@ethz.ch" },
+           { name = "Willi Rath", email = "wrath@geomar.de" }]
 
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -30,6 +31,12 @@ dynamic = ["dependencies"]
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
+gpu_c11 = [
+    "cupy-cuda11x"
+]
+gpu_c12 = [
+    "cupy-cuda12x"
+]
 gpu = [
     "cupy"
 ]

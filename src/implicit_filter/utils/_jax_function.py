@@ -587,3 +587,33 @@ def transform_mask_to_nodes(
     uxn = vmap(lambda n: calculate(ne_pos[:, n], ne_num[n], mask))(jnp.arange(0, n2d))
 
     return uxn
+
+
+def transform_mask_to_elements(
+    mask: jnp.ndarray, en_pos: jnp.ndarray, e2d: int
+) -> jnp.ndarray:
+    """
+    Project node mask to elements by checking if
+
+    Parameters:
+    ----------
+    mask : jnp.ndarray
+        A JAX array of shape (n_nodes,) with the mask values defined on nodes.
+
+    ne_pos : jnp.ndarray
+        A JAX array of shape (3, n_element) containing the node indices for each element.
+
+    Returns:
+    -------
+    jnp.ndarray
+        A JAX array of shape (n_elements,) with the projected mask defined on elements.
+    """
+
+    @jit
+    def calculate(mask: jnp.ndarray, ne_pos: jnp.ndarray):
+        return jnp.all(mask[ne_pos])
+
+    # Apply the function to each element
+    element_mask = vmap(lambda n: calculate(mask, en_pos[:, n]))(jnp.arange(0, e2d))
+
+    return element_mask

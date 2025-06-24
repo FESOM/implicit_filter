@@ -350,7 +350,8 @@ class LatLonFilter(Filter):
         ) / np.sum(selected_area)
 
         for i in range(nr):
-            ttu, ttv = self.compute_velocity(n, k[i], unod, vyn)
+            ttu = self._compute(n, k[i], unod)
+            ttv = self._compute(n, k[i], vnod)
 
             ttu -= unod
             ttv -= vnod

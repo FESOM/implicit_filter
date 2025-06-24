@@ -1,5 +1,10 @@
 from implicit_filter import Filter, TriangularFilter, NemoFilter
-from ._jax_function import transform_vector_to_nodes, transform_to_nodes
+from ._jax_function import (
+    transform_vector_to_nodes,
+    transform_to_nodes,
+    transform_mask_to_nodes,
+    transform_mask_to_elements,
+)
 from ._numpy_functions import convert_to_tcells
 
 import jax.numpy as jnp
@@ -41,10 +46,32 @@ def transform_scalar_to_nodes(data, filter: Filter) -> tuple[np.ndarray, np.ndar
         raise TypeError("Only TriangularFilter and it's subclasses are supported")
 
 
+def transform_mask_from_elements_to_nodes(
+    mask: np.ndarray, filter: filter
+) -> np.ndarray:
+    if issubclass(filter.__class__, TriangularFilter):
+        uxn = transform_mask_to_nodes(
+            jnp.array(mask), filter._ne_pos, filter._ne_num, filter._n2d
+        )
+        return np.array(uxn, dtype=bool)
+    else:
+        raise TypeError("Only TriangularFilter and it's subclasses are supported")
+
+
+def transform_mask_from_nodes_to_elements(
+    mask: np.ndarray, filter: filter
+) -> np.ndarray:
+    if issubclass(filter.__class__, TriangularFilter):
+        uxn = transform_mask_to_elements(jnp.array(mask), filter._en_pos, filter._e2d)
+        return np.array(uxn, dtype=bool)
+    else:
+        raise TypeError("Only TriangularFilter and it's subclasses are supported")
+
+
 def transform_to_T_cells(
     ux: np.ndarray, vy: np.ndarray, filter: Filter
 ) -> tuple[np.ndarray, np.ndarray]:
     if issubclass(filter.__class__, NemoFilter):
-        return convert_to_tcells(filter._e2d, filter._ee_pos, ux, uy)
+        return convert_to_tcells(filter._e2d, filter._ee_pos, ux, vy)
     else:
         raise TypeError("Only NemoFilter and it's subclasses are supported")

@@ -2,7 +2,11 @@ import numpy as np
 import xarray as xr
 
 from implicit_filter.utils._auxiliary import find_adjacent_points_north
-from implicit_filter.utils._numpy_functions import calculate_global_nemo_neighbourhood
+from implicit_filter.utils._numpy_functions import (
+    calculate_global_nemo_neighbourhood,
+    calculate_global_regular_neighbourhood,
+    calculate_local_regular_neighbourhood,
+)
 from .latlon_filter import LatLonFilter
 
 
@@ -17,34 +21,62 @@ class NemoFilter(LatLonFilter):
         vl: int,
         mask: np.ndarray | bool = True,
         gpu: bool = False,
+        neighb: str = "full",
     ):
         ds = xr.open_dataset(file)
+        north_adj = None
+
+        if neighb == "full":
+            north_adj, corresponds_to_redundant = find_adjacent_points_north(file, 1e-5)
+        else:
+            corresponds_to_redundant = None
 
         nx, ny = (
-            ds.gphit.isel(t=0, y=slice(None, -2), x=slice(None, -2))
+            ds.gphit.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values.shape
         )
-        north_adj, _ = find_adjacent_points_north(file, 1e-5)
         e2d = nx * ny
 
         self._nx = nx
         self._ny = ny
         self._e2d = e2d
 
-        ee_pos, nza = calculate_global_nemo_neighbourhood(e2d, nx, ny, north_adj)
+        if neighb == "full":
+            ee_pos, nza = calculate_global_nemo_neighbourhood(e2d, nx, ny, north_adj)
+        elif neighb == "west-east":
+            ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
+        elif neighb == "local":
+            ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
+        else:
+            raise NotImplementedError(
+                f"the neighbourhood type {neighb} is not supported. The only options are full, west-east, local."
+            )
+
         self._ee_pos = ee_pos
 
         # Cell sizes
         hx = np.reshape(
-            ds.e1t.isel(t=0, y=slice(None, -2), x=slice(None, -2))
+            ds.e1t.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values
             / 1000.0,
             nx * ny,
         )
         hy = np.reshape(
-            ds.e2t.isel(t=0, y=slice(None, -2), x=slice(None, -2))
+            ds.e2t.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values
             / 1000.0,
@@ -54,14 +86,22 @@ class NemoFilter(LatLonFilter):
 
         hh = np.ones((4, e2d))  # Edge lengths
         hh[1, :] = np.reshape(
-            ds.e2u.isel(t=0, y=slice(None, -2), x=slice(None, -2))
+            ds.e2u.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values
             / 1000.0,
             nx * ny,
         )  # North edge
         hh[0, :] = np.reshape(
-            ds.e1v.isel(t=0, y=slice(None, -2), x=slice(None, -2))
+            ds.e1v.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values
             / 1000.0,
@@ -80,21 +120,36 @@ class NemoFilter(LatLonFilter):
 
         # Cell heights
         h3u = np.reshape(
-            ds.e3u_0.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2))
+            ds.e3u_0.isel(
+                z=vl,
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values
             / 1000.0,
             nx * ny,
         )
         h3v = np.reshape(
-            ds.e3v_0.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2))
+            ds.e3v_0.isel(
+                z=vl,
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values
             / 1000.0,
             nx * ny,
         )
         h3t = np.reshape(
-            ds.e3t_0.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2))
+            ds.e3t_0.isel(
+                z=vl,
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values
             / 1000.0,
@@ -103,14 +158,22 @@ class NemoFilter(LatLonFilter):
 
         hc = np.ones((4, e2d))  # Distance to next cell centers
         hc[0, :] = np.reshape(
-            ds.e1u.isel(t=0, y=slice(None, -2), x=slice(None, -2))
+            ds.e1u.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values
             / 1000.0,
             nx * ny,
         )  # West neighbour
         hc[1, :] = np.reshape(
-            ds.e2v.isel(t=0, y=slice(None, -2), x=slice(None, -2))
+            ds.e2v.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
             .transpose("x", "y")
             .values
             / 1000.0,
@@ -136,7 +199,12 @@ class NemoFilter(LatLonFilter):
             pass
         elif mask:
             mask = np.reshape(
-                ds.tmask.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2))
+                ds.tmask.isel(
+                    z=vl,
+                    y=slice(None, corresponds_to_redundant),
+                    x=slice(None, corresponds_to_redundant),
+                )
+                .squeeze()
                 .transpose("x", "y")
                 .values,
                 nx * ny,
