@@ -204,7 +204,6 @@ class TriangularFilter(Filter):
         full: bool = False,
         mask: np.ndarray = None,
         gpu: bool = False,
-        mask_transform: bool = False,
     ):
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
         self._n2d = n2d

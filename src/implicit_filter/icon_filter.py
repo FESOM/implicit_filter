@@ -46,5 +46,4 @@ class IconFilter(TriangularFilter):
             full=full,
             mask=mask,
             gpu=gpu,
-            mask_transform=mask_transform,
         )
