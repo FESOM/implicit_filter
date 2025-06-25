@@ -18,10 +18,26 @@ class Filter(ABC):
 
     @abstractmethod
     def set_backend(self, backend: str):
+        """
+        Set the computational backend for filter operations.
+
+        Parameters
+        ----------
+        backend : str
+            Name of the backend to use (e.g., 'cpu', 'gpu').
+        """
         pass
 
     @abstractmethod
     def get_backend(self) -> str:
+        """
+        Get the current computational backend.
+
+        Returns
+        -------
+        str
+            Name of the active backend.
+        """
         pass
 
     @abstractmethod
@@ -158,10 +174,29 @@ class Filter(ABC):
         return {k: v for k, v in vars(self).items() if k.startswith("_")}
 
     def save_to_file(self, file: str):
-        """Save auxiliary arrays to file, as they're mesh-specific"""
+        """
+        Persist internal state to NPZ file.
+
+        Parameters
+        ----------
+        file : str
+            Output file path (.npz extension recommended)
+        """
         np.savez(file, **self.__getstate__())
 
     @classmethod
     def load_from_file(cls, file: str):
-        """Load auxiliary arrays from a file"""
+        """
+        Instantiate filter from saved state file.
+
+        Parameters
+        ----------
+        file : str
+            Input file path created by save_to_file()
+
+        Returns
+        -------
+        Filter
+            Reconstructed filter instance with restored state
+        """
         return cls(**dict(np.load(file)))

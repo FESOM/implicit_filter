@@ -13,6 +13,15 @@ class IconFilter(TriangularFilter):
         gpu: bool = False,
     ):
         grid2d = xr.open_dataset(grid_file)
+        self.prepare_from_data_array(grid2d, full, mask, gpu)
+
+    def prepare_from_data_array(
+        self,
+        grid2d: xr.DataArray,
+        full: bool = False,
+        mask: np.ndarray | bool = False,
+        gpu: bool = False,
+    ):
         # Prepare the mesh data
         xcoord = grid2d["vlon"].values * 180.0 / np.pi
         ycoord = grid2d["vlat"].values * 180.0 / np.pi  # Location of nodes, in degrees

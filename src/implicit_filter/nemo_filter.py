@@ -24,6 +24,16 @@ class NemoFilter(LatLonFilter):
         neighb: str = "full",
     ):
         ds = xr.open_dataset(file)
+        self.prepare_from_data_array(ds, vl, mask, gpu, neighb)
+
+    def prepare_from_data_array(
+        self,
+        ds: xr.DataArray,
+        vl: int,
+        mask: np.ndarray | bool = True,
+        gpu: bool = False,
+        neighb: str = "full",
+    ):
         north_adj = None
 
         if neighb == "full":
