@@ -104,7 +104,7 @@ class LatLonFilter(Filter):
         xcoord = np.reshape(xcoord, [nx * ny])
         ycoord = np.reshape(ycoord, [nx * ny])
 
-        self._mask_n = np.ones(self._e2d, dtype=bool) if mask is None else mask
+        self._mask_n = np.ones(self._e2d, dtype=bool) if mask is None else mask.flatten()
 
         if local:
             ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
@@ -175,7 +175,7 @@ class LatLonFilter(Filter):
         for n in range(e2d):
             no = nn
             for m in range(4):
-                if ee_pos[m, n] != n:
+                if ee_pos[m, n] != n and self._mask_n[ee_pos[m, n]] != 0:
                     nn += 1
                     # print(f"nn: {nn} m: {m} n: {n}")
                     ss[nn] = (hc[m, n] / hh[m, n]) / area[n]
@@ -193,11 +193,11 @@ class LatLonFilter(Filter):
         self._area = area
 
         # Create a mask where both _ii and _jj are not 0
-        mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
-
-        self._ss = self._ss[mask_sp]
-        self._ii = self._ii[mask_sp]
-        self._jj = self._jj[mask_sp]
+        # mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
+        #
+        # self._ss = self._ss[mask_sp]
+        # self._ii = self._ii[mask_sp]
+        # self._jj = self._jj[mask_sp]
 
         self.set_backend("gpu" if gpu else "cpu")
 
