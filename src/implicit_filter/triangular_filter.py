@@ -169,6 +169,32 @@ class TriangularFilter(Filter):
     def compute_velocity(
         self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Apply filter to velocity components on triangular mesh.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : float
+            Filter wavelength in spatial units.
+        ux : np.ndarray
+            Eastward velocity component at mesh nodes.
+        vy : np.ndarray
+            Northward velocity component at mesh nodes.
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray]
+            Filtered velocity components (ux_filt, vy_filt).
+
+        Raises
+        ------
+        ValueError
+            If filter order n < 1.
+        SolverNotConvergedError
+            If linear solver fails to converge.
+        """
         if n < 1:
             raise ValueError("Filter order must be positive")
 
@@ -184,6 +210,28 @@ class TriangularFilter(Filter):
             return ttu, ttv
 
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
+        """
+        Apply filter to scalar field on triangular mesh.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : float
+            Filter wavelength in spatial units.
+        data : np.ndarray
+            Scalar field values at mesh nodes.
+
+        Returns
+        -------
+        np.ndarray
+            Filtered scalar field.
+
+        Raises
+        ------
+        ValueError
+            If filter order n < 1.
+        """
         if n < 1:
             raise ValueError("Filter order must be positive")
 
@@ -205,6 +253,42 @@ class TriangularFilter(Filter):
         mask: np.ndarray = None,
         gpu: bool = False,
     ):
+        """
+        Prepare filter for a specific triangular mesh.
+
+        Computes mesh topology, geometric properties, and assembles the filter
+        operator matrix. Must be called before any filtering operations.
+
+        Parameters
+        ----------
+        n2d : int
+            Number of nodes in the mesh.
+        e2d : int
+            Number of elements in the mesh.
+        tri : np.ndarray
+            Element connectivity matrix (e2d x 3) of node indices.
+        xcoord : np.ndarray
+            X-coordinates of mesh nodes (degrees).
+        ycoord : np.ndarray
+            Y-coordinates of mesh nodes (degrees).
+        meshtype : str, optional
+            Mesh type identifier ('m' for general meshes).
+        cartesian : bool, optional
+            True for Cartesian coordinates, False for spherical.
+        cyclic_length : float, optional
+            Cyclic domain length in radians (default: 2π).
+        full : bool, optional
+            True to include metric terms in operator (default: False).
+        mask : np.ndarray, optional
+            Element mask where True indicates land (default: all ocean).
+        gpu : bool, optional
+            True to enable GPU acceleration (default: False).
+
+        Notes
+        -----
+        Coordinates are expected in degrees while cyclic_length is in radians.
+        The mask is converted to nodal representation where True indicates land.
+        """
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
         self._n2d = n2d
         self._e2d = e2d
@@ -289,9 +373,29 @@ class TriangularFilter(Filter):
         self.set_backend("gpu" if gpu else "cpu")
 
     def get_backend(self) -> str:
+        """
+        Get current computational backend.
+
+        Returns
+        -------
+        str
+            Current backend ('cpu' or 'gpu').
+        """
         return self.backend
 
     def set_backend(self, backend: str):
+        """
+        Set computational backend for filtering operations.
+
+        Parameters
+        ----------
+        backend : str
+            Desired backend ('cpu' or 'gpu').
+
+        Notes
+        -----
+        Configures appropriate sparse linear algebra functions for the backend.
+        """
         self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = (
             get_backend(backend)
         )
@@ -304,6 +408,27 @@ class TriangularFilter(Filter):
         data: np.ndarray,
         mask: np.ndarray | None = None,
     ) -> np.ndarray:
+        """
+        Compute power spectra for scalar field at specified wavelengths.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : Iterable | np.ndarray
+            Target wavelengths for spectral analysis.
+        data : np.ndarray
+            Scalar field values at mesh nodes.
+        mask : np.ndarray, optional
+            Boolean mask where True excludes nodes from spectra computation.
+
+        Returns
+        -------
+        np.ndarray
+            Power spectral density at wavelengths [0, k0, k1, ...]:
+            [0] : Total variance
+            [1:] : Variance at each wavelength k
+        """
         nr = len(k)
         spectra = np.zeros(nr + 1)
         if mask is None:
@@ -335,6 +460,35 @@ class TriangularFilter(Filter):
         vy: np.ndarray,
         mask: np.ndarray | None = None,
     ) -> np.ndarray:
+        """
+        Compute power spectra for velocity field at specified wavelengths.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : Iterable | np.ndarray
+            Target wavelengths for spectral analysis.
+        ux : np.ndarray
+            Eastward velocity component at mesh nodes.
+        vy : np.ndarray
+            Northward velocity component at mesh nodes.
+        mask : np.ndarray, optional
+            Boolean mask where True excludes nodes from spectra computation.
+
+        Returns
+        -------
+        np.ndarray
+            Kinetic energy spectral density at wavelengths [0, k0, k1, ...]:
+            [0] : Total kinetic energy
+            [1:] : Kinetic energy at each wavelength k
+
+        Notes
+        -----
+        Implements spectral decomposition:
+            E(k) = ⟨(u - uₖ)² + (v - vₖ)²⟩
+        where (uₖ, vₖ) is the filtered velocity at wavelength k.
+        """
         nr = len(k)
         spectra = np.zeros(nr + 1)
         if mask is None:

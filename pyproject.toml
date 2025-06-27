@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "implicit_filter"
-version = "1.1.0"
+version = "2.0.0"
 description = "Python package implementing implicit filtering method on any type of mesh."
 readme = "readme.md"
 authors = [{ name = "Kacper Nowak", email = "kacper.nowak@awi.de" },
@@ -15,7 +15,7 @@ authors = [{ name = "Kacper Nowak", email = "kacper.nowak@awi.de" },
            { name = "Willi Rath", email = "wrath@geomar.de" }]
 
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Environment :: GPU",
