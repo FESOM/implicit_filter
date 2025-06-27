@@ -15,6 +15,18 @@ For details of the implementation please read out paper on [arXiv](https://arxiv
 
 For full mathematical formulation of the implicit filter please refer to [this paper](http://dx.doi.org/10.1029/2023MS003946)
 ## Installation 
+
+### End-user installation
+
+```shell
+# create env with cupy (e.g. from Conda)
+# activate env
+python -m pip install git+https://github.com/FESOM/implicit_filter.git@VERSION
+```
+with `VERSION` being, e.g., `v2.0.0` or `main` if you really want the bleeding edge.
+
+### Developer installation
+
 Currently Python version has to be 3.10 or newer. 
 ```shell
 source ./path/to/enviroment/of/your/choice
