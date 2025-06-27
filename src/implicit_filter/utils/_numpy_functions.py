@@ -145,7 +145,7 @@ def convert_to_tcells(
     ttu = v[0, :] + v[2, :]
     ttv = v[1, :] + v[3, :]
 
-    return ttu, ttv
+    return np.reshape(ttu, ux.shape), np.reshape(ttv, vy.shape)
 
 
 def calculate_global_nemo_neighbourhood(

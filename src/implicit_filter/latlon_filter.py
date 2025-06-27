@@ -17,33 +17,38 @@ from implicit_filter.utils.utils import (
 
 class LatLonFilter(Filter):
     """
-    A filter class for data based on regular latitude and longitude grids using NumPy arrays.
+    Filter implementation for regular latitude-longitude grids.
 
-    Methods
-    -------
-    many_compute(n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
-        Placeholder method to compute filtering on multiple datasets. Not implemented yet.
+    This class provides implicit filtering capabilities for data on structured
+    lat-lon grids. It supports both Cartesian and spherical coordinate systems
+    with configurable boundary conditions and land-sea masks.
 
-    compute_velocity(n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        Computes the filtered velocity fields.
+    Parameters
+    ----------
+    See Filter class for inherited parameters.
 
-    compute(n: int, k: float, data: np.ndarray) → np.ndarray:
-        Computes the filtered data.
-
+    Attributes
+    ----------
+    _e2d : int
+        Total number of grid points (nx * ny)
+    _nx : int
+        Number of longitude points
+    _ny : int
+        Number of latitude points
+    _ss : np.ndarray
+        Non-zero values of sparse filter matrix
+    _ii : np.ndarray
+        Row indices for sparse matrix entries
+    _jj : np.ndarray
+        Column indices for sparse matrix entries
+    _area : np.ndarray
+        Area associated with each grid cell
+    _backend : str
+        Computational backend ('cpu' or 'gpu')
+    _mask_n : np.ndarray
+        Boolean mask for valid grid points (False indicates land)
     """
-
     def __init__(self, *initial_data, **kwargs):
-        """
-        Initializes the LatLonNumpyFilter with the given data and keyword arguments.
-
-        Parameters
-        ----------
-        initial_data : tuple
-            Initial data to be passed to the parent class.
-        kwargs : dict
-            Additional keyword arguments.
-
-        """
         super().__init__(initial_data, **kwargs)
         it = lambda ar: int(ar)
         ar = lambda ar: np.array(ar)
@@ -67,24 +72,37 @@ class LatLonFilter(Filter):
         longitude: np.ndarray,
         cartesian: bool = False,
         local: bool = True,
+        cyclic_length: float = 2 * math.pi,
         mask: np.ndarray | None = None,
         gpu: bool = False,
     ):
         """
-        Prepares the filter for latitude and longitude grids regular grids
+        Configure filter for a latitude-longitude grid.
+
+        Computes grid topology, geometric properties, and assembles the filter
+        operator matrix. Must be called before any filtering operations.
 
         Parameters
         ----------
-        latitude: np.ndarray
-            1D np.ndarray of floats with latitude values
-        longitude: np.ndarray
-            1D np.ndarray of floats with longitude values
-        cartesian: bool
-            If true, the conversion from degrees to km should assume that mesh is cartesian.
-        local: bool
-            If true, neighborhood calculation doesn't wrap around an East/West direction
-        """
+        latitude : np.ndarray
+            Latitude values in degrees (1D array)
+        longitude : np.ndarray
+            Longitude values in degrees (1D array)
+        cartesian : bool, optional
+            True for Cartesian coordinates, False for spherical (default)
+        local : bool, optional
+            True for 4-point local neighborhood, False for 8-point global (default: True)
+        cyclic_length : float, optional
+            Cyclic domain length in radians (default: 2π).
+        mask : np.ndarray, optional
+            Land-sea mask where True indicates land (default: all ocean)
+        gpu : bool, optional
+            True to enable GPU acceleration (default: False)
 
+        Notes
+        -----
+        - Land points are masked using Neumann boundary conditions
+        """
         nx = len(longitude)
         ny = len(latitude)
         e2d = nx * ny
@@ -123,10 +141,7 @@ class LatLonFilter(Filter):
         hh = np.ones((4, e2d))  # Edge lengths
         hc = np.ones((4, e2d))  # Distance to next cell centers
         r_earth = 6400.0
-        cyclic_length = (
-            360  # in degrees; if not cyclic, take it larger than  zonal size
-        )
-        cyclic_length = cyclic_length * math.pi / 180
+
         # Fill ee_pos, arrangement is W;N;E;S
         for i in range(e2d):
             if ee_pos[1, i] == i:
@@ -204,9 +219,29 @@ class LatLonFilter(Filter):
         self.set_backend("gpu" if gpu else "cpu")
 
     def get_backend(self) -> str:
+        """
+        Get current computational backend.
+
+        Returns
+        -------
+        str
+            Current backend ('cpu' or 'gpu').
+        """
         return self._backend
 
     def set_backend(self, backend: str):
+        """
+        Set computational backend for filtering operations.
+
+        Parameters
+        ----------
+        backend : str
+            Desired backend ('cpu' or 'gpu').
+
+        Notes
+        -----
+        Configures appropriate sparse linear algebra functions for the backend.
+        """
         self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = (
             get_backend(backend)
         )
@@ -247,6 +282,28 @@ class LatLonFilter(Filter):
         return self.tonumpy(tts)
 
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
+        """
+        Apply filter to scalar field on lat-lon grid.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : float
+            Filter wavelength in spatial units.
+        data : np.ndarray
+            Scalar field values on grid (shape: (nx, ny)).
+
+        Returns
+        -------
+        np.ndarray
+            Filtered scalar field (shape: (nx, ny)).
+
+        Raises
+        ------
+        ValueError
+            If filter order n < 1.
+        """
         if n < 1:
             raise ValueError("Filter order must be positive")
 
@@ -257,6 +314,30 @@ class LatLonFilter(Filter):
     def compute_velocity(
         self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Apply filter to velocity components on lat-lon grid.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : float
+            Filter wavelength in spatial units.
+        ux : np.ndarray
+            Eastward velocity component (shape: (nx, ny)).
+        vy : np.ndarray
+            Northward velocity component (shape: (nx, ny)).
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray]
+            Filtered velocity components (ux_filt, vy_filt) each with shape (nx, ny).
+
+        Raises
+        ------
+        ValueError
+            If filter order n < 1.
+        """
         if n < 1:
             raise ValueError("Filter order must be positive")
 
@@ -276,6 +357,27 @@ class LatLonFilter(Filter):
         data: np.ndarray,
         mask: np.ndarray | None = None,
     ) -> np.ndarray:
+        """
+        Compute power spectra for scalar field at specified wavelengths.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : Iterable | np.ndarray
+            Target wavelengths for spectral analysis.
+        data : np.ndarray
+            Scalar field values on grid (shape: (nx, ny)).
+        mask : np.ndarray, optional
+            Boolean mask where True excludes points from spectra computation.
+
+        Returns
+        -------
+        np.ndarray
+            Power spectral density at wavelengths [0, k0, k1, ...]:
+            [0] : Total variance
+            [1:] : Variance at each wavelength k
+        """
         nr = len(k)
         tt = np.reshape(data, self._e2d)
         spectra = np.zeros(nr + 1)
@@ -309,34 +411,29 @@ class LatLonFilter(Filter):
         mask: np.ndarray | None = None,
     ) -> np.ndarray:
         """
-        Computes power spectra for given wavelengths.
-        Data must be placed on mesh nodes
+        Compute power spectra for velocity field at specified wavelengths.
 
-        For details refer to https://arxiv.org/abs/2404.07398
-        Parameters:
-        -----------
+        Parameters
+        ----------
         n : int
-            Order of filter, one is recommended
-
+            Filter order (must be positive).
         k : Iterable | np.ndarray
-            List of wavelengths to be filtered.
-
+            Target wavelengths for spectral analysis.
         ux : np.ndarray
-            NumPy array containing an eastward velocity component to be filtered.
-
+            Eastward velocity component (shape: (nx, ny)).
         vy : np.ndarray
-            NumPy array containing a northwards velocity component to be filtered.
+            Northward velocity component (shape: (nx, ny)).
+        mask : np.ndarray, optional
+            Boolean mask where True excludes points from spectra computation.
 
-        mask : np.ndarray | None
-            Mask applied to data while computing spectra.
-            True means selected data won't be used for computing spectra.
-            This mask won't be used during filtering.
-
-        Returns:
-        --------
-        np.ndarray:
-            Array containing power spectra for given wavelengths.
+        Returns
+        -------
+        np.ndarray
+            Kinetic energy spectral density at wavelengths [0, k0, k1, ...]:
+            [0] : Total kinetic energy
+            [1:] : Kinetic energy at each wavelength k
         """
+
         nr = len(k)
         unod = np.reshape(ux, self._e2d)
         vnod = np.reshape(vy, self._e2d)

@@ -1,5 +1,6 @@
 import numpy as np
 import xarray as xr
+import math
 
 from implicit_filter.utils._auxiliary import find_adjacent_points_north
 from implicit_filter.utils._numpy_functions import (
@@ -12,7 +13,21 @@ from .latlon_filter import LatLonFilter
 
 class NemoFilter(LatLonFilter):
     """
-    A filter class for NEMO ocean model data using NumPy arrays.
+    Filter implementation specialized for NEMO ocean model grids.
+
+    This class extends LatLonFilter to handle NEMO's specific grid characteristics
+    including partial cells, scale factors, and complex boundary representations.
+    It supports different neighborhood configurations for accurate filtering.
+
+    Parameters
+    ----------
+    See LatLonFilter for inherited parameters.
+
+    Notes
+    -----
+    - Automatically handles NEMO's redundant point representation
+    - Supports three neighborhood types: 'full', 'west-east', and 'local'
+    - Accounts for partial cells through 3D scale factors
     """
 
     def prepare_from_file(
@@ -23,6 +38,34 @@ class NemoFilter(LatLonFilter):
         gpu: bool = False,
         neighb: str = "full",
     ):
+        """
+        Configure filter using a NEMO grid file.
+
+        Parameters
+        ----------
+        file : str
+            Path to NEMO grid file (NetCDF format).
+        vl : int
+            Vertical level index for which to configure the filter.
+        mask : np.ndarray | bool, optional
+            Land-sea mask specification:
+            - np.ndarray: Precomputed mask array
+            - True: Auto-detect from 'tmask' variable (default)
+            - False: All ocean cells
+        gpu : bool, optional
+            True to enable GPU acceleration (default: False).
+        neighb : str, optional
+            Neighborhood type:
+            - 'full': Full 4-point neighborhood with North Pole handling
+            - 'west-east': Zonal connections only
+            - 'local': Standard 4-point neighborhood (default: 'full')
+
+        Notes
+        -----
+        - Automatically detects and handles NEMO's redundant grid points
+        - Converts grid metrics from meters to kilometers
+        - Uses vertical level scale factors for accurate cell volumes
+        """
         ds = xr.open_dataset(file)
         self.prepare_from_data_array(ds, vl, mask, gpu, neighb)
 
@@ -34,6 +77,34 @@ class NemoFilter(LatLonFilter):
         gpu: bool = False,
         neighb: str = "full",
     ):
+        """
+        Configure filter using an xarray Dataset containing NEMO grid data.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            xarray Dataset containing NEMO grid variables.
+        vl : int
+            Vertical level index for filter configuration.
+        mask : np.ndarray | bool, optional
+            Land-sea mask specification (see prepare_from_file).
+        gpu : bool, optional
+            GPU acceleration flag (default: False).
+        neighb : str, optional
+            Neighborhood type (see prepare_from_file).
+
+        Raises
+        ------
+        NotImplementedError
+            If unsupported neighborhood type is specified.
+
+        Notes
+        -----
+        - Requires standard NEMO grid variables: gphit, e1t, e2t, e1u, e2v, e3u_0, e3v_0, e3t_0
+        - The 'tmask' variable is used for land-sea masking when auto-detection is enabled
+        - Handles North Pole folding in 'full' neighborhood configuration
+        - Grid metrics are converted from meters to kilometers for consistency
+        """
         north_adj = None
 
         if neighb == "full":
@@ -59,7 +130,7 @@ class NemoFilter(LatLonFilter):
         if neighb == "full":
             ee_pos, nza = calculate_global_nemo_neighbourhood(e2d, nx, ny, north_adj)
         elif neighb == "west-east":
-            ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
+            ee_pos, nza = calculate_global_regular_neighbourhood(e2d, nx, ny)
         elif neighb == "local":
             ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
         else:
