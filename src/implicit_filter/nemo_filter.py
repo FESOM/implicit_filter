@@ -1,138 +1,193 @@
-from typing import Tuple, Union, List
-
 import numpy as np
 import xarray as xr
-from scipy.sparse import csc_matrix, identity
-from scipy.sparse.linalg import cg
+import math
 
-from implicit_filter._auxiliary import find_adjacent_points_north
-from implicit_filter._numpy_functions import calculate_global_nemo_neighbourhood
-from implicit_filter._utils import SolverNotConvergedError, VeryStupidIdeaError, transform_attribute
-from implicit_filter.filter import Filter
+from implicit_filter.utils._auxiliary import find_adjacent_points_north
+from implicit_filter.utils._numpy_functions import (
+    calculate_global_nemo_neighbourhood,
+    calculate_global_regular_neighbourhood,
+    calculate_local_regular_neighbourhood,
+)
+from .latlon_filter import LatLonFilter
 
 
-class NemoNumpyFilter(Filter):
+class NemoFilter(LatLonFilter):
     """
-    A filter class for NEMO ocean model data using NumPy arrays.
+    Filter implementation specialized for NEMO ocean model grids.
 
-    Methods
-    -------
-    many_compute(n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
-        Placeholder method to compute filtering on multiple datasets. Not implemented yet.
+    This class extends LatLonFilter to handle NEMO's specific grid characteristics
+    including partial cells, scale factors, and complex boundary representations.
+    It supports different neighborhood configurations for accurate filtering.
 
-    compute_velocity(n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        Computes the filtered velocity fields.
+    Parameters
+    ----------
+    See LatLonFilter for inherited parameters.
 
-    compute(n: int, k: float, data: np.ndarray) -> np.ndarray:
-        Computes the filtered data.
-
-    prepare_from_file(file: str, vl: int):
-        Prepares the filter using data from a specified file.
-
+    Notes
+    -----
+    - Automatically handles NEMO's redundant point representation
+    - Supports three neighborhood types: 'full', 'west-east', and 'local'
+    - Accounts for partial cells through 3D scale factors
     """
 
-    def __init__(self, *initial_data, **kwargs):
+    def prepare_from_file(
+        self,
+        file: str,
+        vl: int,
+        mask: np.ndarray | bool = True,
+        gpu: bool = False,
+        neighb: str = "full",
+    ):
         """
-        Initializes the NemoNumpyFilter with the given data and keyword arguments.
+        Configure filter using a NEMO grid file.
 
         Parameters
         ----------
-        initial_data : tuple
-            Initial data to be passed to the parent class.
-        kwargs : dict
-            Additional keyword arguments.
+        file : str
+            Path to NEMO grid file (NetCDF format).
+        vl : int
+            Vertical level index for which to configure the filter.
+        mask : np.ndarray | bool, optional
+            Land-sea mask specification:
+            - np.ndarray: Precomputed mask array
+            - True: Auto-detect from 'tmask' variable (default)
+            - False: All ocean cells
+        gpu : bool, optional
+            True to enable GPU acceleration (default: False).
+        neighb : str, optional
+            Neighborhood type:
+            - 'full': Full 4-point neighborhood with North Pole handling
+            - 'west-east': Zonal connections only
+            - 'local': Standard 4-point neighborhood (default: 'full')
 
+        Notes
+        -----
+        - Automatically detects and handles NEMO's redundant grid points
+        - Converts grid metrics from meters to kilometers
+        - Uses vertical level scale factors for accurate cell volumes
         """
-        super().__init__(initial_data, **kwargs)
-        it = lambda ar: int(ar)
-
-        # Transform and initialize attributes with default values
-        transform_attribute(self, "_e2d", it, 0)
-        transform_attribute(self, "_nx", it, 0)
-        transform_attribute(self, "_ny", it, 0)
-
-    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
-        raise NotImplementedError("This method is not yet implemented.")
-
-    def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        if n < 1:
-            raise ValueError("Filter order must be positive")
-        elif n > 2:
-            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
-
-        v = np.zeros((4, self._e2d))  # N, W, E, S
-        v[0, :] = np.reshape(ux, self._e2d)  # West
-        v[1, :] = np.reshape(vy, self._e2d)  # North
-
-        for i in range(self._e2d):
-            if self._ee_pos[3, i] != i:
-                v[3, i] = v[1, self._ee_pos[3, i]]
-
-            if self._ee_pos[2, i] != i:
-                v[2, i] = v[0, self._ee_pos[2, i]]
-
-        ttu = v[0, :] + v[2, :]
-        ttv = v[1, :] + v[3, :]
-
-        return (np.reshape(self._compute(n, k, ttu), (self._nx, self._ny)),
-                np.reshape(self._compute(n, k, ttv), (self._nx, self._ny)))
-
-    def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
-        if n < 1:
-            raise ValueError("Filter order must be positive")
-        elif n > 2:
-            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
-
-        tt = np.reshape(data, self._e2d)
-        return np.reshape(self._compute(n, k, tt), (self._nx, self._ny))
-
-    def _compute(self, n: int, k: float, data: np.ndarray, maxiter: int = 150_000, tol: float = 1e-6) -> np.ndarray:
-        Smat1 = csc_matrix((self._ss * (1.0 / k ** 2), (self._ii, self._jj)), shape=(self._e2d, self._e2d))
-        Smat2 = identity(self._e2d)
-
-        Smat = Smat2 + 0.5 * (-1 * Smat1) ** n
-        ttw = data.T - Smat @ data.T  # Work with perturbations
-
-        # b = 1. / Smat.diagonal()  # Simple preconditioner
-        # pre = csc_matrix((b, (np.arange(self._e2d), np.arange(self._e2d))), shape=(self._e2d, self._e2d))
-
-        tts, code = cg(Smat, ttw, maxiter=maxiter, tol=tol)
-        tts += data.T
-
-        if code != 0:
-            raise SolverNotConvergedError("Solver has not converged",
-                                          [f"output code with code: {code}"])
-
-        return tts
-
-    def prepare_from_file(self, file: str, vl: int):
         ds = xr.open_dataset(file)
+        self.prepare_from_data_array(ds, vl, mask, gpu, neighb)
 
-        nx, ny = ds.gphit.isel(t=0, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values.shape
-        north_adj, red = find_adjacent_points_north(file, 1e-5)
+    def prepare_from_data_array(
+        self,
+        ds: xr.DataArray,
+        vl: int,
+        mask: np.ndarray | bool = True,
+        gpu: bool = False,
+        neighb: str = "full",
+    ):
+        """
+        Configure filter using an xarray Dataset containing NEMO grid data.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            xarray Dataset containing NEMO grid variables.
+        vl : int
+            Vertical level index for filter configuration.
+        mask : np.ndarray | bool, optional
+            Land-sea mask specification (see prepare_from_file).
+        gpu : bool, optional
+            GPU acceleration flag (default: False).
+        neighb : str, optional
+            Neighborhood type (see prepare_from_file).
+
+        Raises
+        ------
+        NotImplementedError
+            If unsupported neighborhood type is specified.
+
+        Notes
+        -----
+        - Requires standard NEMO grid variables: gphit, e1t, e2t, e1u, e2v, e3u_0, e3v_0, e3t_0
+        - The 'tmask' variable is used for land-sea masking when auto-detection is enabled
+        - Handles North Pole folding in 'full' neighborhood configuration
+        - Grid metrics are converted from meters to kilometers for consistency
+        """
+        north_adj = None
+
+        if neighb == "full":
+            north_adj, corresponds_to_redundant = find_adjacent_points_north(ds, 1e-5)
+        else:
+            corresponds_to_redundant = None
+
+        nx, ny = (
+            ds.gphit.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values.shape
+        )
         e2d = nx * ny
 
         self._nx = nx
         self._ny = ny
         self._e2d = e2d
 
-        ee_pos, nza = calculate_global_nemo_neighbourhood(e2d, nx, ny, north_adj)
+        if neighb == "full":
+            ee_pos, nza = calculate_global_nemo_neighbourhood(e2d, nx, ny, north_adj)
+        elif neighb == "west-east":
+            ee_pos, nza = calculate_global_regular_neighbourhood(e2d, nx, ny)
+        elif neighb == "local":
+            ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
+        else:
+            raise NotImplementedError(
+                f"the neighbourhood type {neighb} is not supported. The only options are full, west-east, local."
+            )
+
         self._ee_pos = ee_pos
 
         # Cell sizes
-        hx = np.reshape(ds.e1t.isel(t=0, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values / 1000.0,
-                        nx * ny)
-        hy = np.reshape(ds.e2t.isel(t=0, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values / 1000.0,
-                        nx * ny)
+        hx = np.reshape(
+            ds.e1t.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values
+            / 1000.0,
+            nx * ny,
+        )
+        hy = np.reshape(
+            ds.e2t.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values
+            / 1000.0,
+            nx * ny,
+        )
         self._area = hx * hy
 
         hh = np.ones((4, e2d))  # Edge lengths
         hh[1, :] = np.reshape(
-            ds.e2u.isel(t=0, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values / 1000.0,
-            nx * ny)  # North edge
+            ds.e2u.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values
+            / 1000.0,
+            nx * ny,
+        )  # North edge
         hh[0, :] = np.reshape(
-            ds.e1v.isel(t=0, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values / 1000.0,
-            nx * ny)  # West edge
+            ds.e1v.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values
+            / 1000.0,
+            nx * ny,
+        )  # West edge
         for n in range(e2d):
             if ee_pos[3, n] != n:
                 hh[3, n] = hh[1, ee_pos[3, n]]
@@ -146,19 +201,65 @@ class NemoNumpyFilter(Filter):
 
         # Cell heights
         h3u = np.reshape(
-            ds.e3u_0.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values / 1000.0, nx * ny)
+            ds.e3u_0.isel(
+                z=vl,
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values
+            / 1000.0,
+            nx * ny,
+        )
         h3v = np.reshape(
-            ds.e3v_0.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values / 1000.0, nx * ny)
+            ds.e3v_0.isel(
+                z=vl,
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values
+            / 1000.0,
+            nx * ny,
+        )
         h3t = np.reshape(
-            ds.e3t_0.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values / 1000.0, nx * ny)
+            ds.e3t_0.isel(
+                z=vl,
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values
+            / 1000.0,
+            nx * ny,
+        )
 
         hc = np.ones((4, e2d))  # Distance to next cell centers
         hc[0, :] = np.reshape(
-            ds.e1u.isel(t=0, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values / 1000.0,
-            nx * ny)  # West neighbour
+            ds.e1u.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values
+            / 1000.0,
+            nx * ny,
+        )  # West neighbour
         hc[1, :] = np.reshape(
-            ds.e2v.isel(t=0, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values / 1000.0,
-            nx * ny)  # North neighbour
+            ds.e2v.isel(
+                y=slice(None, corresponds_to_redundant),
+                x=slice(None, corresponds_to_redundant),
+            )
+            .squeeze()
+            .transpose("x", "y")
+            .values
+            / 1000.0,
+            nx * ny,
+        )  # North neighbour
 
         for n in range(e2d):
             if ee_pos[3, n] != n:
@@ -174,8 +275,23 @@ class NemoNumpyFilter(Filter):
         ss = np.zeros(nza, dtype="float")
         ii = np.zeros(nza, dtype="int")
         jj = np.zeros(nza, dtype="int")
-        mask = np.reshape(
-            ds.tmask.isel(t=0, z=vl, y=slice(None, -2), x=slice(None, -2)).transpose("x", "y").values, nx * ny)
+
+        if isinstance(mask, np.ndarray):
+            pass
+        elif mask:
+            mask = np.reshape(
+                ds.tmask.isel(
+                    z=vl,
+                    y=slice(None, corresponds_to_redundant),
+                    x=slice(None, corresponds_to_redundant),
+                )
+                .squeeze()
+                .transpose("x", "y")
+                .values,
+                nx * ny,
+            )
+        else:
+            mask = np.ones(nx * ny, dtype=bool)
 
         nn = 0
         for n in range(e2d):
@@ -183,18 +299,30 @@ class NemoNumpyFilter(Filter):
             for m in range(4):
                 if ee_pos[m, n] != n and mask[ee_pos[m, n]] != 0:
                     nn += 1
-                    # print(f"nn: {nn} m: {m} n: {n}")
-                    ss[nn] = (hh[m, n] * h3u[n]) / (hc[m, n] * h3t[n]) if m % 2 == 0 else (hh[m, n] * h3v[n]) / (
-                            hc[m, n] * h3t[n])
+                    ss[nn] = (
+                        (hh[m, n] * h3u[ee_pos[m, n]]) / (hc[m, n] * h3t[ee_pos[m, n]])
+                        if m % 2 == 0
+                        else (hh[m, n] * h3v[ee_pos[m, n]])
+                        / (hc[m, n] * h3t[ee_pos[m, n]])
+                    )
+
                     ss[nn] /= self._area[n]  # Add division on cell area if you prefer
                     ii[nn] = n
                     jj[nn] = ee_pos[m, n]
 
             ii[no] = n
             jj[no] = n
-            ss[no] = -np.sum(ss[no:nn + 1])
+            ss[no] = -np.sum(ss[no : nn + 1])
             nn += 1
 
         self._ss = ss
         self._ii = ii
         self._jj = jj
+
+        mask_sp = np.logical_and(mask[ii], mask[jj])
+
+        self._ss = self._ss[mask_sp]
+        self._ii = self._ii[mask_sp]
+        self._jj = self._jj[mask_sp]
+
+        self.set_backend("gpu" if gpu else "cpu")

@@ -12,7 +12,7 @@ import os
 sys.path.insert(0, os.path.abspath('..'))
 
 project = 'Implicit Filter'
-copyright = '2023, Kacper Nowak'
+copyright = '2025, Kacper Nowak'
 author = 'Kacper Nowak'
 
 # -- General configuration ---------------------------------------------------

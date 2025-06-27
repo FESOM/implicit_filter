@@ -7,10 +7,7 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2404.07398-b31b1b.svg)](https://arxiv.org/abs/2404.07398)
 
 The Implicit Filter Python Package provides a collection of classes for filtering data using implicit filtering techniques.
-Currently FESOM, NEMO and longitude-latitude meshes are supported.
-
-For ICON please use this [fork](https://github.com/wienkers/implicit_filter_ICON) made by Aaron Wienkers.
-In the future it will be integrated into the main repository.
+Currently FESOM, ICON, NEMO and longitude-latitude meshes are supported.
 
 For optimal performance usage of Nvidia GPU is highly recommended.
 
@@ -18,32 +15,32 @@ For details of the implementation please read out paper on [arXiv](https://arxiv
 
 For full mathematical formulation of the implicit filter please refer to [this paper](http://dx.doi.org/10.1029/2023MS003946)
 ## Installation 
-Currently Python version 3.10 and 3.9 are supported. Using newer version can enabled 
-```shell
-source ./path/to/enviroment/of/your/choice
-git clone https://github.com/FESOM/implicit_filter
 
-cd implicit_filter
-# CPU only installation
-pip install -e .
-# GPU installation
-pip install -e .[gpu]
-```
-### Known issues
-Installing CuPy can cause an error, in case this happens try installing it manually:
+### End-user installation
 
 ```shell
-pip install cupy
+# create env with cupy (e.g. from Conda)
+# activate env
+python -m pip install git+https://github.com/FESOM/implicit_filter.git
 ```
 
-In case it also doesn't work, check your Nvidia driver version using `nvidia-smi` and install 
-CuPy version matching your drivers.
+If one wants to use GPU it's necessary to install [cupy](https://cupy.dev/). It can be installed with the pachage by adding optional dependency. Check your Nvidia driver version using `nvidia-smi` and install CuPy version matching your drivers. You can install it separately 
+```shell
+pip install cupy-cuda11x # CUDA 11 
+pip install cupy-cuda12x # CUDA 12 or newer
+```
+It can be also installed with the package (example for CUDA 12)
+```shell
+python -m pip install "implicit_filter[gpu_c12] @ git+https://github.com/FESOM/implicit_filter.git"
+```
 
 # Tutorial
 
+This is a basic example, for more advanced usecases please look into the examples. 
+
 Lets start with loading FESOM mesh file and data that we want to filter
 
-This is basic example with only scalar data.
+This is a basic example with only scalar data.
 ```python
 import xarray as xr
 
@@ -54,24 +51,32 @@ data = xr.open_dataset(path + "ssh.nc")
 unfiltered = data['ssh'].values[0, :]
 ```
 
-Now we can create filter.
+Now create filter.
 
-The easiest way to do it is by using mesh file path
+The easiest way to do it is by using mesh path. Alternatively, you can set arrays by yourself, but this is shown in notebooks in examples.
 
 ```python
-from implicit_filter import CuPyFilter 
+from implicit_filter import FesomFilter 
 # if you don't have GPU use JaxFilter instead
 
-flter = CuPyFilter()
+flter = FesomFilter()
 flter.prepare_from_file(path + "fesom.mesh.diag.nc")
 ```
 JAX warning might appear about GPU not being available, but it should be ignored. 
 
-If you don't have GPU support enabled importing CuPyFilter will cause an import error.
 
-Alternatively you can set arrays by yourself, but this is shown in notebooks in examples.
+To use GPU you need to either pass this option in filter preparation or set backend later. Backends can be switched during runtime without causing any issues. 
+```python
+from implicit_filter import FesomFilter 
+# if you don't have GPU use JaxFilter instead
 
-It is highly recommended to save filter's auxiliary arrays as it can take significant amount of time to compute them.
+flter = FesomFilter()
+flter.prepare_from_file(path + "fesom.mesh.diag.nc", gpu=True)
+
+flter.set_backend("gpu")
+```
+
+It is highly recommended to save filter's auxiliary arrays as it can take a significant amount of time to compute them.
 Auxiliary arrays are specific to each mesh, so they only need to be computed once.
 
 ```python
@@ -81,7 +86,7 @@ flter.save_to_file("filter_cash")
 Later filter can be created based on this file
 
 ```python
-flter = CuPyFilter.load_from_file("filter_cash.npz")
+flter = FesomFilter.load_from_file("filter_cash.npz")
 ```
 
 Now you can define wavenumber of the filter in two ways.
@@ -110,6 +115,18 @@ Finally you can filter your data
 
 ```python
 filtered = flter.compute(1, k, unfiltered)
+```
+
+### Developer installation
+
+Currently Python version has to be 3.10 or newer. 
+```shell
+source ./path/to/enviroment/of/your/choice
+git clone https://github.com/FESOM/implicit_filter
+
+cd implicit_filter
+# CPU only installation
+pip install -e .
 ```
 
 ## Dependencies

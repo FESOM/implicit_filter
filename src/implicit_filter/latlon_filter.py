@@ -1,48 +1,58 @@
 import math
-from typing import Tuple, Union, List
+from typing import Tuple, Iterable
 
 import numpy as np
-from scipy.sparse import csc_matrix, identity
-from scipy.sparse.linalg import cg
 
-from implicit_filter._numpy_functions import calculate_local_regular_neighbourhood, \
-    calculate_global_regular_neighbourhood
+from implicit_filter.utils._numpy_functions import (
+    calculate_local_regular_neighbourhood,
+    calculate_global_regular_neighbourhood,
+)
 from implicit_filter.filter import Filter
-from implicit_filter._utils import SolverNotConvergedError, VeryStupidIdeaError, transform_attribute
+from implicit_filter.utils.utils import (
+    SolverNotConvergedError,
+    get_backend,
+    transform_attribute,
+)
 
 
-class LatLonNumpyFilter(Filter):
+class LatLonFilter(Filter):
     """
-    A filter class for data based on regular latitude and longitude grids using NumPy arrays.
+    Filter implementation for regular latitude-longitude grids.
 
-    Methods
-    -------
-    many_compute(n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
-        Placeholder method to compute filtering on multiple datasets. Not implemented yet.
+    This class provides implicit filtering capabilities for data on structured
+    lat-lon grids. It supports both Cartesian and spherical coordinate systems
+    with configurable boundary conditions and land-sea masks.
 
-    compute_velocity(n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        Computes the filtered velocity fields.
+    Parameters
+    ----------
+    See Filter class for inherited parameters.
 
-    compute(n: int, k: float, data: np.ndarray) → np.ndarray:
-        Computes the filtered data.
-
+    Attributes
+    ----------
+    _e2d : int
+        Total number of grid points (nx * ny)
+    _nx : int
+        Number of longitude points
+    _ny : int
+        Number of latitude points
+    _ss : np.ndarray
+        Non-zero values of sparse filter matrix
+    _ii : np.ndarray
+        Row indices for sparse matrix entries
+    _jj : np.ndarray
+        Column indices for sparse matrix entries
+    _area : np.ndarray
+        Area associated with each grid cell
+    _backend : str
+        Computational backend ('cpu' or 'gpu')
+    _mask_n : np.ndarray
+        Boolean mask for valid grid points (False indicates land)
     """
-
     def __init__(self, *initial_data, **kwargs):
-        """
-        Initializes the LatLonNumpyFilter with the given data and keyword arguments.
-
-        Parameters
-        ----------
-        initial_data : tuple
-            Initial data to be passed to the parent class.
-        kwargs : dict
-            Additional keyword arguments.
-
-        """
         super().__init__(initial_data, **kwargs)
         it = lambda ar: int(ar)
         ar = lambda ar: np.array(ar)
+        st = lambda ar: str(ar)
 
         # Transform and initialize attributes with default values
         transform_attribute(self, "_e2d", it, 0)
@@ -51,30 +61,54 @@ class LatLonNumpyFilter(Filter):
         transform_attribute(self, "_ss", ar, None)
         transform_attribute(self, "_ii", ar, None)
         transform_attribute(self, "_jj", ar, None)
+        transform_attribute(self, "_area", ar, None)
+        transform_attribute(self, "_backend", st, "cpu")
 
-    def prepare(self, latitude: np.ndarray, longitude: np.ndarray, cartesian: bool = False, local: bool = True):
+        self.set_backend(self._backend)
+
+    def prepare(
+        self,
+        latitude: np.ndarray,
+        longitude: np.ndarray,
+        cartesian: bool = False,
+        local: bool = True,
+        cyclic_length: float = 2 * math.pi,
+        mask: np.ndarray | None = None,
+        gpu: bool = False,
+    ):
         """
-        Prepares the filter for latitude and longitude grids regular grids
+        Configure filter for a latitude-longitude grid.
+
+        Computes grid topology, geometric properties, and assembles the filter
+        operator matrix. Must be called before any filtering operations.
 
         Parameters
         ----------
-        latitude: np.ndarray
-            1D np.ndarray of floats with latitude values
-        longitude: np.ndarray
-            1D np.ndarray of floats with longitude values
-        cartesian: bool
-            If true, the conversion from degrees to km should assume that mesh is cartesian.
-        local: bool
-            If true, neighborhood calculation doesn't wrap around an East/West direction
-        """
+        latitude : np.ndarray
+            Latitude values in degrees (1D array)
+        longitude : np.ndarray
+            Longitude values in degrees (1D array)
+        cartesian : bool, optional
+            True for Cartesian coordinates, False for spherical (default)
+        local : bool, optional
+            True for 4-point local neighborhood, False for 8-point global (default: True)
+        cyclic_length : float, optional
+            Cyclic domain length in radians (default: 2π).
+        mask : np.ndarray, optional
+            Land-sea mask where True indicates land (default: all ocean)
+        gpu : bool, optional
+            True to enable GPU acceleration (default: False)
 
+        Notes
+        -----
+        - Land points are masked using Neumann boundary conditions
+        """
         nx = len(longitude)
         ny = len(latitude)
         e2d = nx * ny
         self._e2d = e2d
         self._nx = nx
         self._ny = ny
-
 
         xcoord = np.zeros((nx, ny))
         ycoord = xcoord.copy()
@@ -87,6 +121,10 @@ class LatLonNumpyFilter(Filter):
 
         xcoord = np.reshape(xcoord, [nx * ny])
         ycoord = np.reshape(ycoord, [nx * ny])
+
+        self._mask_n = (
+            np.ones(self._e2d, dtype=bool) if mask is None else mask.flatten()
+        )
 
         if local:
             ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
@@ -102,9 +140,8 @@ class LatLonNumpyFilter(Filter):
 
         hh = np.ones((4, e2d))  # Edge lengths
         hc = np.ones((4, e2d))  # Distance to next cell centers
-        r_earth = 6400.
-        cyclic_length = 360  # in degrees; if not cyclic, take it larger than  zonal size
-        cyclic_length = cyclic_length * math.pi / 180
+        r_earth = 6400.0
+
         # Fill ee_pos, arrangement is W;N;E;S
         for i in range(e2d):
             if ee_pos[1, i] == i:
@@ -155,7 +192,7 @@ class LatLonNumpyFilter(Filter):
         for n in range(e2d):
             no = nn
             for m in range(4):
-                if ee_pos[m, n] != n:
+                if ee_pos[m, n] != n and self._mask_n[ee_pos[m, n]] != 0:
                     nn += 1
                     # print(f"nn: {nn} m: {m} n: {n}")
                     ss[nn] = (hc[m, n] / hh[m, n]) / area[n]
@@ -164,47 +201,265 @@ class LatLonNumpyFilter(Filter):
 
             ii[no] = n
             jj[no] = n
-            ss[no] = -np.sum(ss[no:nn + 1])
+            ss[no] = -np.sum(ss[no : nn + 1])
             nn += 1
 
         self._ss = ss
         self._ii = ii
         self._jj = jj
+        self._area = area
 
-    def _compute(self, n, k, data: np.ndarray, maxiter=150_000, tol=1e-6) -> np.ndarray:
-        e2d = self._e2d
+        # Create a mask where both _ii and _jj are not 0
+        mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
 
-        Smat1 = csc_matrix((self._ss * (1.0 / k ** 2), (self._ii, self._jj)), shape=(e2d, e2d))
-        Smat2 = identity(e2d)
-        Smat = Smat2 + 0.5 * (-1 * Smat1) ** n
-        ttw = data.T - Smat @ data.T  # Work with perturbations
+        self._ss = self._ss[mask_sp]
+        self._ii = self._ii[mask_sp]
+        self._jj = self._jj[mask_sp]
 
-        b = 1. / Smat.diagonal()  # Simple preconditioner
-        pre = csc_matrix((b, (np.arange(e2d), np.arange(e2d))), shape=(e2d, e2d))
-        tts, code = cg(Smat, ttw, maxiter=maxiter, rtol=tol, M=pre)
-        tts += data.T
+        self.set_backend("gpu" if gpu else "cpu")
 
+    def get_backend(self) -> str:
+        """
+        Get current computational backend.
+
+        Returns
+        -------
+        str
+            Current backend ('cpu' or 'gpu').
+        """
+        return self._backend
+
+    def set_backend(self, backend: str):
+        """
+        Set computational backend for filtering operations.
+
+        Parameters
+        ----------
+        backend : str
+            Desired backend ('cpu' or 'gpu').
+
+        Notes
+        -----
+        Configures appropriate sparse linear algebra functions for the backend.
+        """
+        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = (
+            get_backend(backend)
+        )
+        self._backend = backend
+
+    def _compute(
+        self,
+        n: int,
+        k: float,
+        data: np.ndarray,
+        maxiter: int = 150_000,
+        tol: float = 1e-6,
+    ) -> np.ndarray:
+        Smat1 = self.csc_matrix(
+            (
+                self.convers(self._ss) * (-1.0 / np.square(k)),
+                (self.convers(self._ii), self.convers(self._jj)),
+            ),
+            shape=(self._e2d, self._e2d),
+        )
+        Smat = self.identity(self._e2d) + 2.0 * (Smat1**n)
+
+        ttu = self.convers(data)
+        ttw = ttu - Smat @ ttu  # Work with perturbations
+
+        b = 1.0 / Smat.diagonal()  # Simple preconditioner
+        arr = self.convers(np.arange(self._e2d))
+        pre = self.csc_matrix((b, (arr, arr)), shape=(self._e2d, self._e2d))
+
+        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
         if code != 0:
-            raise SolverNotConvergedError("Solver has not converged",
-                                          [f"output code with code: {code}"])
-        return tts
+            raise SolverNotConvergedError(
+                "Solver has not converged without metric terms",
+                [f"output code with code: {code}"],
+            )
+
+        tts += ttu
+        return self.tonumpy(tts)
 
     def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
+        """
+        Apply filter to scalar field on lat-lon grid.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : float
+            Filter wavelength in spatial units.
+        data : np.ndarray
+            Scalar field values on grid (shape: (nx, ny)).
+
+        Returns
+        -------
+        np.ndarray
+            Filtered scalar field (shape: (nx, ny)).
+
+        Raises
+        ------
+        ValueError
+            If filter order n < 1.
+        """
         if n < 1:
             raise ValueError("Filter order must be positive")
-        elif n > 2:
-            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
-        return np.reshape(self._compute(n, k, np.reshape(data, self._e2d)), (self._nx, self._ny))
+        return np.reshape(
+            self._compute(n, k, np.reshape(data, self._e2d)), (self._nx, self._ny)
+        )
 
-    def compute_velocity(self, n: int, k: float, ux: np.ndarray, vy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_velocity(
+        self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Apply filter to velocity components on lat-lon grid.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : float
+            Filter wavelength in spatial units.
+        ux : np.ndarray
+            Eastward velocity component (shape: (nx, ny)).
+        vy : np.ndarray
+            Northward velocity component (shape: (nx, ny)).
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray]
+            Filtered velocity components (ux_filt, vy_filt) each with shape (nx, ny).
+
+        Raises
+        ------
+        ValueError
+            If filter order n < 1.
+        """
         if n < 1:
             raise ValueError("Filter order must be positive")
-        elif n > 2:
-            raise VeryStupidIdeaError("Filter order too large", ["It really shouldn't be larger than 2"])
 
-        return (np.reshape(self._compute(n, k, np.reshape(ux, self._e2d)), (self._nx, self._ny)),
-                np.reshape(self._compute(n, k, np.reshape(vy, self._e2d)), (self._nx, self._ny)))
+        return (
+            np.reshape(
+                self._compute(n, k, np.reshape(ux, self._e2d)), (self._nx, self._ny)
+            ),
+            np.reshape(
+                self._compute(n, k, np.reshape(vy, self._e2d)), (self._nx, self._ny)
+            ),
+        )
 
-    def many_compute(self, n: int, k: float, data: Union[np.ndarray, List[np.ndarray]]) -> List[np.ndarray]:
-        raise NotImplementedError("This method is not yet implemented.")
+    def compute_spectra_scalar(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        data: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """
+        Compute power spectra for scalar field at specified wavelengths.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : Iterable | np.ndarray
+            Target wavelengths for spectral analysis.
+        data : np.ndarray
+            Scalar field values on grid (shape: (nx, ny)).
+        mask : np.ndarray, optional
+            Boolean mask where True excludes points from spectra computation.
+
+        Returns
+        -------
+        np.ndarray
+            Power spectral density at wavelengths [0, k0, k1, ...]:
+            [0] : Total variance
+            [1:] : Variance at each wavelength k
+        """
+        nr = len(k)
+        tt = np.reshape(data, self._e2d)
+        spectra = np.zeros(nr + 1)
+        if mask is None:
+            mask: np.ndarray = np.zeros(tt.shape, dtype=bool)
+
+        not_mask = ~mask
+        selected_area = self._area[not_mask]
+
+        spectra[0] = np.sum(selected_area * (np.square(tt))[not_mask]) / np.sum(
+            selected_area
+        )
+
+        for i in range(nr):
+            ttu = self._compute(n, k[i], tt)
+            ttu -= tt
+
+            ttu[mask] = 0.0
+            spectra[i + 1] = np.sum(
+                selected_area * (np.square(ttu))[not_mask]
+            ) / np.sum(selected_area)
+
+        return spectra
+
+    def compute_spectra_velocity(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        ux: np.ndarray,
+        vy: np.ndarray,
+        mask: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """
+        Compute power spectra for velocity field at specified wavelengths.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : Iterable | np.ndarray
+            Target wavelengths for spectral analysis.
+        ux : np.ndarray
+            Eastward velocity component (shape: (nx, ny)).
+        vy : np.ndarray
+            Northward velocity component (shape: (nx, ny)).
+        mask : np.ndarray, optional
+            Boolean mask where True excludes points from spectra computation.
+
+        Returns
+        -------
+        np.ndarray
+            Kinetic energy spectral density at wavelengths [0, k0, k1, ...]:
+            [0] : Total kinetic energy
+            [1:] : Kinetic energy at each wavelength k
+        """
+
+        nr = len(k)
+        unod = np.reshape(ux, self._e2d)
+        vnod = np.reshape(vy, self._e2d)
+
+        spectra = np.zeros(nr + 1)
+        if mask is None:
+            mask = np.zeros(unod.shape, dtype=bool)
+
+        not_mask = ~mask
+        selected_area = self._area[not_mask]
+        spectra[0] = np.sum(
+            selected_area * (np.square(unod) + np.square(vnod))[not_mask]
+        ) / np.sum(selected_area)
+
+        for i in range(nr):
+            ttu = self._compute(n, k[i], unod)
+            ttv = self._compute(n, k[i], vnod)
+
+            ttu -= unod
+            ttv -= vnod
+
+            ttu[mask] = 0.0
+            ttv[mask] = 0.0
+
+            spectra[i + 1] = np.sum(
+                selected_area * (np.square(ttu) + np.square(ttv))[not_mask]
+            ) / np.sum(selected_area)
+
+        return spectra
