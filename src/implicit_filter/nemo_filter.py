@@ -37,7 +37,7 @@ class NemoFilter(LatLonFilter):
         north_adj = None
 
         if neighb == "full":
-            north_adj, corresponds_to_redundant = find_adjacent_points_north(file, 1e-5)
+            north_adj, corresponds_to_redundant = find_adjacent_points_north(ds, 1e-5)
         else:
             corresponds_to_redundant = None
 
@@ -229,10 +229,12 @@ class NemoFilter(LatLonFilter):
                 if ee_pos[m, n] != n and mask[ee_pos[m, n]] != 0:
                     nn += 1
                     ss[nn] = (
-                        (hh[m, n] * h3u[n]) / (hc[m, n] * h3t[n])
+                        (hh[m, n] * h3u[ee_pos[m, n]]) / (hc[m, n] * h3t[ee_pos[m, n]])
                         if m % 2 == 0
-                        else (hh[m, n] * h3v[n]) / (hc[m, n] * h3t[n])
+                        else (hh[m, n] * h3v[ee_pos[m, n]])
+                        / (hc[m, n] * h3t[ee_pos[m, n]])
                     )
+
                     ss[nn] /= self._area[n]  # Add division on cell area if you prefer
                     ii[nn] = n
                     jj[nn] = ee_pos[m, n]
@@ -245,5 +247,11 @@ class NemoFilter(LatLonFilter):
         self._ss = ss
         self._ii = ii
         self._jj = jj
+
+        mask_sp = np.logical_and(mask[ii], mask[jj])
+
+        self._ss = self._ss[mask_sp]
+        self._ii = self._ii[mask_sp]
+        self._jj = self._jj[mask_sp]
 
         self.set_backend("gpu" if gpu else "cpu")

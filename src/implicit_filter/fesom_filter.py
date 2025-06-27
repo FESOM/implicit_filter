@@ -7,7 +7,21 @@ from .triangular_filter import TriangularFilter
 
 class FesomFilter(TriangularFilter):
     """
-    Class for filtering data based on FESOM triangular meshes.
+    Filter implementation specialized for FESOM ocean model meshes.
+
+    This class extends the TriangularFilter to work natively with FESOM
+    mesh files and data structures. It provides convenience methods for
+    loading mesh configurations directly from FESOM output files.
+
+    Parameters
+    ----------
+    See TriangularFilter for inherited parameters.
+
+    Notes
+    -----
+    Supports FESOM mesh files containing either 'elements' or 'face_nodes'
+    variables to define element connectivity. Automatically handles FESOM's
+    1-based indexing conversion to 0-based indexing for Python.
     """
 
     def prepare_from_file(
@@ -21,27 +35,34 @@ class FesomFilter(TriangularFilter):
         gpu: bool = False,
     ):
         """
-        Prepare the filter to be used with a mesh provided in the given file path.
+        Configure filter using a FESOM mesh file.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         file : str
-            Path to the FESOM mesh file.
-
-        meshtype : str
-        Mesh type, either 'm' (metric) or 'r' (radial).
-        Default is metric.
-
-        carthesian : bool
-            Boolean indicating whether the mesh is in Cartesian coordinates. Default is False
-
-        cyclic_length : float
-            The length of the cyclic boundary if the mesh is cyclic (for 'r' meshtype). Default is 360 * pi / 180
-
+            Path to FESOM mesh file (NetCDF format).
+        meshtype : str, optional
+            Mesh type identifier:
+            - 'm': Metric tensor formulation (default)
+            - 'r': Radial formulation for spherical coordinates
+        cartesian : bool, optional
+            True for Cartesian coordinates, False for spherical (default).
+        cyclic_length : float, optional
+            Cyclic domain length in radians (default: 2π).
         metric : bool, optional
-            A flag indicating whether to use the calculation including metric terms (True) or not (False).
-            Default is False.
+            True to include metric terms in operator (default: False).
+        mask : np.ndarray, optional
+            Element land mask where True indicates land (default: None).
+        gpu : bool, optional
+            True to enable GPU acceleration (default: False).
 
+        Notes
+        -----
+        This method automatically:
+        1. Reads the mesh file using xarray
+        2. Extracts node coordinates and element connectivity
+        3. Converts FESOM's 1-based indexing to 0-based indexing
+        4. Configures the filter using the parent class prepare method
         """
         mesh = xr.open_dataset(file)
         self.prepare_from_data_array(
@@ -58,6 +79,38 @@ class FesomFilter(TriangularFilter):
         mask: np.ndarray = None,
         gpu: bool = False,
     ):
+        """
+        Configure filter using an xarray Dataset containing FESOM mesh data.
+
+        Parameters
+        ----------
+        mesh : xr.Dataset
+            xarray Dataset containing FESOM mesh variables.
+        meshtype : str, optional
+            Mesh type identifier (default: 'm').
+        cartesian : bool, optional
+            Coordinate system flag (default: False).
+        cyclic_length : float, optional
+            Cyclic domain length in radians (default: 2π).
+        metric : bool, optional
+            Metric terms inclusion flag (default: False).
+        mask : np.ndarray, optional
+            Element land mask (default: None).
+        gpu : bool, optional
+            GPU acceleration flag (default: False).
+
+        Raises
+        ------
+        RuntimeError
+            If mesh doesn't contain recognizable element connectivity data.
+
+        Notes
+        -----
+        Looks for element connectivity in variables named:
+        - 'elements'
+        - 'face_nodes'
+        - 'elem'
+        """
         xcoord = mesh["lon"].values
         ycoord = mesh["lat"].values
 

@@ -21,29 +21,17 @@ For full mathematical formulation of the implicit filter please refer to [this p
 ```shell
 # create env with cupy (e.g. from Conda)
 # activate env
-python -m pip install git+https://github.com/FESOM/implicit_filter.git@VERSION
-```
-with `VERSION` being, e.g., `v2.0.0` or `main` if you really want the bleeding edge.
-
-### Developer installation
-
-Currently Python version has to be 3.10 or newer. 
-```shell
-source ./path/to/enviroment/of/your/choice
-git clone https://github.com/FESOM/implicit_filter
-
-cd implicit_filter
-# CPU only installation
-pip install -e .
+python -m pip install git+https://github.com/FESOM/implicit_filter.git
 ```
 
-If one wants to use GPU it's necessary to install [cupy](https://cupy.dev/). It can be installed with the pachage by adding optional dependency. Check your Nvidia driver version using `nvidia-smi` and install CuPy version matching your drivers. In case of CUDA 11:
+If one wants to use GPU it's necessary to install [cupy](https://cupy.dev/). It can be installed with the pachage by adding optional dependency. Check your Nvidia driver version using `nvidia-smi` and install CuPy version matching your drivers. You can install it separately 
 ```shell
-pip install -e .[gpu_c11]
+pip install cupy-cuda11x # CUDA 11 
+pip install cupy-cuda12x # CUDA 12 or newer
 ```
-For CUDA 12 or newer:
+It can be also installed with the package (example for CUDA 12)
 ```shell
-pip install -e .[gpu_c12]
+python -m pip install "implicit_filter[gpu_c12] @ git+https://github.com/FESOM/implicit_filter.git"
 ```
 
 # Tutorial
@@ -127,6 +115,18 @@ Finally you can filter your data
 
 ```python
 filtered = flter.compute(1, k, unfiltered)
+```
+
+### Developer installation
+
+Currently Python version has to be 3.10 or newer. 
+```shell
+source ./path/to/enviroment/of/your/choice
+git clone https://github.com/FESOM/implicit_filter
+
+cd implicit_filter
+# CPU only installation
+pip install -e .
 ```
 
 ## Dependencies

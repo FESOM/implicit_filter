@@ -104,7 +104,9 @@ class LatLonFilter(Filter):
         xcoord = np.reshape(xcoord, [nx * ny])
         ycoord = np.reshape(ycoord, [nx * ny])
 
-        self._mask_n = np.ones(self._e2d, dtype=bool) if mask is None else mask.flatten()
+        self._mask_n = (
+            np.ones(self._e2d, dtype=bool) if mask is None else mask.flatten()
+        )
 
         if local:
             ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
@@ -193,11 +195,11 @@ class LatLonFilter(Filter):
         self._area = area
 
         # Create a mask where both _ii and _jj are not 0
-        # mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
-        #
-        # self._ss = self._ss[mask_sp]
-        # self._ii = self._ii[mask_sp]
-        # self._jj = self._jj[mask_sp]
+        mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
+
+        self._ss = self._ss[mask_sp]
+        self._ii = self._ii[mask_sp]
+        self._jj = self._jj[mask_sp]
 
         self.set_backend("gpu" if gpu else "cpu")
 

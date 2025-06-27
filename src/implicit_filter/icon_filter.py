@@ -12,6 +12,24 @@ class IconFilter(TriangularFilter):
         mask: np.ndarray | bool = False,
         gpu: bool = False,
     ):
+        """
+        Configure filter using an ICON grid file.
+
+        Parameters
+        ----------
+        grid_file : str
+            Path to ICON grid file (NetCDF format).
+        full : bool, optional
+            True to include metric terms in operator (default: False).
+        mask : np.ndarray | bool, optional
+            Can be:
+            - Precomputed land mask array
+            - True to automatically detect mask from file
+            - False to treat all cells as ocean (default)
+        gpu : bool, optional
+            True to enable GPU acceleration (default: False).
+
+        """
         grid2d = xr.open_dataset(grid_file)
         self.prepare_from_data_array(grid2d, full, mask, gpu)
 
@@ -22,6 +40,35 @@ class IconFilter(TriangularFilter):
         mask: np.ndarray | bool = False,
         gpu: bool = False,
     ):
+        """
+        Configure filter using an xarray Dataset containing ICON grid data.
+
+        Parameters
+        ----------
+        grid2d : xr.Dataset
+            xarray Dataset containing ICON grid variables.
+        full : bool, optional
+            Metric terms inclusion flag (default: False).
+        mask : np.ndarray | bool, optional
+            Land-sea mask specification:
+            - np.ndarray: Precomputed mask array
+            - True: Auto-detect from 'cell_sea_land_mask'
+            - False: All ocean cells (default)
+        gpu : bool, optional
+            GPU acceleration flag (default: False).
+
+        Raises
+        ------
+        KeyError
+            If mask=True but 'cell_sea_land_mask' not found in dataset.
+
+        Notes
+        -----
+        - Vertex coordinates are converted from radians to degrees
+        - Element connectivity is expected in 'vertex_of_cell' variable
+        - Spherical coordinates with cyclic domain are assumed
+        - Land-sea mask is transformed from cell-centered to nodal representation
+        """
         # Prepare the mesh data
         xcoord = grid2d["vlon"].values * 180.0 / np.pi
         ycoord = grid2d["vlat"].values * 180.0 / np.pi  # Location of nodes, in degrees
