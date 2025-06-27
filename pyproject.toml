@@ -8,6 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "implicit_filter"
 version = "2.0.0"
+
 description = "Python package implementing implicit filtering method on any type of mesh."
 readme = "readme.md"
 authors = [{ name = "Kacper Nowak", email = "kacper.nowak@awi.de" },
