@@ -2,7 +2,9 @@ name: implicit_filter
 channels:
   - conda-forge
 dependencies:
-  - python>=3.9
+  - python
+  - cupy
+  - ipykernel
   - pip
   - pip:
     - -r requirements.txt
