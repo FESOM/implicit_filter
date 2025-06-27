@@ -374,7 +374,7 @@ def convert_to_wavenumbers(dist, dxm):
 
 
 def find_adjacent_points_north(
-    mesh_mask_path: str = None, lon_lat_prec_degrees: float = None
+    ds_mm: xr.DataArray = None, lon_lat_prec_degrees: float = None
 ) -> tuple[Series, int]:
     """
     Fix rounding erros in NEMO grid using linear regression
@@ -383,7 +383,7 @@ def find_adjacent_points_north(
 
     Parameters:
     -----------
-    mesh_mask_path : str
+    ds_mm : xr.DataArray
         Path to the mesh mask file.
     lon_lat_prec_degrees : float
         Rounding precision for longitude and latitude coordinates.
@@ -395,7 +395,6 @@ def find_adjacent_points_north(
 
     """
     # load mesh mask
-    ds_mm = xr.open_dataset(mesh_mask_path)
     ds_mm = ds_mm.squeeze(drop=True)
     ds_mm = ds_mm.assign_coords(
         x=np.arange(ds_mm.sizes["x"]),
