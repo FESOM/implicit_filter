@@ -67,7 +67,6 @@ JAX warning might appear about GPU not being available, but it should be ignored
 To use GPU you need to either pass this option in filter preparation or set backend later. Backends can be switched during runtime without causing any issues. 
 ```python
 from implicit_filter import FesomFilter 
-# if you don't have GPU use JaxFilter instead
 
 flter = FesomFilter()
 flter.prepare_from_file(path + "fesom.mesh.diag.nc", gpu=True)
