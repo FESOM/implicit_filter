@@ -57,7 +57,6 @@ The easiest way to do it is by using mesh path. Alternatively, you can set array
 
 ```python
 from implicit_filter import FesomFilter 
-# if you don't have GPU use JaxFilter instead
 
 flter = FesomFilter()
 flter.prepare_from_file(path + "fesom.mesh.diag.nc")

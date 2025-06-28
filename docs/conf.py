@@ -27,6 +27,13 @@ extensions = [
     'sphinx.ext.napoleon'
 ]
 
+source_suffix = '.rst'
+master_doc = 'index'
+language = 'en'
+pygments_style = 'sphinx'
+
+apidoc_module_dir = './src/implicit_filter'
+apidoc_output_dir = './_build/'
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
