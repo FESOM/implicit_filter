@@ -272,7 +272,7 @@ class TriangularFilter(Filter):
         ycoord : np.ndarray
             Y-coordinates of mesh nodes (degrees).
         meshtype : str, optional
-            Mesh type identifier ('m' for general meshes).
+            Mesh type coordinate unit ('m' for metric, 'r' for radial).
         cartesian : bool, optional
             True for Cartesian coordinates, False for spherical.
         cyclic_length : float, optional
@@ -295,7 +295,7 @@ class TriangularFilter(Filter):
         self._full = full
 
         if mask is None:
-            mask = np.ones(e2d)
+            mask = np.ones(e2d, dtype=np.bool)
         ne_num, ne_pos = neighboring_triangles(n2d, e2d, tri)
         nn_num, nn_pos = neighbouring_nodes(n2d, tri, ne_num, ne_pos)
         area, elem_area, dx, dy, Mt = areas(
@@ -329,7 +329,7 @@ class TriangularFilter(Filter):
         self._mask_n = transform_mask_to_nodes(
             self._mask_n, self._ne_pos, self._ne_num, self._n2d
         )
-        self._mask_n = ~jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(
+        self._mask_n = jnp.where(self._mask_n > 0.5, 1.0, 0.0).astype(
             bool
         )  # Where there's ocean
 
