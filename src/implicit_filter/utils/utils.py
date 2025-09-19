@@ -63,7 +63,7 @@ def get_backend(backend: str):
         convers = jnp.array
         tonumpy = np.array
 
-        cg = lambda Smat, ttw, x0, tol, maxiter, pre: scipy_cg(A=Smat, b=ttw, x0=x0, tol=tol, maxiter=maxiter, M=pre)
+        cg = lambda Smat, ttw, x0, tol, maxiter, pre: scipy_cg(A=Smat, b=ttw, x0=x0, rtol=tol, maxiter=maxiter, M=pre)
         return csc_matrix, identity, cg, convers, tonumpy
     else:
         raise NotImplementedError(f"Backend {backend} is not supported.")

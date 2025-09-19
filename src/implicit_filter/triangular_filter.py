@@ -246,7 +246,7 @@ class TriangularFilter(Filter):
         tri: np.ndarray,
         xcoord: np.ndarray,
         ycoord: np.ndarray,
-        meshtype: str = "m",
+        meshtype: str = "r",
         cartesian: bool = True,
         cyclic_length: float = 360.0 * pi / 180.0,
         full: bool = False,
@@ -272,7 +272,7 @@ class TriangularFilter(Filter):
         ycoord : np.ndarray
             Y-coordinates of mesh nodes (degrees).
         meshtype : str, optional
-            Mesh type coordinate unit ('m' for metric, 'r' for radial).
+            Mesh type coordinate unit: 'm' for metric, 'r' for radial(degrees).
         cartesian : bool, optional
             True for Cartesian coordinates, False for spherical.
         cyclic_length : float, optional

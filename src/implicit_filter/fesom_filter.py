@@ -27,7 +27,7 @@ class FesomFilter(TriangularFilter):
     def prepare_from_file(
         self,
         file: str,
-        meshtype: str = "m",
+        meshtype: str = "r",
         cartesian: bool = False,
         cyclic_length: float = 360.0 * math.pi / 180.0,
         metric: bool = False,
@@ -42,9 +42,7 @@ class FesomFilter(TriangularFilter):
         file : str
             Path to FESOM mesh file (NetCDF format).
         meshtype : str, optional
-            Mesh type identifier:
-            - 'm': Metric tensor formulation (default)
-            - 'r': Radial formulation for spherical coordinates
+            Mesh type coordinate unit: 'm' for metric, 'r' for radial(degrees).
         cartesian : bool, optional
             True for Cartesian coordinates, False for spherical (default).
         cyclic_length : float, optional
@@ -72,7 +70,7 @@ class FesomFilter(TriangularFilter):
     def prepare_from_data_array(
         self,
         mesh: xr.DataArray,
-        meshtype: str = "m",
+        meshtype: str = "r",
         cartesian: bool = False,
         cyclic_length: float = 360.0 * math.pi / 180.0,
         metric: bool = False,
@@ -87,7 +85,7 @@ class FesomFilter(TriangularFilter):
         mesh : xr.Dataset
             xarray Dataset containing FESOM mesh variables.
         meshtype : str, optional
-            Mesh type identifier (default: 'm').
+            Mesh type coordinate unit: 'm' for metric, 'r' for radial(degrees).
         cartesian : bool, optional
             Coordinate system flag (default: False).
         cyclic_length : float, optional

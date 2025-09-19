@@ -99,7 +99,7 @@ def neighbouring_nodes(
     # Initialize an array to store the positions of neighboring nodes for each node.
     nn_num = np.zeros([n2d], dtype=int)
     check = np.zeros([n2d], dtype=int)
-    aux = np.zeros([10], dtype=int)
+    aux = np.zeros([20], dtype=int)
     for j in range(n2d):
         cc = 0
         for m in range(ne_num[j]):
