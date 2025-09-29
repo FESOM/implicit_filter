@@ -250,7 +250,7 @@ class TriangularFilter(Filter):
         cartesian: bool = True,
         cyclic_length: float = 360.0 * pi / 180.0,
         full: bool = False,
-        mask: np.ndarray = None,
+        mask: np.ndarray | None = None,
         gpu: bool = False,
     ):
         """
@@ -280,7 +280,7 @@ class TriangularFilter(Filter):
         full : bool, optional
             True to include metric terms in operator (default: False).
         mask : np.ndarray, optional
-            Element mask where True indicates land (default: all ocean).
+            Element mask where True indicates ocean (default: all ocean).
         gpu : bool, optional
             True to enable GPU acceleration (default: False).
 

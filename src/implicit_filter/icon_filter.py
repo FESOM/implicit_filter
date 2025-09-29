@@ -51,7 +51,7 @@ class IconFilter(TriangularFilter):
             Metric terms inclusion flag (default: False).
         mask : np.ndarray | bool, optional
             Land-sea mask specification:
-            - np.ndarray: Precomputed mask array
+            - np.ndarray: Precomputed mask array where true is ocean
             - True: Auto-detect from 'cell_sea_land_mask'
             - False: All ocean cells (default)
         gpu : bool, optional
@@ -74,17 +74,19 @@ class IconFilter(TriangularFilter):
         ycoord = grid2d["vlat"].values * 180.0 / np.pi  # Location of nodes, in degrees
         tri = grid2d["vertex_of_cell"].values.T.astype(int) - 1
         tri = tri.astype(int)
-        mask_transform = False
 
         if isinstance(mask, np.ndarray):
             pass
         elif mask:
             if "cell_sea_land_mask" in grid2d:
-                mask = grid2d["cell_sea_land_mask"].values
-                mask_transform = True
+                mask = grid2d["cell_sea_land_mask"].values * -1
+                mask[mask == 2] = 1
+                mask[mask == -2] = -1
+                mask = grid2d["cell_sea_land_mask"].values * -1
+                mask = mask.astype(np.bool)
             else:
                 raise KeyError(
-                    f"In the file {grid_file} there's no ocean mask under default name {'cell_sea_land_mask'}"
+                    f"In the file grid file there's no ocean mask under default name 'cell_sea_land_mask'"
                 )
         else:
             mask = np.ones(len(tri[:, 1]))
