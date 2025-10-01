@@ -113,13 +113,16 @@ class TriangularFilter(Filter):
         self.set_backend(self.backend)
 
     def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
+        if type(kl) is float:
+            kl = np.ones(ttu.shape) * kl
+
         Smat1 = self.csc_matrix(
             (
-                self.convers(self._ss) * (1.0 / np.square(kl)),
+                self.convers(self._ss),
                 (self.convers(self._ii), self.convers(self._jj)),
             ),
             shape=(self._n2d, self._n2d),
-        )
+        ) @ self.diags(1.0 / np.square(kl))
         Smat = self.identity(self._n2d) + 2.0 * (Smat1**n)
 
         ttu = self.convers(ttu)
@@ -140,13 +143,16 @@ class TriangularFilter(Filter):
         return self.tonumpy(tts)
 
     def _compute_full(self, n, kl, ttuv, tol=1e-5, maxiter=150000) -> np.ndarray:
+        if type(kl) is float:
+            kl = np.ones(2 * self._n2d) * kl
+
         Smat1 = self.csc_matrix(
             (
                 self.convers(self._ss) * (1.0 / np.square(kl)),
                 (self.convers(self._ii), self.convers(self._jj)),
             ),
             shape=(2 * self._n2d, 2 * self._n2d),
-        )
+        ) @ self.diags(1.0 / np.square(kl))
         Smat = self.identity(2 * self._n2d) + 2.0 * (Smat1**n)
 
         ttuv = self.convers(ttuv)
@@ -167,7 +173,7 @@ class TriangularFilter(Filter):
         return self.tonumpy(tts)
 
     def compute_velocity(
-        self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
+        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Apply filter to velocity components on triangular mesh.
@@ -176,8 +182,10 @@ class TriangularFilter(Filter):
         ----------
         n : int
             Filter order (must be positive).
-        k : float
+        k : float | np.ndarray
             Filter wavelength in spatial units.
+            Float can be passed to be applied for entire mesh or array with scales for each node.
+            Size of the array must match the size of the input data
         ux : np.ndarray
             Eastward velocity component at mesh nodes.
         vy : np.ndarray
@@ -209,7 +217,7 @@ class TriangularFilter(Filter):
             ttv = self._compute(n, k, vyn)
             return ttu, ttv
 
-    def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
+    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray) -> np.ndarray:
         """
         Apply filter to scalar field on triangular mesh.
 
@@ -217,8 +225,10 @@ class TriangularFilter(Filter):
         ----------
         n : int
             Filter order (must be positive).
-        k : float
+        k : float | np.ndarray
             Filter wavelength in spatial units.
+            Float can be passed to be applied for entire mesh or array with scales for each node.
+            Size of the array must match the size of the input data
         data : np.ndarray
             Scalar field values at mesh nodes.
 
@@ -396,9 +406,14 @@ class TriangularFilter(Filter):
         -----
         Configures appropriate sparse linear algebra functions for the backend.
         """
-        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = (
-            get_backend(backend)
-        )
+        (
+            self.csc_matrix,
+            self.identity,
+            self.diags,
+            self.cg,
+            self.convers,
+            self.tonumpy,
+        ) = get_backend(backend)
         self.backend = backend
 
     def compute_spectra_scalar(
@@ -410,6 +425,9 @@ class TriangularFilter(Filter):
     ) -> np.ndarray:
         """
         Compute power spectra for scalar field at specified wavelengths.
+
+        If one want's to use spatialy varying filter scale, k should be
+        list of numpy arrays with size mathing the input data.
 
         Parameters
         ----------
@@ -462,6 +480,9 @@ class TriangularFilter(Filter):
     ) -> np.ndarray:
         """
         Compute power spectra for velocity field at specified wavelengths.
+
+        If one want's to use spatialy varying filter scale, k should be
+        list of numpy arrays with size mathing the input data.
 
         Parameters
         ----------

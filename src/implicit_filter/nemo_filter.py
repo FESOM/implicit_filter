@@ -67,6 +67,13 @@ class NemoFilter(LatLonFilter):
         - Uses vertical level scale factors for accurate cell volumes
         """
         ds = xr.open_dataset(file)
+        if "z" not in ds.dims and vl == 0:
+            ds = ds.expand_dims({"z": 1})
+        elif "z" not in ds.dims and vl != 0:
+            raise ValueError(
+                "The file doesn't have the vertical dimension 'z'. One cannot use vl greater than 0"
+            )
+
         self.prepare_from_data_array(ds, vl, mask, gpu, neighb)
 
     def prepare_from_data_array(
@@ -149,7 +156,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1000.0,
+            / 1.0,
             nx * ny,
         )
         hy = np.reshape(
@@ -160,7 +167,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1000.0,
+            / 1.0,
             nx * ny,
         )
         self._area = hx * hy
@@ -174,7 +181,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1000.0,
+            / 1.0,
             nx * ny,
         )  # North edge
         hh[0, :] = np.reshape(
@@ -185,7 +192,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1000.0,
+            / 1.0,
             nx * ny,
         )  # West edge
         for n in range(e2d):
@@ -209,7 +216,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1000.0,
+            / 1.0,
             nx * ny,
         )
         h3v = np.reshape(
@@ -221,7 +228,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1000.0,
+            / 1.0,
             nx * ny,
         )
         h3t = np.reshape(
@@ -233,7 +240,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1000.0,
+            / 1.0,
             nx * ny,
         )
 
@@ -246,7 +253,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1000.0,
+            / 1.0,
             nx * ny,
         )  # West neighbour
         hc[1, :] = np.reshape(
@@ -257,7 +264,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1000.0,
+            / 1.0,
             nx * ny,
         )  # North neighbour
 
