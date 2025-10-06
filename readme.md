@@ -24,7 +24,7 @@ For full mathematical formulation of the implicit filter please refer to [this p
 python -m pip install git+https://github.com/FESOM/implicit_filter.git
 ```
 
-If one wants to use GPU it's necessary to install [cupy](https://cupy.dev/). It can be installed with the pachage by adding optional dependency. Check your Nvidia driver version using `nvidia-smi` and install CuPy version matching your drivers. You can install it separately 
+If one wants to use GPU it's necessary to install [cupy](https://cupy.dev/). It can be installed with the package by adding optional dependency. Check your Nvidia driver version using `nvidia-smi` and install CuPy version matching your drivers. You can install it separately 
 ```shell
 pip install cupy-cuda11x # CUDA 11 
 pip install cupy-cuda12x # CUDA 12 or newer
