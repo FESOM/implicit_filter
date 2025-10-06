@@ -11,7 +11,7 @@ Currently FESOM, ICON, NEMO and longitude-latitude meshes are supported.
 
 For optimal performance usage of Nvidia GPU is highly recommended.
 
-For details of the implementation please read out paper on [arXiv](https://arxiv.org/abs/2404.07398)
+For details of the implementation please read out paper on [GMD](https://gmd.copernicus.org/articles/18/6541/2025/)
 
 For full mathematical formulation of the implicit filter please refer to [this paper](http://dx.doi.org/10.1029/2023MS003946)
 ## Installation 
