@@ -11,7 +11,7 @@ Currently FESOM, ICON, NEMO and longitude-latitude meshes are supported.
 
 For optimal performance usage of Nvidia GPU is highly recommended.
 
-For details of the implementation please read out paper on [arXiv](https://arxiv.org/abs/2404.07398)
+For details of the implementation please read out paper on [GMD](https://gmd.copernicus.org/articles/18/6541/2025/)
 
 For full mathematical formulation of the implicit filter please refer to [this paper](http://dx.doi.org/10.1029/2023MS003946)
 ## Installation 
@@ -24,7 +24,7 @@ For full mathematical formulation of the implicit filter please refer to [this p
 python -m pip install git+https://github.com/FESOM/implicit_filter.git
 ```
 
-If one wants to use GPU it's necessary to install [cupy](https://cupy.dev/). It can be installed with the pachage by adding optional dependency. Check your Nvidia driver version using `nvidia-smi` and install CuPy version matching your drivers. You can install it separately 
+If one wants to use GPU it's necessary to install [cupy](https://cupy.dev/). It can be installed with the package by adding optional dependency. Check your Nvidia driver version using `nvidia-smi` and install CuPy version matching your drivers. You can install it separately 
 ```shell
 pip install cupy-cuda11x # CUDA 11 
 pip install cupy-cuda12x # CUDA 12 or newer
