@@ -156,7 +156,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1.0,
+            / 1000.0,
             nx * ny,
         )
         hy = np.reshape(
@@ -167,7 +167,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1.0,
+            / 1000.0,
             nx * ny,
         )
         self._area = hx * hy
@@ -181,7 +181,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1.0,
+            / 1000.0,
             nx * ny,
         )  # North edge
         hh[0, :] = np.reshape(
@@ -192,7 +192,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1.0,
+            / 1000.0,
             nx * ny,
         )  # West edge
         for n in range(e2d):
@@ -216,7 +216,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1.0,
+            / 1000.0,
             nx * ny,
         )
         h3v = np.reshape(
@@ -228,7 +228,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1.0,
+            / 1000.0,
             nx * ny,
         )
         h3t = np.reshape(
@@ -240,7 +240,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1.0,
+            / 1000.0,
             nx * ny,
         )
 
@@ -253,7 +253,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1.0,
+            / 1000.0,
             nx * ny,
         )  # West neighbour
         hc[1, :] = np.reshape(
@@ -264,7 +264,7 @@ class NemoFilter(LatLonFilter):
             .squeeze()
             .transpose("x", "y")
             .values
-            / 1.0,
+            / 1000.0,
             nx * ny,
         )  # North neighbour
 

@@ -261,22 +261,16 @@ class LatLonFilter(Filter):
         maxiter: int = 150_000,
         tol: float = 1e-6,
     ) -> np.ndarray:
-        # if type(k) is float:
-        #     k = np.ones(self._e2d) * k
+        if type(k) is float:
+            k = np.ones(self._e2d) * k
 
         Smat1 = self.csc_matrix(
             (
-                self.convers(self._ss) * (1.0 / np.square(k)),
+                self.convers(self._ss),
                 (self.convers(self._ii), self.convers(self._jj)),
             ),
             shape=(self._e2d, self._e2d),
-        )
-
-        # scaling_vector = 1.0 / np.square(k)
-        # nnz_per_column = np.diff(self.tonumpy(Smat1.indptr))
-        # repeats_on_cpu = self.tonumpy(nnz_per_column)
-        # multipliers = np.repeat(scaling_vector, repeats_on_cpu)
-        # Smat1.data *= self.convers(multipliers)
+        ) @ self.diags(1.0 / np.square(k))
 
         Smat = self.identity(self._e2d) + 2.0 * (Smat1**n)
 
