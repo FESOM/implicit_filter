@@ -122,7 +122,14 @@ class TriangularFilter(Filter):
                 (self.convers(self._ii), self.convers(self._jj)),
             ),
             shape=(self._n2d, self._n2d),
-        ) @ self.diags(1.0 / np.square(kl))
+        )
+
+        scaling_vector = 1.0 / np.square(kl)
+        nnz_per_column = np.diff(self.tonumpy(Smat1.indptr))
+        repeats_on_cpu = self.tonumpy(nnz_per_column)
+        multipliers = np.repeat(scaling_vector, repeats_on_cpu)
+        Smat1.data *= self.convers(multipliers)
+
         Smat = self.identity(self._n2d) + 2.0 * (Smat1**n)
 
         ttu = self.convers(ttu)
@@ -152,7 +159,14 @@ class TriangularFilter(Filter):
                 (self.convers(self._ii), self.convers(self._jj)),
             ),
             shape=(2 * self._n2d, 2 * self._n2d),
-        ) @ self.diags(1.0 / np.square(kl))
+        )
+
+        scaling_vector = 1.0 / np.square(kl)
+        nnz_per_column = np.diff(self.tonumpy(Smat1.indptr))
+        repeats_on_cpu = self.tonumpy(nnz_per_column)
+        multipliers = np.repeat(scaling_vector, repeats_on_cpu)
+        Smat1.data *= self.convers(multipliers)
+
         Smat = self.identity(2 * self._n2d) + 2.0 * (Smat1**n)
 
         ttuv = self.convers(ttuv)
