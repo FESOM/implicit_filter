@@ -49,12 +49,12 @@ For optimal performance, usage of an Nvidia GPU is highly recommended. You must 
 Option A: Automatic (via extras)
 Install the package with the tag matching your CUDA version (check via nvidia-smi):
 
-# For CUDA 11.x
+### For CUDA 11.x
 ```bash
 python -m pip install "implicit_filter[gpu_c11] @ git+https://github.com/FESOM/implicit_filter.git"
 ```
 
-# For CUDA 12.x
+### For CUDA 12.x
 ```bash
 python -m pip install "implicit_filter[gpu_c12] @ git+https://github.com/FESOM/implicit_filter.git"
 ```
@@ -67,7 +67,7 @@ pip install cupy-cuda12x  # Adjust for your CUDA version
 python -m pip install git+https://github.com/FESOM/implicit_filter.git
 ```
 
-🚀 Quick Start
+## 🚀 Quick Start
 
 Here is a complete example of how to load a FESOM mesh, prepare the filter, and apply it to Scalar data (e.g., SSH).
 
