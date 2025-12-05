@@ -3,7 +3,8 @@
 # setup.py uses the list of patterns in this file to decide
 # what to delete, but it's not 100% sound. Be careful when
 # refactoring this file!
-
+*.txt
+*.err
 # PyPi
 dist/*
 caer.egg-info/*

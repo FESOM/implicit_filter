@@ -48,6 +48,7 @@ class LatLonFilter(Filter):
     _mask_n : np.ndarray
         Boolean mask for valid grid points (False indicates land)
     """
+
     def __init__(self, *initial_data, **kwargs):
         super().__init__(initial_data, **kwargs)
         it = lambda ar: int(ar)
@@ -242,34 +243,47 @@ class LatLonFilter(Filter):
         -----
         Configures appropriate sparse linear algebra functions for the backend.
         """
-        self.csc_matrix, self.identity, self.cg, self.convers, self.tonumpy = (
-            get_backend(backend)
-        )
+        (
+            self.csc_matrix,
+            self.identity,
+            self.diags,
+            self.cg,
+            self.convers,
+            self.tonumpy,
+        ) = get_backend(backend)
         self._backend = backend
 
     def _compute(
         self,
         n: int,
-        k: float,
+        k: float | np.ndarray,
         data: np.ndarray,
         maxiter: int = 150_000,
         tol: float = 1e-6,
     ) -> np.ndarray:
+        if type(k) is float:
+            k = np.ones(self._e2d) * k
+
         Smat1 = self.csc_matrix(
             (
-                self.convers(self._ss) * (-1.0 / np.square(k)),
+                self.convers(self._ss),
                 (self.convers(self._ii), self.convers(self._jj)),
             ),
             shape=(self._e2d, self._e2d),
         )
+
+        scaling_vector = -1.0 / np.square(k)
+        nnz_per_column = np.diff(self.tonumpy(Smat1.indptr))
+        repeats_on_cpu = self.tonumpy(nnz_per_column)
+        multipliers = np.repeat(scaling_vector, repeats_on_cpu)
+        Smat1.data *= self.convers(multipliers)
+
         Smat = self.identity(self._e2d) + 2.0 * (Smat1**n)
 
         ttu = self.convers(data)
         ttw = ttu - Smat @ ttu  # Work with perturbations
 
-        b = 1.0 / Smat.diagonal()  # Simple preconditioner
-        arr = self.convers(np.arange(self._e2d))
-        pre = self.csc_matrix((b, (arr, arr)), shape=(self._e2d, self._e2d))
+        pre = self.diags(1.0 / Smat.diagonal())  # Simple preconditioner
 
         tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
         if code != 0:
@@ -281,7 +295,7 @@ class LatLonFilter(Filter):
         tts += ttu
         return self.tonumpy(tts)
 
-    def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
+    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray) -> np.ndarray:
         """
         Apply filter to scalar field on lat-lon grid.
 
@@ -289,8 +303,10 @@ class LatLonFilter(Filter):
         ----------
         n : int
             Filter order (must be positive).
-        k : float
+        k : float | np.ndarray
             Filter wavelength in spatial units.
+            Float can be passed to be applied for entire mesh or array with scales for each node.
+            Size of the array must match the size of the input data
         data : np.ndarray
             Scalar field values on grid (shape: (nx, ny)).
 
@@ -312,7 +328,7 @@ class LatLonFilter(Filter):
         )
 
     def compute_velocity(
-        self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
+        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Apply filter to velocity components on lat-lon grid.
@@ -321,8 +337,10 @@ class LatLonFilter(Filter):
         ----------
         n : int
             Filter order (must be positive).
-        k : float
+        k : float | np.ndarray
             Filter wavelength in spatial units.
+            Float can be passed to be applied for entire mesh or array with scales for each node.
+            Size of the array must match the size of the input data
         ux : np.ndarray
             Eastward velocity component (shape: (nx, ny)).
         vy : np.ndarray
@@ -359,6 +377,9 @@ class LatLonFilter(Filter):
     ) -> np.ndarray:
         """
         Compute power spectra for scalar field at specified wavelengths.
+
+        If one want's to use spatialy varying filter scale, k should be
+        list of numpy arrays with size mathing the input data.
 
         Parameters
         ----------
@@ -412,6 +433,9 @@ class LatLonFilter(Filter):
     ) -> np.ndarray:
         """
         Compute power spectra for velocity field at specified wavelengths.
+
+        If one want's to use spatialy varying filter scale, k should be
+        list of numpy arrays with size mathing the input data.
 
         Parameters
         ----------

@@ -41,7 +41,7 @@ class Filter(ABC):
         pass
 
     @abstractmethod
-    def compute(self, n: int, k: float, data: np.ndarray) -> np.ndarray:
+    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray) -> np.ndarray:
         """
         Compute the filtered data using a specified filter size.
         Data must be placed on mesh nodes
@@ -51,8 +51,10 @@ class Filter(ABC):
         n : int
             Order of filter, one is recommended
 
-        k : float
+        k : float | np.ndarray
             Wavelength of the filter.
+            Float can be passed to be applied for entire mesh or array with scales for each node.
+            Size of the array must match the size of the input data
 
         data : np.ndarray
             NumPy array containing data to be filtered.
@@ -66,7 +68,7 @@ class Filter(ABC):
 
     @abstractmethod
     def compute_velocity(
-        self, n: int, k: float, ux: np.ndarray, vy: np.ndarray
+        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the filtered velocity data using a specified filter size.
@@ -77,8 +79,10 @@ class Filter(ABC):
         n : int
             Order of filter, one is recommended
 
-        k : float
+        k : float | np.ndarray
             Wavelength of the filter.
+            Float can be passed to be applied for entire mesh or array with scales for each node.
+            Size of the array must match the size of the input data
 
         ux : np.ndarray
             NumPy array containing eastward velocity component to be filtered.
@@ -104,6 +108,9 @@ class Filter(ABC):
         """
         Computes power spectra for given wavelengths.
         Data must be placed on mesh nodes
+
+        If one want's to use spatialy varying filter scale, k should be
+        list of numpy arrays with size mathing the input data.
 
         For details refer to https://arxiv.org/abs/2404.07398
         Parameters:
@@ -141,6 +148,9 @@ class Filter(ABC):
         """
         Computes power spectra for given wavelengths.
         Data must be placed on mesh nodes
+
+        If one want's to use spatialy varying filter scale, k should be
+        list of numpy arrays with size mathing the input data.
 
         For details refer to https://arxiv.org/abs/2404.07398
         Parameters:

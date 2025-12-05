@@ -67,6 +67,13 @@ class NemoFilter(LatLonFilter):
         - Uses vertical level scale factors for accurate cell volumes
         """
         ds = xr.open_dataset(file)
+        if "z" not in ds.dims and vl == 0:
+            ds = ds.expand_dims({"z": 1})
+        elif "z" not in ds.dims and vl != 0:
+            raise ValueError(
+                "The file doesn't have the vertical dimension 'z'. One cannot use vl greater than 0"
+            )
+
         self.prepare_from_data_array(ds, vl, mask, gpu, neighb)
 
     def prepare_from_data_array(

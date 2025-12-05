@@ -7,18 +7,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
       - uses: actions/setup-python@v3
+        with:
+          python-version: '3.10' 
+
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install sphinx sphinx_rtd_theme
+          pip install -e . 
+      
       - name: Sphinx build
         run: |
-          sphinx-build docs _build
+          cd docs
+          make html
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         with:
           publish_branch: gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: _build/
+          publish_dir: docs/_build/html
           force_orphan: true
