@@ -99,8 +99,8 @@ distance = 100  # Target filter size (e.g., km)
 
 # 5. Apply Filter
 filtered_data = flter.compute(1, 2*math.pi / distance, unfiltered_data)
-Switching Backends
 ```
+
 You can switch between CPU and GPU at runtime without restarting:
 
 ```python
