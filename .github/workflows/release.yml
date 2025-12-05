@@ -1,0 +1,70 @@
+name: Release on Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main  
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Only run if the PR was actually merged (not just closed/declined)
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install build tool and package
+        run: |
+          pip install --upgrade pip build
+          # Install current package to read its version safely
+          pip install .
+
+      - name: Get Version
+        id: get_version
+        run: |
+          # Use python to get the version installed in the previous step
+          # Replace 'implicit_filter' with the exact name of your package if different
+          VERSION=$(python -c "from importlib.metadata import version; print(version('implicit_filter'))")
+          echo "Detected version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build package
+        run: python -m build
+
+      - name: Create Git Tag
+        # This step pushes a tag like 'v1.0.1' back to the repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ steps.get_version.outputs.version }}
+        run: |
+          # Check if tag exists to avoid errors
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists. Skipping release."
+            exit 1
+          fi
+          
+          # Configure git to push the tag
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          files: dist/*
+          generate_release_notes: true
+          # Use the title of the merged PR as the release name
+          name: "v${{ steps.get_version.outputs.version }}: ${{ github.event.pull_request.title }}"
