@@ -50,7 +50,9 @@ Option A: Automatic (via extras)
 Install the package with the tag matching your CUDA version (check via nvidia-smi):
 
 # For CUDA 11.x
+```bash
 python -m pip install "implicit_filter[gpu_c11] @ git+https://github.com/FESOM/implicit_filter.git"
+```
 
 # For CUDA 12.x
 ```bash
