@@ -1,0 +1,1616 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="./">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="prev" title="Welcome to Implicit Filter’s Documentation!" href="index.html">
+
+    <!-- Generated with Sphinx 8.1.3 and Furo 2025.12.19 -->
+        <title>API Reference - Implicit Filter documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">Implicit Filter  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+  
+  <span class="sidebar-brand-text">Implicit Filter  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Developer Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Reference</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="https://github.com/FESOM/implicit_filter/blob/main/docs/api.rst?plain=true" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div><div class="edit-this-page">
+  <a class="muted-link" href="https://github.com/FESOM/implicit_filter/edit/main/docs/api.rst" rel="edit" title="Edit this page">
+    <svg><use href="#svg-pencil"></use></svg>
+    <span class="visually-hidden">Edit this page</span>
+  </a>
+</div><div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="api-reference">
+<h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h1>
+<p>This page provides detailed documentation for all modules and classes in the <code class="docutils literal notranslate"><span class="pre">implicit_filter</span></code> package.</p>
+<section id="module-implicit_filter.filter">
+<span id="filter-base-class"></span><h2>Filter Base Class<a class="headerlink" href="#module-implicit_filter.filter" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="implicit_filter.filter.Filter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">implicit_filter.filter.</span></span><span class="sig-name descname"><span class="pre">Filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">initial_data</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/filter.html#Filter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.filter.Filter" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
+<p>Abstract base class for filters</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.filter.Filter.compute">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">compute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/filter.html#Filter.compute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.filter.Filter.compute" title="Link to this definition">¶</a></dt>
+<dd><p>Compute the filtered data using a specified filter size.
+Data must be placed on mesh nodes</p>
+<section id="parameters">
+<h3>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>n<span class="classifier">int</span></dt><dd><p>Order of filter, one is recommended</p>
+</dd>
+<dt>k<span class="classifier">float | np.ndarray</span></dt><dd><p>Wavelength of the filter.
+Float can be passed to be applied for entire mesh or array with scales for each node.
+Size of the array must match the size of the input data</p>
+</dd>
+<dt>data<span class="classifier">np.ndarray</span></dt><dd><p>NumPy array containing data to be filtered.</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h3>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>np.ndarray</dt><dd><p>NumPy array with filtered data.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.filter.Filter.compute_spectra_scalar">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">compute_spectra_scalar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/filter.html#Filter.compute_spectra_scalar"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.filter.Filter.compute_spectra_scalar" title="Link to this definition">¶</a></dt>
+<dd><p>Computes power spectra for given wavelengths.
+Data must be placed on mesh nodes</p>
+<p>If one want’s to use spatialy varying filter scale, k should be
+list of numpy arrays with size mathing the input data.</p>
+<p>For details refer to <a class="reference external" href="https://arxiv.org/abs/2404.07398">https://arxiv.org/abs/2404.07398</a>
+Parameters:
+———–
+n : int</p>
+<blockquote>
+<div><p>Order of filter, one is recommended</p>
+</div></blockquote>
+<dl class="simple">
+<dt>k<span class="classifier">Iterable | np.ndarray</span></dt><dd><p>List of wavelengths to be filtered.</p>
+</dd>
+<dt>data<span class="classifier">np.ndarray</span></dt><dd><p>NumPy array containing data to be filtered.</p>
+</dd>
+<dt>mask<span class="classifier">np.ndarray | None</span></dt><dd><p>Mask applied to data while computing spectra.
+True means selected data won’t be used for computing spectra.
+This mask won’t be used during filtering.</p>
+</dd>
+</dl>
+<section id="id1">
+<h3>Returns:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>np.ndarray:</dt><dd><p>Array containing power spectra for given wavelengths.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.filter.Filter.compute_spectra_velocity">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">compute_spectra_velocity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/filter.html#Filter.compute_spectra_velocity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.filter.Filter.compute_spectra_velocity" title="Link to this definition">¶</a></dt>
+<dd><p>Computes power spectra for given wavelengths.
+Data must be placed on mesh nodes</p>
+<p>If one want’s to use spatialy varying filter scale, k should be
+list of numpy arrays with size mathing the input data.</p>
+<p>For details refer to <a class="reference external" href="https://arxiv.org/abs/2404.07398">https://arxiv.org/abs/2404.07398</a>
+Parameters:
+———–
+n : int</p>
+<blockquote>
+<div><p>Order of filter, one is recommended</p>
+</div></blockquote>
+<dl class="simple">
+<dt>k<span class="classifier">Iterable | np.ndarray</span></dt><dd><p>List of wavelengths to be filtered.</p>
+</dd>
+<dt>ux<span class="classifier">np.ndarray</span></dt><dd><p>NumPy array containing an eastward velocity component to be filtered.</p>
+</dd>
+<dt>vy<span class="classifier">np.ndarray</span></dt><dd><p>NumPy array containing a northwards velocity component to be filtered.</p>
+</dd>
+<dt>mask<span class="classifier">np.ndarray | None</span></dt><dd><p>Mask applied to data while computing spectra.
+True means selected data won’t be used for computing spectra.
+This mask won’t be used during filtering.</p>
+</dd>
+</dl>
+<section id="id2">
+<h3>Returns:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>np.ndarray:</dt><dd><p>Array containing power spectra for given wavelengths.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.filter.Filter.compute_velocity">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">compute_velocity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/implicit_filter/filter.html#Filter.compute_velocity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.filter.Filter.compute_velocity" title="Link to this definition">¶</a></dt>
+<dd><p>Compute the filtered velocity data using a specified filter size.
+Data must be placed on mesh nodes</p>
+<section id="id3">
+<h3>Parameters:<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>n<span class="classifier">int</span></dt><dd><p>Order of filter, one is recommended</p>
+</dd>
+<dt>k<span class="classifier">float | np.ndarray</span></dt><dd><p>Wavelength of the filter.
+Float can be passed to be applied for entire mesh or array with scales for each node.
+Size of the array must match the size of the input data</p>
+</dd>
+<dt>ux<span class="classifier">np.ndarray</span></dt><dd><p>NumPy array containing eastward velocity component to be filtered.</p>
+</dd>
+<dt>vy<span class="classifier">np.ndarray</span></dt><dd><p>NumPy array containing northwards velocity component to be filtered.</p>
+</dd>
+</dl>
+</section>
+<section id="id4">
+<h3>Returns:<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>Tuple[np.ndarray, np.ndarray]:</dt><dd><p>Tuple containing NumPy arrays with filtered data ux and uy velocities on mesh nodes.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.filter.Filter.get_backend">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_backend</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/implicit_filter/filter.html#Filter.get_backend"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.filter.Filter.get_backend" title="Link to this definition">¶</a></dt>
+<dd><p>Get the current computational backend.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Name of the active backend.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.filter.Filter.load_from_file">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">load_from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/filter.html#Filter.load_from_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.filter.Filter.load_from_file" title="Link to this definition">¶</a></dt>
+<dd><p>Instantiate filter from saved state file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>file</strong> (<em>str</em>) – Input file path created by save_to_file()</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Reconstructed filter instance with restored state</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter">Filter</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.filter.Filter.save_to_file">
+<span class="sig-name descname"><span class="pre">save_to_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/filter.html#Filter.save_to_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.filter.Filter.save_to_file" title="Link to this definition">¶</a></dt>
+<dd><p>Persist internal state to NPZ file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>file</strong> (<em>str</em>) – Output file path (.npz extension recommended)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.filter.Filter.set_backend">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_backend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/filter.html#Filter.set_backend"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.filter.Filter.set_backend" title="Link to this definition">¶</a></dt>
+<dd><p>Set the computational backend for filter operations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>backend</strong> (<em>str</em>) – Name of the backend to use (e.g., ‘cpu’, ‘gpu’).</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-implicit_filter.triangular_filter">
+<span id="triangular-mesh-filters"></span><h2>Triangular Mesh Filters<a class="headerlink" href="#module-implicit_filter.triangular_filter" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="implicit_filter.triangular_filter.TriangularFilter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">implicit_filter.triangular_filter.</span></span><span class="sig-name descname"><span class="pre">TriangularFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">initial_data</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/triangular_filter.html#TriangularFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.triangular_filter.TriangularFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><code class="xref py py-class docutils literal notranslate"><span class="pre">Filter</span></code></a></p>
+<p>A class for filtering data using JAX for generic triangular meshes.
+Extends the base Filter class.</p>
+<section id="attributes">
+<h3>Attributes:<a class="headerlink" href="#attributes" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>_elem_area<span class="classifier">Optional[jnp.ndarray]</span></dt><dd><p>Area of each element in the mesh.</p>
+</dd>
+<dt>_area<span class="classifier">Optional[jnp.ndarray]</span></dt><dd><p>Area of each node’s neighborhood in the mesh.</p>
+</dd>
+<dt>_ne_pos<span class="classifier">Optional[jnp.ndarray]</span></dt><dd><p>Connectivity matrix representing neighboring elements for each node.</p>
+</dd>
+<dt>_ne_num<span class="classifier">Optional[jnp.ndarray]</span></dt><dd><p>Number of neighboring elements for each node.</p>
+</dd>
+<dt>_dx<span class="classifier">Optional[jnp.ndarray]</span></dt><dd><p>X-component of the derivative of P1 basis functions.</p>
+</dd>
+<dt>_dy<span class="classifier">Optional[jnp.ndarray]</span></dt><dd><p>Y-component of the derivative of P1 basis functions.</p>
+</dd>
+<dt>_ss<span class="classifier">Optional[jnp.ndarray]</span></dt><dd><p>Non-zero entries of the sparse matrix.</p>
+</dd>
+<dt>_ii<span class="classifier">Optional[jnp.ndarray]</span></dt><dd><p>Row indices of non-zero entries.</p>
+</dd>
+<dt>_jj<span class="classifier">Optional[jnp.ndarray]</span></dt><dd><p>Column indices of non-zero entries.</p>
+</dd>
+<dt>_n2d<span class="classifier">int</span></dt><dd><p>Total number of nodes in the mesh.</p>
+</dd>
+<dt>_full<span class="classifier">bool</span></dt><dd><p>Flag indicating whether to use the full matrix.</p>
+</dd>
+<dt>_mask_n: Optional[jnp.ndarray]</dt><dd><p>Mask of valid elements in the mesh.
+For example it can land mask.</p>
+</dd>
+</dl>
+</section>
+<section id="methods">
+<h3>Methods:<a class="headerlink" href="#methods" title="Link to this heading">¶</a></h3>
+<dl>
+<dt>compute_velocity(n: int, k: float, ux: np.ndarray, vy: np.ndarray) -&gt; Tuple[np.ndarray, np.ndarray]:</dt><dd><p>Compute filtered velocity components (u, v) using implicit filtering.</p>
+</dd>
+<dt>Compute(n: int, k: float, data: np.ndarray) -&gt; np.ndarray:</dt><dd><p>Compute filtered data using implicit filtering.</p>
+</dd>
+<dt>Prepare(n2d: int, e2d: int, tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, meshtype: str,</dt><dd><blockquote>
+<div><p>cartesian: bool, cyclic_length: float, full: bool = False):</p>
+</div></blockquote>
+<p>Prepare the filter for a specific mesh.</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.triangular_filter.TriangularFilter.compute">
+<span class="sig-name descname"><span class="pre">compute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/triangular_filter.html#TriangularFilter.compute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.triangular_filter.TriangularFilter.compute" title="Link to this definition">¶</a></dt>
+<dd><p>Apply filter to scalar field on triangular mesh.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Filter order (must be positive).</p></li>
+<li><p><strong>k</strong> (<em>float</em><em> | </em><em>np.ndarray</em>) – Filter wavelength in spatial units.
+Float can be passed to be applied for entire mesh or array with scales for each node.
+Size of the array must match the size of the input data</p></li>
+<li><p><strong>data</strong> (<em>np.ndarray</em>) – Scalar field values at mesh nodes.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Filtered scalar field.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If filter order n &lt; 1.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.triangular_filter.TriangularFilter.compute_spectra_scalar">
+<span class="sig-name descname"><span class="pre">compute_spectra_scalar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/triangular_filter.html#TriangularFilter.compute_spectra_scalar"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.triangular_filter.TriangularFilter.compute_spectra_scalar" title="Link to this definition">¶</a></dt>
+<dd><p>Compute power spectra for scalar field at specified wavelengths.</p>
+<p>If one want’s to use spatialy varying filter scale, k should be
+list of numpy arrays with size mathing the input data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Filter order (must be positive).</p></li>
+<li><p><strong>k</strong> (<em>Iterable</em><em> | </em><em>np.ndarray</em>) – Target wavelengths for spectral analysis.</p></li>
+<li><p><strong>data</strong> (<em>np.ndarray</em>) – Scalar field values at mesh nodes.</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em>, </em><em>optional</em>) – Boolean mask where True excludes nodes from spectra computation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Power spectral density at wavelengths [0, k0, k1, …]:
+[0] : Total variance
+[1:] : Variance at each wavelength k</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.triangular_filter.TriangularFilter.compute_spectra_velocity">
+<span class="sig-name descname"><span class="pre">compute_spectra_velocity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/triangular_filter.html#TriangularFilter.compute_spectra_velocity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.triangular_filter.TriangularFilter.compute_spectra_velocity" title="Link to this definition">¶</a></dt>
+<dd><p>Compute power spectra for velocity field at specified wavelengths.</p>
+<p>If one want’s to use spatialy varying filter scale, k should be
+list of numpy arrays with size mathing the input data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Filter order (must be positive).</p></li>
+<li><p><strong>k</strong> (<em>Iterable</em><em> | </em><em>np.ndarray</em>) – Target wavelengths for spectral analysis.</p></li>
+<li><p><strong>ux</strong> (<em>np.ndarray</em>) – Eastward velocity component at mesh nodes.</p></li>
+<li><p><strong>vy</strong> (<em>np.ndarray</em>) – Northward velocity component at mesh nodes.</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em>, </em><em>optional</em>) – Boolean mask where True excludes nodes from spectra computation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Kinetic energy spectral density at wavelengths [0, k0, k1, …]:
+[0] : Total kinetic energy
+[1:] : Kinetic energy at each wavelength k</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<dl class="simple">
+<dt>Implements spectral decomposition:</dt><dd><p>E(k) = ⟨(u - uₖ)² + (v - vₖ)²⟩</p>
+</dd>
+</dl>
+<p>where (uₖ, vₖ) is the filtered velocity at wavelength k.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.triangular_filter.TriangularFilter.compute_velocity">
+<span class="sig-name descname"><span class="pre">compute_velocity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/implicit_filter/triangular_filter.html#TriangularFilter.compute_velocity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.triangular_filter.TriangularFilter.compute_velocity" title="Link to this definition">¶</a></dt>
+<dd><p>Apply filter to velocity components on triangular mesh.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Filter order (must be positive).</p></li>
+<li><p><strong>k</strong> (<em>float</em><em> | </em><em>np.ndarray</em>) – Filter wavelength in spatial units.
+Float can be passed to be applied for entire mesh or array with scales for each node.
+Size of the array must match the size of the input data</p></li>
+<li><p><strong>ux</strong> (<em>np.ndarray</em>) – Eastward velocity component at mesh nodes.</p></li>
+<li><p><strong>vy</strong> (<em>np.ndarray</em>) – Northward velocity component at mesh nodes.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Filtered velocity components (ux_filt, vy_filt).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple[np.ndarray, np.ndarray]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If filter order n &lt; 1.</p></li>
+<li><p><strong>SolverNotConvergedError</strong> – If linear solver fails to converge.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.triangular_filter.TriangularFilter.get_backend">
+<span class="sig-name descname"><span class="pre">get_backend</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/implicit_filter/triangular_filter.html#TriangularFilter.get_backend"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.triangular_filter.TriangularFilter.get_backend" title="Link to this definition">¶</a></dt>
+<dd><p>Get current computational backend.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Current backend (‘cpu’ or ‘gpu’).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.triangular_filter.TriangularFilter.prepare">
+<span class="sig-name descname"><span class="pre">prepare</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n2d</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">e2d</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tri</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xcoord</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ycoord</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meshtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'r'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cartesian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cyclic_length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">6.283185307179586</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">full</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/triangular_filter.html#TriangularFilter.prepare"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.triangular_filter.TriangularFilter.prepare" title="Link to this definition">¶</a></dt>
+<dd><p>Prepare filter for a specific triangular mesh.</p>
+<p>Computes mesh topology, geometric properties, and assembles the filter
+operator matrix. Must be called before any filtering operations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n2d</strong> (<em>int</em>) – Number of nodes in the mesh.</p></li>
+<li><p><strong>e2d</strong> (<em>int</em>) – Number of elements in the mesh.</p></li>
+<li><p><strong>tri</strong> (<em>np.ndarray</em>) – Element connectivity matrix (e2d x 3) of node indices.</p></li>
+<li><p><strong>xcoord</strong> (<em>np.ndarray</em>) – X-coordinates of mesh nodes (degrees).</p></li>
+<li><p><strong>ycoord</strong> (<em>np.ndarray</em>) – Y-coordinates of mesh nodes (degrees).</p></li>
+<li><p><strong>meshtype</strong> (<em>str</em><em>, </em><em>optional</em>) – Mesh type coordinate unit: ‘m’ for metric, ‘r’ for radial(degrees).</p></li>
+<li><p><strong>cartesian</strong> (<em>bool</em><em>, </em><em>optional</em>) – True for Cartesian coordinates, False for spherical.</p></li>
+<li><p><strong>cyclic_length</strong> (<em>float</em><em>, </em><em>optional</em>) – Cyclic domain length in radians (default: 2π).</p></li>
+<li><p><strong>full</strong> (<em>bool</em><em>, </em><em>optional</em>) – True to include metric terms in operator (default: False).</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em>, </em><em>optional</em>) – Element mask where True indicates ocean (default: all ocean).</p></li>
+<li><p><strong>gpu</strong> (<em>bool</em><em>, </em><em>optional</em>) – True to enable GPU acceleration (default: False).</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Coordinates are expected in degrees while cyclic_length is in radians.
+The mask is converted to nodal representation where True indicates land.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.triangular_filter.TriangularFilter.set_backend">
+<span class="sig-name descname"><span class="pre">set_backend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/triangular_filter.html#TriangularFilter.set_backend"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.triangular_filter.TriangularFilter.set_backend" title="Link to this definition">¶</a></dt>
+<dd><p>Set computational backend for filtering operations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>backend</strong> (<em>str</em>) – Desired backend (‘cpu’ or ‘gpu’).</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Configures appropriate sparse linear algebra functions for the backend.</p>
+</dd></dl>
+
+</section>
+</dd></dl>
+
+<dl class="py class" id="module-implicit_filter.fesom_filter">
+<dt class="sig sig-object py" id="implicit_filter.fesom_filter.FesomFilter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">implicit_filter.fesom_filter.</span></span><span class="sig-name descname"><span class="pre">FesomFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">initial_data</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/fesom_filter.html#FesomFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.fesom_filter.FesomFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter" title="implicit_filter.triangular_filter.TriangularFilter"><code class="xref py py-class docutils literal notranslate"><span class="pre">TriangularFilter</span></code></a></p>
+<p>Filter implementation specialized for FESOM ocean model meshes.</p>
+<p>This class extends the TriangularFilter to work natively with FESOM
+mesh files and data structures. It provides convenience methods for
+loading mesh configurations directly from FESOM output files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameters.</strong> (<em>See TriangularFilter for inherited</em>)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Supports FESOM mesh files containing either ‘elements’ or ‘face_nodes’
+variables to define element connectivity. Automatically handles FESOM’s
+1-based indexing conversion to 0-based indexing for Python.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.fesom_filter.FesomFilter.prepare_from_data_array">
+<span class="sig-name descname"><span class="pre">prepare_from_data_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataArray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meshtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'r'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cartesian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cyclic_length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">6.283185307179586</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/fesom_filter.html#FesomFilter.prepare_from_data_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.fesom_filter.FesomFilter.prepare_from_data_array" title="Link to this definition">¶</a></dt>
+<dd><p>Configure filter using an xarray Dataset containing FESOM mesh data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mesh</strong> (<em>xr.Dataset</em>) – xarray Dataset containing FESOM mesh variables.</p></li>
+<li><p><strong>meshtype</strong> (<em>str</em><em>, </em><em>optional</em>) – Mesh type coordinate unit: ‘m’ for metric, ‘r’ for radial(degrees).</p></li>
+<li><p><strong>cartesian</strong> (<em>bool</em><em>, </em><em>optional</em>) – Coordinate system flag (default: False).</p></li>
+<li><p><strong>cyclic_length</strong> (<em>float</em><em>, </em><em>optional</em>) – Cyclic domain length in radians (default: 2π).</p></li>
+<li><p><strong>metric</strong> (<em>bool</em><em>, </em><em>optional</em>) – Metric terms inclusion flag (default: False).</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em>, </em><em>optional</em>) – Element land mask (default: None).</p></li>
+<li><p><strong>gpu</strong> (<em>bool</em><em>, </em><em>optional</em>) – GPU acceleration flag (default: False).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>RuntimeError</strong> – If mesh doesn’t contain recognizable element connectivity data.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Looks for element connectivity in variables named:
+- ‘elements’
+- ‘face_nodes’
+- ‘elem’</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.fesom_filter.FesomFilter.prepare_from_file">
+<span class="sig-name descname"><span class="pre">prepare_from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meshtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'r'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cartesian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cyclic_length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">6.283185307179586</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/fesom_filter.html#FesomFilter.prepare_from_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.fesom_filter.FesomFilter.prepare_from_file" title="Link to this definition">¶</a></dt>
+<dd><p>Configure filter using a FESOM mesh file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file</strong> (<em>str</em>) – Path to FESOM mesh file (NetCDF format).</p></li>
+<li><p><strong>meshtype</strong> (<em>str</em><em>, </em><em>optional</em>) – Mesh type coordinate unit: ‘m’ for metric, ‘r’ for radial(degrees).</p></li>
+<li><p><strong>cartesian</strong> (<em>bool</em><em>, </em><em>optional</em>) – True for Cartesian coordinates, False for spherical (default).</p></li>
+<li><p><strong>cyclic_length</strong> (<em>float</em><em>, </em><em>optional</em>) – Cyclic domain length in radians (default: 2π).</p></li>
+<li><p><strong>metric</strong> (<em>bool</em><em>, </em><em>optional</em>) – True to include metric terms in operator (default: False).</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em>, </em><em>optional</em>) – Element land mask where True indicates land (default: None).</p></li>
+<li><p><strong>gpu</strong> (<em>bool</em><em>, </em><em>optional</em>) – True to enable GPU acceleration (default: False).</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This method automatically:
+1. Reads the mesh file using xarray
+2. Extracts node coordinates and element connectivity
+3. Converts FESOM’s 1-based indexing to 0-based indexing
+4. Configures the filter using the parent class prepare method</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class" id="module-implicit_filter.icon_filter">
+<dt class="sig sig-object py" id="implicit_filter.icon_filter.IconFilter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">implicit_filter.icon_filter.</span></span><span class="sig-name descname"><span class="pre">IconFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">initial_data</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/icon_filter.html#IconFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.icon_filter.IconFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter" title="implicit_filter.triangular_filter.TriangularFilter"><code class="xref py py-class docutils literal notranslate"><span class="pre">TriangularFilter</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.icon_filter.IconFilter.prepare_from_data_array">
+<span class="sig-name descname"><span class="pre">prepare_from_data_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid2d</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataArray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">full</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/icon_filter.html#IconFilter.prepare_from_data_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.icon_filter.IconFilter.prepare_from_data_array" title="Link to this definition">¶</a></dt>
+<dd><p>Configure filter using an xarray Dataset containing ICON grid data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>grid2d</strong> (<em>xr.Dataset</em>) – xarray Dataset containing ICON grid variables.</p></li>
+<li><p><strong>full</strong> (<em>bool</em><em>, </em><em>optional</em>) – Metric terms inclusion flag (default: False).</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em> | </em><em>bool</em><em>, </em><em>optional</em>) – Land-sea mask specification:
+- np.ndarray: Precomputed mask array where true is ocean
+- True: Auto-detect from ‘cell_sea_land_mask’
+- False: All ocean cells (default)</p></li>
+<li><p><strong>gpu</strong> (<em>bool</em><em>, </em><em>optional</em>) – GPU acceleration flag (default: False).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>KeyError</strong> – If mask=True but ‘cell_sea_land_mask’ not found in dataset.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Vertex coordinates are converted from radians to degrees</p></li>
+<li><p>Element connectivity is expected in ‘vertex_of_cell’ variable</p></li>
+<li><p>Spherical coordinates with cyclic domain are assumed</p></li>
+<li><p>Land-sea mask is transformed from cell-centered to nodal representation</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.icon_filter.IconFilter.prepare_from_file">
+<span class="sig-name descname"><span class="pre">prepare_from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">grid_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">full</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/icon_filter.html#IconFilter.prepare_from_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.icon_filter.IconFilter.prepare_from_file" title="Link to this definition">¶</a></dt>
+<dd><p>Configure filter using an ICON grid file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>grid_file</strong> (<em>str</em>) – Path to ICON grid file (NetCDF format).</p></li>
+<li><p><strong>full</strong> (<em>bool</em><em>, </em><em>optional</em>) – True to include metric terms in operator (default: False).</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em> | </em><em>bool</em><em>, </em><em>optional</em>) – Can be:
+- Precomputed land mask array
+- True to automatically detect mask from file
+- False to treat all cells as ocean (default)</p></li>
+<li><p><strong>gpu</strong> (<em>bool</em><em>, </em><em>optional</em>) – True to enable GPU acceleration (default: False).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-implicit_filter.latlon_filter">
+<span id="structured-grid-filters"></span><h2>Structured Grid Filters<a class="headerlink" href="#module-implicit_filter.latlon_filter" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">implicit_filter.latlon_filter.</span></span><span class="sig-name descname"><span class="pre">LatLonFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">initial_data</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/latlon_filter.html#LatLonFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><code class="xref py py-class docutils literal notranslate"><span class="pre">Filter</span></code></a></p>
+<p>Filter implementation for regular latitude-longitude grids.</p>
+<p>This class provides implicit filtering capabilities for data on structured
+lat-lon grids. It supports both Cartesian and spherical coordinate systems
+with configurable boundary conditions and land-sea masks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameters.</strong> (<em>See Filter class for inherited</em>)</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter._e2d">
+<span class="sig-name descname"><span class="pre">_e2d</span></span><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter._e2d" title="Link to this definition">¶</a></dt>
+<dd><p>Total number of grid points (nx * ny)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter._nx">
+<span class="sig-name descname"><span class="pre">_nx</span></span><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter._nx" title="Link to this definition">¶</a></dt>
+<dd><p>Number of longitude points</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter._ny">
+<span class="sig-name descname"><span class="pre">_ny</span></span><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter._ny" title="Link to this definition">¶</a></dt>
+<dd><p>Number of latitude points</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter._ss">
+<span class="sig-name descname"><span class="pre">_ss</span></span><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter._ss" title="Link to this definition">¶</a></dt>
+<dd><p>Non-zero values of sparse filter matrix</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter._ii">
+<span class="sig-name descname"><span class="pre">_ii</span></span><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter._ii" title="Link to this definition">¶</a></dt>
+<dd><p>Row indices for sparse matrix entries</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter._jj">
+<span class="sig-name descname"><span class="pre">_jj</span></span><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter._jj" title="Link to this definition">¶</a></dt>
+<dd><p>Column indices for sparse matrix entries</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter._area">
+<span class="sig-name descname"><span class="pre">_area</span></span><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter._area" title="Link to this definition">¶</a></dt>
+<dd><p>Area associated with each grid cell</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter._backend">
+<span class="sig-name descname"><span class="pre">_backend</span></span><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter._backend" title="Link to this definition">¶</a></dt>
+<dd><p>Computational backend (‘cpu’ or ‘gpu’)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter._mask_n">
+<span class="sig-name descname"><span class="pre">_mask_n</span></span><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter._mask_n" title="Link to this definition">¶</a></dt>
+<dd><p>Boolean mask for valid grid points (False indicates land)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter.compute">
+<span class="sig-name descname"><span class="pre">compute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/latlon_filter.html#LatLonFilter.compute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter.compute" title="Link to this definition">¶</a></dt>
+<dd><p>Apply filter to scalar field on lat-lon grid.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Filter order (must be positive).</p></li>
+<li><p><strong>k</strong> (<em>float</em><em> | </em><em>np.ndarray</em>) – Filter wavelength in spatial units.
+Float can be passed to be applied for entire mesh or array with scales for each node.
+Size of the array must match the size of the input data</p></li>
+<li><p><strong>data</strong> (<em>np.ndarray</em>) – Scalar field values on grid (shape: (nx, ny)).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Filtered scalar field (shape: (nx, ny)).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If filter order n &lt; 1.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter.compute_spectra_scalar">
+<span class="sig-name descname"><span class="pre">compute_spectra_scalar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/latlon_filter.html#LatLonFilter.compute_spectra_scalar"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter.compute_spectra_scalar" title="Link to this definition">¶</a></dt>
+<dd><p>Compute power spectra for scalar field at specified wavelengths.</p>
+<p>If one want’s to use spatialy varying filter scale, k should be
+list of numpy arrays with size mathing the input data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Filter order (must be positive).</p></li>
+<li><p><strong>k</strong> (<em>Iterable</em><em> | </em><em>np.ndarray</em>) – Target wavelengths for spectral analysis.</p></li>
+<li><p><strong>data</strong> (<em>np.ndarray</em>) – Scalar field values on grid (shape: (nx, ny)).</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em>, </em><em>optional</em>) – Boolean mask where True excludes points from spectra computation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Power spectral density at wavelengths [0, k0, k1, …]:
+[0] : Total variance
+[1:] : Variance at each wavelength k</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter.compute_spectra_velocity">
+<span class="sig-name descname"><span class="pre">compute_spectra_velocity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/latlon_filter.html#LatLonFilter.compute_spectra_velocity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter.compute_spectra_velocity" title="Link to this definition">¶</a></dt>
+<dd><p>Compute power spectra for velocity field at specified wavelengths.</p>
+<p>If one want’s to use spatialy varying filter scale, k should be
+list of numpy arrays with size mathing the input data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Filter order (must be positive).</p></li>
+<li><p><strong>k</strong> (<em>Iterable</em><em> | </em><em>np.ndarray</em>) – Target wavelengths for spectral analysis.</p></li>
+<li><p><strong>ux</strong> (<em>np.ndarray</em>) – Eastward velocity component (shape: (nx, ny)).</p></li>
+<li><p><strong>vy</strong> (<em>np.ndarray</em>) – Northward velocity component (shape: (nx, ny)).</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em>, </em><em>optional</em>) – Boolean mask where True excludes points from spectra computation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Kinetic energy spectral density at wavelengths [0, k0, k1, …]:
+[0] : Total kinetic energy
+[1:] : Kinetic energy at each wavelength k</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter.compute_velocity">
+<span class="sig-name descname"><span class="pre">compute_velocity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/implicit_filter/latlon_filter.html#LatLonFilter.compute_velocity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter.compute_velocity" title="Link to this definition">¶</a></dt>
+<dd><p>Apply filter to velocity components on lat-lon grid.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Filter order (must be positive).</p></li>
+<li><p><strong>k</strong> (<em>float</em><em> | </em><em>np.ndarray</em>) – Filter wavelength in spatial units.
+Float can be passed to be applied for entire mesh or array with scales for each node.
+Size of the array must match the size of the input data</p></li>
+<li><p><strong>ux</strong> (<em>np.ndarray</em>) – Eastward velocity component (shape: (nx, ny)).</p></li>
+<li><p><strong>vy</strong> (<em>np.ndarray</em>) – Northward velocity component (shape: (nx, ny)).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Filtered velocity components (ux_filt, vy_filt) each with shape (nx, ny).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple[np.ndarray, np.ndarray]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If filter order n &lt; 1.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter.get_backend">
+<span class="sig-name descname"><span class="pre">get_backend</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/implicit_filter/latlon_filter.html#LatLonFilter.get_backend"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter.get_backend" title="Link to this definition">¶</a></dt>
+<dd><p>Get current computational backend.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Current backend (‘cpu’ or ‘gpu’).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter.prepare">
+<span class="sig-name descname"><span class="pre">prepare</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">latitude</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">longitude</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cartesian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">local</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cyclic_length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">6.283185307179586</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/latlon_filter.html#LatLonFilter.prepare"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter.prepare" title="Link to this definition">¶</a></dt>
+<dd><p>Configure filter for a latitude-longitude grid.</p>
+<p>Computes grid topology, geometric properties, and assembles the filter
+operator matrix. Must be called before any filtering operations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>latitude</strong> (<em>np.ndarray</em>) – Latitude values in degrees (1D array)</p></li>
+<li><p><strong>longitude</strong> (<em>np.ndarray</em>) – Longitude values in degrees (1D array)</p></li>
+<li><p><strong>cartesian</strong> (<em>bool</em><em>, </em><em>optional</em>) – True for Cartesian coordinates, False for spherical (default)</p></li>
+<li><p><strong>local</strong> (<em>bool</em><em>, </em><em>optional</em>) – True for 4-point local neighborhood, False for 8-point global (default: True)</p></li>
+<li><p><strong>cyclic_length</strong> (<em>float</em><em>, </em><em>optional</em>) – Cyclic domain length in radians (default: 2π).</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em>, </em><em>optional</em>) – Land-sea mask where True indicates land (default: all ocean)</p></li>
+<li><p><strong>gpu</strong> (<em>bool</em><em>, </em><em>optional</em>) – True to enable GPU acceleration (default: False)</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Land points are masked using Neumann boundary conditions</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.latlon_filter.LatLonFilter.set_backend">
+<span class="sig-name descname"><span class="pre">set_backend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">backend</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/latlon_filter.html#LatLonFilter.set_backend"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.latlon_filter.LatLonFilter.set_backend" title="Link to this definition">¶</a></dt>
+<dd><p>Set computational backend for filtering operations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>backend</strong> (<em>str</em>) – Desired backend (‘cpu’ or ‘gpu’).</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Configures appropriate sparse linear algebra functions for the backend.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class" id="module-implicit_filter.nemo_filter">
+<dt class="sig sig-object py" id="implicit_filter.nemo_filter.NemoFilter">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">implicit_filter.nemo_filter.</span></span><span class="sig-name descname"><span class="pre">NemoFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">initial_data</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/nemo_filter.html#NemoFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.nemo_filter.NemoFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter" title="implicit_filter.latlon_filter.LatLonFilter"><code class="xref py py-class docutils literal notranslate"><span class="pre">LatLonFilter</span></code></a></p>
+<p>Filter implementation specialized for NEMO ocean model grids.</p>
+<p>This class extends LatLonFilter to handle NEMO’s specific grid characteristics
+including partial cells, scale factors, and complex boundary representations.
+It supports different neighborhood configurations for accurate filtering.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>parameters.</strong> (<em>See LatLonFilter for inherited</em>)</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Automatically handles NEMO’s redundant point representation</p></li>
+<li><p>Supports three neighborhood types: ‘full’, ‘west-east’, and ‘local’</p></li>
+<li><p>Accounts for partial cells through 3D scale factors</p></li>
+</ul>
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.nemo_filter.NemoFilter.prepare_from_data_array">
+<span class="sig-name descname"><span class="pre">prepare_from_data_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataArray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vl</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">neighb</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'full'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/nemo_filter.html#NemoFilter.prepare_from_data_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.nemo_filter.NemoFilter.prepare_from_data_array" title="Link to this definition">¶</a></dt>
+<dd><p>Configure filter using an xarray Dataset containing NEMO grid data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ds</strong> (<em>xr.Dataset</em>) – xarray Dataset containing NEMO grid variables.</p></li>
+<li><p><strong>vl</strong> (<em>int</em>) – Vertical level index for filter configuration.</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em> | </em><em>bool</em><em>, </em><em>optional</em>) – Land-sea mask specification (see prepare_from_file).</p></li>
+<li><p><strong>gpu</strong> (<em>bool</em><em>, </em><em>optional</em>) – GPU acceleration flag (default: False).</p></li>
+<li><p><strong>neighb</strong> (<em>str</em><em>, </em><em>optional</em>) – Neighborhood type (see prepare_from_file).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>NotImplementedError</strong> – If unsupported neighborhood type is specified.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Requires standard NEMO grid variables: gphit, e1t, e2t, e1u, e2v, e3u_0, e3v_0, e3t_0</p></li>
+<li><p>The ‘tmask’ variable is used for land-sea masking when auto-detection is enabled</p></li>
+<li><p>Handles North Pole folding in ‘full’ neighborhood configuration</p></li>
+<li><p>Grid metrics are converted from meters to kilometers for consistency</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="implicit_filter.nemo_filter.NemoFilter.prepare_from_file">
+<span class="sig-name descname"><span class="pre">prepare_from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vl</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gpu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">neighb</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'full'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/nemo_filter.html#NemoFilter.prepare_from_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.nemo_filter.NemoFilter.prepare_from_file" title="Link to this definition">¶</a></dt>
+<dd><p>Configure filter using a NEMO grid file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>file</strong> (<em>str</em>) – Path to NEMO grid file (NetCDF format).</p></li>
+<li><p><strong>vl</strong> (<em>int</em>) – Vertical level index for which to configure the filter.</p></li>
+<li><p><strong>mask</strong> (<em>np.ndarray</em><em> | </em><em>bool</em><em>, </em><em>optional</em>) – Land-sea mask specification:
+- np.ndarray: Precomputed mask array
+- True: Auto-detect from ‘tmask’ variable (default)
+- False: All ocean cells</p></li>
+<li><p><strong>gpu</strong> (<em>bool</em><em>, </em><em>optional</em>) – True to enable GPU acceleration (default: False).</p></li>
+<li><p><strong>neighb</strong> (<em>str</em><em>, </em><em>optional</em>) – Neighborhood type:
+- ‘full’: Full 4-point neighborhood with North Pole handling
+- ‘west-east’: Zonal connections only
+- ‘local’: Standard 4-point neighborhood (default: ‘full’)</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Automatically detects and handles NEMO’s redundant grid points</p></li>
+<li><p>Converts grid metrics from meters to kilometers</p></li>
+<li><p>Uses vertical level scale factors for accurate cell volumes</p></li>
+</ul>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="utility-functions">
+<h2>Utility Functions<a class="headerlink" href="#utility-functions" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">convert_to_wavenumbers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dxm</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/utils/_auxiliary.html#convert_to_wavenumbers"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Converts a given spatial distance to wavenumbers for spectral analysis.</p>
+<section id="id5">
+<h3>Parameters:<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>dist<span class="classifier">float</span></dt><dd><p>The spatial distance for which wavenumbers are to be calculated.</p>
+</dd>
+<dt>dxm<span class="classifier">float</span></dt><dd><p>The mesh resolution, representing the distance between grid points.</p>
+</dd>
+</dl>
+</section>
+<section id="id6">
+<h3>Returns:<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>float</dt><dd><p>The corresponding wavenumber for the given spatial distance.</p>
+</dd>
+</dl>
+</section>
+<section id="notes">
+<h3>Notes:<a class="headerlink" href="#notes" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Input parameters <cite>dist</cite> and <cite>dxm</cite> must have the same unit.</p></li>
+<li><p>The factor 3.5 is used to make the results comparable with box-type filters.</p></li>
+</ul>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_mask_from_elements_to_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">filter</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_mask_from_elements_to_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Transform land-sea mask from elements to nodes for triangular meshes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mask</strong> (<em>np.ndarray</em>) – Boolean land-sea mask defined on mesh elements (True = land).</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be TriangularFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Land-sea mask interpolated to mesh nodes (True = land).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a TriangularFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>A node is considered land if any of its connected elements are land.
+Useful for converting element-based masks to nodal representation.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_mask_from_nodes_to_elements</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">filter</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_mask_from_nodes_to_elements"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Transform land-sea mask from nodes to elements for triangular meshes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mask</strong> (<em>np.ndarray</em>) – Boolean land-sea mask defined on mesh nodes (True = land).</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be TriangularFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Land-sea mask interpolated to mesh elements (True = land).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a TriangularFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>An element is considered land if any of its nodes are land.
+Useful for converting nodal masks to element-based representation.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_scalar_to_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><span class="pre">Filter</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_scalar_to_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Transform scalar field from elements to nodes for triangular meshes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>np.ndarray</em>) – Scalar field defined on mesh elements.</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be TriangularFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Scalar field interpolated to mesh nodes.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a TriangularFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Performs area-weighted averaging to interpolate scalar values from
+element centers to mesh nodes. Only applicable for unstructured
+triangular meshes.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_to_T_cells</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><span class="pre">Filter</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_to_T_cells"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Transform velocity components to T-grid points for NEMO grids.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ux</strong> (<em>np.ndarray</em>) – Eastward velocity component on U-grid points.</p></li>
+<li><p><strong>vy</strong> (<em>np.ndarray</em>) – Northward velocity component on V-grid points.</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be NemoFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Velocity components interpolated to T-grid points (ux_t, vy_t).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[np.ndarray, np.ndarray]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a NemoFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Specifically designed for NEMO’s Arakawa C-grid:
+- U-points: located at east-west cell faces
+- V-points: located at north-south cell faces
+- T-points: located at cell centers
+Performs simple averaging to interpolate velocities to cell centers.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_velocity_to_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><span class="pre">Filter</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_velocity_to_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a></dt>
+<dd><p>Transform velocity components from elements to nodes for triangular meshes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ux</strong> (<em>np.ndarray</em>) – Eastward velocity component defined on mesh elements.</p></li>
+<li><p><strong>vy</strong> (<em>np.ndarray</em>) – Northward velocity component defined on mesh elements.</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be TriangularFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Velocity components interpolated to mesh nodes (ux_nodes, vy_nodes).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[np.ndarray, np.ndarray]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a TriangularFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function performs area-weighted averaging to interpolate velocity
+components from element centers to mesh nodes. Only applicable for
+unstructured triangular meshes.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="implicit_filter.transform_velocity_to_nodes">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_velocity_to_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><span class="pre">Filter</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_velocity_to_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.transform_velocity_to_nodes" title="Link to this definition">¶</a></dt>
+<dd><p>Transform velocity components from elements to nodes for triangular meshes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ux</strong> (<em>np.ndarray</em>) – Eastward velocity component defined on mesh elements.</p></li>
+<li><p><strong>vy</strong> (<em>np.ndarray</em>) – Northward velocity component defined on mesh elements.</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be TriangularFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Velocity components interpolated to mesh nodes (ux_nodes, vy_nodes).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[np.ndarray, np.ndarray]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a TriangularFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function performs area-weighted averaging to interpolate velocity
+components from element centers to mesh nodes. Only applicable for
+unstructured triangular meshes.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="implicit_filter.transform_scalar_to_nodes">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_scalar_to_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><span class="pre">Filter</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_scalar_to_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.transform_scalar_to_nodes" title="Link to this definition">¶</a></dt>
+<dd><p>Transform scalar field from elements to nodes for triangular meshes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>np.ndarray</em>) – Scalar field defined on mesh elements.</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be TriangularFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Scalar field interpolated to mesh nodes.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a TriangularFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Performs area-weighted averaging to interpolate scalar values from
+element centers to mesh nodes. Only applicable for unstructured
+triangular meshes.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="implicit_filter.transform_mask_from_elements_to_nodes">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_mask_from_elements_to_nodes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">filter</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_mask_from_elements_to_nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.transform_mask_from_elements_to_nodes" title="Link to this definition">¶</a></dt>
+<dd><p>Transform land-sea mask from elements to nodes for triangular meshes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mask</strong> (<em>np.ndarray</em>) – Boolean land-sea mask defined on mesh elements (True = land).</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be TriangularFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Land-sea mask interpolated to mesh nodes (True = land).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a TriangularFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>A node is considered land if any of its connected elements are land.
+Useful for converting element-based masks to nodal representation.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="implicit_filter.transform_mask_from_nodes_to_elements">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_mask_from_nodes_to_elements</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">filter</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_mask_from_nodes_to_elements"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.transform_mask_from_nodes_to_elements" title="Link to this definition">¶</a></dt>
+<dd><p>Transform land-sea mask from nodes to elements for triangular meshes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mask</strong> (<em>np.ndarray</em>) – Boolean land-sea mask defined on mesh nodes (True = land).</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be TriangularFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Land-sea mask interpolated to mesh elements (True = land).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a TriangularFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>An element is considered land if any of its nodes are land.
+Useful for converting nodal masks to element-based representation.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="implicit_filter.transform_to_T_cells">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">transform_to_T_cells</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ux</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><span class="pre">Filter</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/implicit_filter/utils/conversion_tools.html#transform_to_T_cells"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.transform_to_T_cells" title="Link to this definition">¶</a></dt>
+<dd><p>Transform velocity components to T-grid points for NEMO grids.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ux</strong> (<em>np.ndarray</em>) – Eastward velocity component on U-grid points.</p></li>
+<li><p><strong>vy</strong> (<em>np.ndarray</em>) – Northward velocity component on V-grid points.</p></li>
+<li><p><strong>filter</strong> (<a class="reference internal" href="#implicit_filter.filter.Filter" title="implicit_filter.filter.Filter"><em>Filter</em></a>) – Filter instance (must be NemoFilter or subclass).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Velocity components interpolated to T-grid points (ux_t, vy_t).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple[np.ndarray, np.ndarray]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If filter is not a NemoFilter subclass.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Specifically designed for NEMO’s Arakawa C-grid:
+- U-points: located at east-west cell faces
+- V-points: located at north-south cell faces
+- T-points: located at cell centers
+Performs simple averaging to interpolate velocities to cell centers.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="implicit_filter.convert_to_wavenumbers">
+<span class="sig-prename descclassname"><span class="pre">implicit_filter.</span></span><span class="sig-name descname"><span class="pre">convert_to_wavenumbers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dxm</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/implicit_filter/utils/_auxiliary.html#convert_to_wavenumbers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#implicit_filter.convert_to_wavenumbers" title="Link to this definition">¶</a></dt>
+<dd><p>Converts a given spatial distance to wavenumbers for spectral analysis.</p>
+<section id="id7">
+<h3>Parameters:<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>dist<span class="classifier">float</span></dt><dd><p>The spatial distance for which wavenumbers are to be calculated.</p>
+</dd>
+<dt>dxm<span class="classifier">float</span></dt><dd><p>The mesh resolution, representing the distance between grid points.</p>
+</dd>
+</dl>
+</section>
+<section id="id8">
+<h3>Returns:<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>float</dt><dd><p>The corresponding wavenumber for the given spatial distance.</p>
+</dd>
+</dl>
+</section>
+<section id="id9">
+<h3>Notes:<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Input parameters <cite>dist</cite> and <cite>dxm</cite> must have the same unit.</p></li>
+<li><p>The factor 3.5 is used to make the results comparable with box-type filters.</p></li>
+</ul>
+</section>
+</dd></dl>
+
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="#module-implicit_filter.utils" title="implicit_filter.utils"><code class="xref py py-mod docutils literal notranslate"><span class="pre">implicit_filter.utils</span></code></a></p></li>
+</ul>
+<span class="target" id="module-implicit_filter.utils"></span></section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          <a class="prev-page" href="index.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Home</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2025, Kacper Nowak
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">API Reference</a><ul>
+<li><a class="reference internal" href="#module-implicit_filter.filter">Filter Base Class</a><ul>
+<li><a class="reference internal" href="#implicit_filter.filter.Filter"><code class="docutils literal notranslate"><span class="pre">Filter</span></code></a><ul>
+<li><a class="reference internal" href="#implicit_filter.filter.Filter.compute"><code class="docutils literal notranslate"><span class="pre">Filter.compute()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.filter.Filter.compute_spectra_scalar"><code class="docutils literal notranslate"><span class="pre">Filter.compute_spectra_scalar()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.filter.Filter.compute_spectra_velocity"><code class="docutils literal notranslate"><span class="pre">Filter.compute_spectra_velocity()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.filter.Filter.compute_velocity"><code class="docutils literal notranslate"><span class="pre">Filter.compute_velocity()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.filter.Filter.get_backend"><code class="docutils literal notranslate"><span class="pre">Filter.get_backend()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.filter.Filter.load_from_file"><code class="docutils literal notranslate"><span class="pre">Filter.load_from_file()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.filter.Filter.save_to_file"><code class="docutils literal notranslate"><span class="pre">Filter.save_to_file()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.filter.Filter.set_backend"><code class="docutils literal notranslate"><span class="pre">Filter.set_backend()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-implicit_filter.triangular_filter">Triangular Mesh Filters</a><ul>
+<li><a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter"><code class="docutils literal notranslate"><span class="pre">TriangularFilter</span></code></a><ul>
+<li><a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter.compute"><code class="docutils literal notranslate"><span class="pre">TriangularFilter.compute()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter.compute_spectra_scalar"><code class="docutils literal notranslate"><span class="pre">TriangularFilter.compute_spectra_scalar()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter.compute_spectra_velocity"><code class="docutils literal notranslate"><span class="pre">TriangularFilter.compute_spectra_velocity()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter.compute_velocity"><code class="docutils literal notranslate"><span class="pre">TriangularFilter.compute_velocity()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter.get_backend"><code class="docutils literal notranslate"><span class="pre">TriangularFilter.get_backend()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter.prepare"><code class="docutils literal notranslate"><span class="pre">TriangularFilter.prepare()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.triangular_filter.TriangularFilter.set_backend"><code class="docutils literal notranslate"><span class="pre">TriangularFilter.set_backend()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#implicit_filter.fesom_filter.FesomFilter"><code class="docutils literal notranslate"><span class="pre">FesomFilter</span></code></a><ul>
+<li><a class="reference internal" href="#implicit_filter.fesom_filter.FesomFilter.prepare_from_data_array"><code class="docutils literal notranslate"><span class="pre">FesomFilter.prepare_from_data_array()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.fesom_filter.FesomFilter.prepare_from_file"><code class="docutils literal notranslate"><span class="pre">FesomFilter.prepare_from_file()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#implicit_filter.icon_filter.IconFilter"><code class="docutils literal notranslate"><span class="pre">IconFilter</span></code></a><ul>
+<li><a class="reference internal" href="#implicit_filter.icon_filter.IconFilter.prepare_from_data_array"><code class="docutils literal notranslate"><span class="pre">IconFilter.prepare_from_data_array()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.icon_filter.IconFilter.prepare_from_file"><code class="docutils literal notranslate"><span class="pre">IconFilter.prepare_from_file()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-implicit_filter.latlon_filter">Structured Grid Filters</a><ul>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter"><code class="docutils literal notranslate"><span class="pre">LatLonFilter</span></code></a><ul>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter._e2d"><code class="docutils literal notranslate"><span class="pre">LatLonFilter._e2d</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter._nx"><code class="docutils literal notranslate"><span class="pre">LatLonFilter._nx</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter._ny"><code class="docutils literal notranslate"><span class="pre">LatLonFilter._ny</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter._ss"><code class="docutils literal notranslate"><span class="pre">LatLonFilter._ss</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter._ii"><code class="docutils literal notranslate"><span class="pre">LatLonFilter._ii</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter._jj"><code class="docutils literal notranslate"><span class="pre">LatLonFilter._jj</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter._area"><code class="docutils literal notranslate"><span class="pre">LatLonFilter._area</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter._backend"><code class="docutils literal notranslate"><span class="pre">LatLonFilter._backend</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter._mask_n"><code class="docutils literal notranslate"><span class="pre">LatLonFilter._mask_n</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter.compute"><code class="docutils literal notranslate"><span class="pre">LatLonFilter.compute()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter.compute_spectra_scalar"><code class="docutils literal notranslate"><span class="pre">LatLonFilter.compute_spectra_scalar()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter.compute_spectra_velocity"><code class="docutils literal notranslate"><span class="pre">LatLonFilter.compute_spectra_velocity()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter.compute_velocity"><code class="docutils literal notranslate"><span class="pre">LatLonFilter.compute_velocity()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter.get_backend"><code class="docutils literal notranslate"><span class="pre">LatLonFilter.get_backend()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter.prepare"><code class="docutils literal notranslate"><span class="pre">LatLonFilter.prepare()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.latlon_filter.LatLonFilter.set_backend"><code class="docutils literal notranslate"><span class="pre">LatLonFilter.set_backend()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#implicit_filter.nemo_filter.NemoFilter"><code class="docutils literal notranslate"><span class="pre">NemoFilter</span></code></a><ul>
+<li><a class="reference internal" href="#implicit_filter.nemo_filter.NemoFilter.prepare_from_data_array"><code class="docutils literal notranslate"><span class="pre">NemoFilter.prepare_from_data_array()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.nemo_filter.NemoFilter.prepare_from_file"><code class="docutils literal notranslate"><span class="pre">NemoFilter.prepare_from_file()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#utility-functions">Utility Functions</a><ul>
+<li><a class="reference internal" href="#implicit_filter.transform_velocity_to_nodes"><code class="docutils literal notranslate"><span class="pre">transform_velocity_to_nodes()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.transform_scalar_to_nodes"><code class="docutils literal notranslate"><span class="pre">transform_scalar_to_nodes()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.transform_mask_from_elements_to_nodes"><code class="docutils literal notranslate"><span class="pre">transform_mask_from_elements_to_nodes()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.transform_mask_from_nodes_to_elements"><code class="docutils literal notranslate"><span class="pre">transform_mask_from_nodes_to_elements()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.transform_to_T_cells"><code class="docutils literal notranslate"><span class="pre">transform_to_T_cells()</span></code></a></li>
+<li><a class="reference internal" href="#implicit_filter.convert_to_wavenumbers"><code class="docutils literal notranslate"><span class="pre">convert_to_wavenumbers()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/design-tabs.js?v=f930bc37"></script>
+    </body>
+</html>
