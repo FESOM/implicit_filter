@@ -2,7 +2,14 @@ Welcome to Implicit Filter's Documentation!
 ===========================================
 
 .. image:: ../logo.png
+   :class: only-light
    :alt: Implicit Filter Logo
+   :align: center
+   :width: 500px
+
+.. image:: ../logo_dark.png
+   :class: only-dark
+   :alt: Implicit Filter Logo (Dark Mode)
    :align: center
    :width: 500px
 
