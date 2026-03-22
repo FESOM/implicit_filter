@@ -1,23 +1,8 @@
-.. _modules:
-
-============
+=============
 API Reference
-============
+=============
 
-This page provides detailed documentation for all modules and classes in the implicit_filter package.
-
-Core Classes
-============
-
-.. toctree::
-   :maxdepth: 1
-   
-   filter
-   triangular_filter
-   fesom_filter
-   icon_filter
-   latlon_filter
-   nemo_filter
+This page provides detailed documentation for all modules and classes in the ``implicit_filter`` package.
 
 Filter Base Class
 -----------------
@@ -60,7 +45,7 @@ Structured Grid Filters
    :show-inheritance:
 
 Utility Functions
-=================
+-----------------
 
 .. automodule:: implicit_filter
    :members: transform_velocity_to_nodes, 
@@ -71,29 +56,24 @@ Utility Functions
              convert_to_wavenumbers
    :noindex:
 
-.. autofunction:: transform_velocity_to_nodes
+.. autofunction:: implicit_filter.transform_velocity_to_nodes
 
-.. autofunction:: transform_scalar_to_nodes
+.. autofunction:: implicit_filter.transform_scalar_to_nodes
 
-.. autofunction:: transform_mask_from_elements_to_nodes
+.. autofunction:: implicit_filter.transform_mask_from_elements_to_nodes
 
-.. autofunction:: transform_mask_from_nodes_to_elements
+.. autofunction:: implicit_filter.transform_mask_from_nodes_to_elements
 
-.. autofunction:: transform_to_T_cells
+.. autofunction:: implicit_filter.transform_to_T_cells
 
-.. autofunction:: convert_to_wavenumbers
+.. autofunction:: implicit_filter.convert_to_wavenumbers
 
 Submodules
-==========
+----------
 
-.. toctree::
-   :maxdepth: 1
-   
-   utils
+* :mod:`implicit_filter.utils`
 
-Indices and Tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. automodule:: implicit_filter.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
