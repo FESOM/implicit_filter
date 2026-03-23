@@ -2,10 +2,6 @@ import math
 from typing import Tuple
 
 import numpy as np
-import pandas as pd
-import xarray as xr
-from pandas import Series
-from sklearn.linear_model import LinearRegression
 
 
 def neighboring_triangles(n2d: int, e2d: int, tri: np.ndarray):
@@ -374,8 +370,8 @@ def convert_to_wavenumbers(dist, dxm):
 
 
 def find_adjacent_points_north(
-    ds_mm: xr.DataArray = None, lon_lat_prec_degrees: float = None
-) -> tuple[Series, int]:
+    ds_mm=None, lon_lat_prec_degrees: float = None
+) -> tuple:
     """
     Fix rounding erros in NEMO grid using linear regression
 
@@ -443,6 +439,7 @@ def find_adjacent_points_north(
                         break
 
     # filter adjacent x for outliers
+    import pandas as pd
     adjacent_x = pd.Series(
         x_corr,
         name="adjacent_x",
@@ -453,6 +450,7 @@ def find_adjacent_points_north(
     ).dropna()
 
     # fit clean adjacent indices
+    from sklearn.linear_model import LinearRegression
     lr = LinearRegression()
     lr.fit(
         np.array(adjacent_x_sanitized.index).reshape(-1, 1),
@@ -476,3 +474,282 @@ def find_adjacent_points_north(
 
     # return adjacent indices
     return adjacent_x_fit, corresponds_to_redundant
+
+def find_and_sort_edges_and_triangles(n2d, nn_num, nn_pos, ne_num, ne_pos):
+    """
+    Finds unique edges, their associated triangles, and sorts them.
+    Internal edges (with two triangles) are placed before boundary edges.
+    """
+    edge_map = {}
+    
+    for n in range(n2d):
+        for q in range(nn_num[n]):
+            node = nn_pos[q, n]
+            if node > n:
+                n_tris = set(ne_pos[:ne_num[n], n])
+                node_tris = set(ne_pos[:ne_num[node], node])
+                common_tris = list(n_tris.intersection(node_tris))
+                edge_map[(n, node)] = common_tris
+
+    internal_edges, boundary_edges = [], []
+    internal_tri, boundary_tri = [], []
+
+    for edge, tris in edge_map.items():
+        if len(tris) == 2:
+            internal_edges.append(edge)
+            internal_tri.append(tris)
+        else:
+            boundary_edges.append(edge)
+            boundary_tri.append([tris[0] if tris else -1, -1])
+
+    sorted_edge_list = internal_edges + boundary_edges
+    sorted_tri_list = internal_tri + boundary_tri
+    
+    edges = np.array(sorted_edge_list).T
+    edge_tri = np.array(sorted_tri_list).T
+    ed2d_in = len(internal_edges)
+    
+    return edges, edge_tri, ed2d_in
+
+def calculate_triangle_centers(e2d, tri, xcoord, ycoord, meshtype, cyclic_length):
+    """
+    Calculates the geometric center (centroid) of each triangle.
+    """
+    tcenter = np.zeros((2, e2d))
+    
+    if meshtype == 'm':
+        tri_T = tri.T
+        tcenter[0, :] = np.mean(xcoord[tri_T], axis=0)
+        tcenter[1, :] = np.mean(ycoord[tri_T], axis=0)
+        
+    elif meshtype == 'r':
+        rad = np.pi / 180
+        for n in range(e2d):
+            elnodes = tri[n, :]
+            x_nodes = xcoord[elnodes]
+            
+            x_diffs = rad * (x_nodes[1:] - x_nodes[0])
+            x_diffs[x_diffs > cyclic_length / 2.0] -= cyclic_length
+            x_diffs[x_diffs < -cyclic_length / 2.0] += cyclic_length
+            x_adjusted = np.concatenate(([x_nodes[0]], x_nodes[0] + x_diffs / rad))
+            
+            tcenter[0, n] = np.mean(x_adjusted)
+            tcenter[1, n] = np.mean(ycoord[elnodes])
+        
+    return tcenter
+
+def orient_edges(ed2d, edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length):
+    """
+    Orders the direction of edges so that the first triangle is on the left
+    of the edge vector.
+    """
+    edges_oriented = edges.copy()
+    edge_tri_oriented = edge_tri.copy()
+
+    for n in range(ed2d):
+        ed = edges_oriented[:, n]
+        tri1_idx = edge_tri_oriented[0, n]
+        
+        xc = np.zeros(2)
+        xe = np.zeros(2)
+
+        if meshtype == 'm':
+            xc[0] = tcenter[0, tri1_idx] - xcoord[ed[0]]
+            xc[1] = tcenter[1, tri1_idx] - ycoord[ed[0]]
+            xe[0] = xcoord[ed[1]] - xcoord[ed[0]]
+            xe[1] = ycoord[ed[1]] - ycoord[ed[0]]
+        
+        elif meshtype == 'r':
+            rad = np.pi / 180
+            def get_cyclic_diff(a, b):
+                diff = rad * (a - b)
+                if diff > cyclic_length / 2.0: 
+                    diff -= cyclic_length
+                if diff < -cyclic_length / 2.0: 
+                    diff += cyclic_length
+                return diff / rad
+
+            xc[0] = get_cyclic_diff(tcenter[0, tri1_idx], xcoord[ed[0]])
+            xc[1] = tcenter[1, tri1_idx] - ycoord[ed[0]]
+            xe[0] = get_cyclic_diff(xcoord[ed[1]], xcoord[ed[0]])
+            xe[1] = ycoord[ed[1]] - ycoord[ed[0]]
+
+        if xc[0] * xe[1] - xc[1] * xe[0] > 0:
+            if edge_tri_oriented[1, n] != -1:
+                edge_tri_oriented[0, n], edge_tri_oriented[1, n] = edge_tri_oriented[1, n], edge_tri_oriented[0, n]
+            else:
+                edges_oriented[0, n], edges_oriented[1, n] = edges_oriented[1, n], edges_oriented[0, n]
+    
+    return edges_oriented, edge_tri_oriented
+
+def create_triangle_to_edge_map(e2d, ed2d, edge_tri, edges, tri):
+    """
+    Creates a mapping from each triangle to its three edges.
+    """
+    elem_edges_unordered = [[] for _ in range(e2d)]
+    for n in range(ed2d):
+        for k in range(2):
+            q = edge_tri[k, n]
+            if q != -1:
+                elem_edges_unordered[q].append(n)
+                
+    elem_edges = np.zeros((3, e2d), dtype=int)
+    for elem in range(e2d):
+        elnodes = tri[elem, :]
+        eledges = elem_edges_unordered[elem]
+        
+        if len(eledges) != 3: continue
+        
+        for i, node_idx in enumerate(elnodes):
+            for edge_idx in eledges:
+                if node_idx not in edges[:, edge_idx]:
+                    elem_edges[i, elem] = edge_idx
+                    break
+            
+    return elem_edges
+
+def calculate_dimensional_quantities(ed2d, ed2d_in, edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length, r_earth, cartesian):
+    """
+    Calculates geometric properties like edge lengths and distances from
+    edge midpoints to triangle centers.
+    """
+    edge_dxdy = np.zeros((2, ed2d))
+    edge_cross_dxdy = np.zeros((4, ed2d))
+    rad = np.pi / 180
+
+    if meshtype == 'm':
+        edge_dxdy[0, :] = xcoord[edges[1, :]] - xcoord[edges[0, :]]
+        edge_dxdy[1, :] = ycoord[edges[1, :]] - ycoord[edges[0, :]]
+        
+        mid_edge_x = 0.5 * (xcoord[edges[0, :]] + xcoord[edges[1, :]])
+        mid_edge_y = 0.5 * (ycoord[edges[0, :]] + ycoord[edges[1, :]])
+        
+        edge_cross_dxdy[0, :] = tcenter[0, edge_tri[0, :]] - mid_edge_x
+        edge_cross_dxdy[1, :] = tcenter[1, edge_tri[0, :]] - mid_edge_y
+        
+        internal_mask = np.arange(ed2d) < ed2d_in
+        internal_indices = edge_tri[1, internal_mask]
+        if internal_indices.size > 0:
+            edge_cross_dxdy[2, internal_mask] = tcenter[0, internal_indices] - mid_edge_x[internal_mask]
+            edge_cross_dxdy[3, internal_mask] = tcenter[1, internal_indices] - mid_edge_y[internal_mask]
+
+    elif meshtype == 'r':
+        for n in range(ed2d):
+            ed = edges[:, n]
+            def get_cyclic_diff_rad(a, b):
+                diff = rad * (a - b)
+                if diff > cyclic_length / 2.0: diff -= cyclic_length
+                if diff < -cyclic_length / 2.0: diff += cyclic_length
+                return diff
+
+            lon_diff_rad = get_cyclic_diff_rad(xcoord[ed[1]], xcoord[ed[0]])
+            lat_diff_rad = rad * (ycoord[ed[1]] - ycoord[ed[0]])
+            
+            a = np.array([lon_diff_rad, lat_diff_rad])
+            if cartesian == False:
+                a[0] *= np.cos(rad * 0.5 * np.sum(ycoord[ed]))
+            edge_dxdy[:, n] = a * r_earth
+
+            mid_lon = xcoord[ed[0]] + 0.5 * lon_diff_rad / rad
+            mid_lat = 0.5 * np.sum(ycoord[ed])
+            
+            for k in range(2):
+                tri_idx = edge_tri[k, n]
+                if tri_idx != -1:
+                    b_lon_diff = get_cyclic_diff_rad(tcenter[0, tri_idx], mid_lon)
+                    b_lat_diff = rad * (tcenter[1, tri_idx] - mid_lat)
+                    b = np.array([b_lon_diff, b_lat_diff]) * r_earth
+                    if cartesian == False:
+                        b[0] *= np.cos(rad * tcenter[1, tri_idx])
+                    edge_cross_dxdy[2*k:2*k+2, n] = b
+                    
+    return edge_dxdy, edge_cross_dxdy
+
+def calculate_laplacian_weights(e2d, ed2d_in, edge_tri, edge_dxdy, edge_cross_dxdy):
+    """
+    Calculates neighbor lists and weights for the Laplacian operator.
+    """
+    ee_pos = -np.ones((3, e2d), dtype=int)
+    ee_num = np.zeros(e2d, dtype=int)
+    weights = np.zeros((3, e2d))
+    dxcell = np.zeros((3, e2d))
+    
+    for n in range(ed2d_in):
+        elem1, elem2 = edge_tri[:, n]
+        
+        ee_pos[ee_num[elem1], elem1] = elem2
+        ee_pos[ee_num[elem2], elem2] = elem1
+        
+        b = -edge_cross_dxdy[0:2, n] + edge_cross_dxdy[2:4, n]
+        a_normal = np.array([edge_dxdy[1, n], -edge_dxdy[0, n]])
+        
+        dot_b = np.dot(b, b)
+        weight = np.dot(a_normal, b) / dot_b if dot_b != 0 else 0.0
+
+        weights[ee_num[elem1], elem1] = weight
+        weights[ee_num[elem2], elem2] = weight
+        
+        dxcell[ee_num[elem1], elem1] = 0.5 * a_normal[0]
+        dxcell[ee_num[elem2], elem2] = -0.5 * a_normal[0]
+        
+        ee_num[elem1] += 1
+        ee_num[elem2] += 1
+        
+    return ee_pos, ee_num, weights, dxcell
+
+def build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full_form, Mt=None, dxcell=None):
+    # Initialize arrays, just like in the MATLAB script.
+    # The shape is (4, e2d) to accommodate a diagonal (row 0) and up to 3 neighbors.
+    smooth_m = np.zeros((4, e2d))
+    metric = np.zeros((4, e2d))
+
+    # Loop through each element (triangle), same as 'for j=1:e2d'
+    for j in range(e2d):
+        num_neighbors = ee_num[j]
+        
+        # Skip elements with no area to prevent division by zero
+        if elem_area[j] <= 0:
+            continue
+
+        off_diagonal_value = -np.sqrt(3) / elem_area[j]
+        smooth_m[1:num_neighbors + 1, j] = off_diagonal_value
+        diagonal_value = -np.sum(smooth_m[1:num_neighbors + 1, j])
+        smooth_m[0, j] = diagonal_value
+
+        if full_form:
+            smooth_m[0, j] += Mt[j]**2
+        
+            metric_values = 2 * dxcell[0:num_neighbors, j] * Mt[j] / elem_area[j]
+            metric[1:num_neighbors + 1, j] = metric_values
+
+    return smooth_m, metric
+
+def assemble_from_intermediate(e2d, ee_num, ee_pos, smooth_m):
+
+    # This corresponds to: nza = sum(ee_num) + e2d;
+    nza = np.sum(ee_num) + e2d
+
+    # This corresponds to: ss=zeros(...); ii=zeros(...); jj=zeros(...);
+    ss = np.zeros(nza)
+    ii = np.zeros(nza, dtype=int)
+    jj = np.zeros(nza, dtype=int)
+
+    # This corresponds to: nz = 0;
+    nz = 0  # The counter for the current position in the ss, ii, jj arrays
+
+    # This corresponds to the outer loop: for n=1:e2d
+    for n in range(e2d):
+
+        ss[nz] = smooth_m[0, n]  # Diagonal value is in the first row (index 0)
+        
+        ii[nz] = n
+        jj[nz] = n
+        nz += 1
+        num_neighbors = ee_num[n]
+        for m in range(num_neighbors):
+            ss[nz] = smooth_m[m + 1, n] # Neighbor values start in row 1 of smooth_m
+            ii[nz] = n
+            jj[nz] = ee_pos[m, n]
+            nz += 1
+            
+    return ss, ii, jj

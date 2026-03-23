@@ -12,6 +12,14 @@ from implicit_filter.utils._auxiliary import (
     neighboring_triangles,
     neighbouring_nodes,
     areas,
+    find_and_sort_edges_and_triangles,
+    calculate_triangle_centers,
+    orient_edges,
+    create_triangle_to_edge_map,
+    calculate_dimensional_quantities,
+    calculate_laplacian_weights,
+    build_smoothing_and_metric,
+    assemble_from_intermediate
 )
 from implicit_filter.utils._jax_function import (
     make_smooth,
@@ -103,6 +111,9 @@ class TriangularFilter(Filter):
         transform_attribute(self, "_ss", jx, None)
         transform_attribute(self, "_ii", jx, None)
         transform_attribute(self, "_jj", jx, None)
+        transform_attribute(self, "_ss_e", jx, None)
+        transform_attribute(self, "_ii_e", jx, None)
+        transform_attribute(self, "_jj_e", jx, None)
         transform_attribute(self, "_mask_n", jx, None)
 
         transform_attribute(self, "_n2d", it, 0)
@@ -113,15 +124,24 @@ class TriangularFilter(Filter):
         self.set_backend(self.backend)
 
     def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
-        if type(kl) is float:
+        is_elem = (len(ttu) == self._e2d)
+        if is_elem and self._ss_e is None:
+            raise ValueError("Filter was not prepared with filter_elements=True")
+            
+        n_size = self._e2d if is_elem else self._n2d
+        ss = self._ss_e if is_elem else self._ss
+        ii = self._ii_e if is_elem else self._ii
+        jj = self._jj_e if is_elem else self._jj
+
+        if isinstance(kl, (float, int, np.number)):
             kl = np.ones(ttu.shape) * kl
 
         Smat1 = self.csc_matrix(
             (
-                self.convers(self._ss),
-                (self.convers(self._ii), self.convers(self._jj)),
+                self.convers(ss),
+                (self.convers(ii), self.convers(jj)),
             ),
-            shape=(self._n2d, self._n2d),
+            shape=(n_size, n_size),
         )
 
         scaling_vector = 1.0 / np.square(kl)
@@ -130,14 +150,14 @@ class TriangularFilter(Filter):
         multipliers = np.repeat(scaling_vector, repeats_on_cpu)
         Smat1.data *= self.convers(multipliers)
 
-        Smat = self.identity(self._n2d) + 2.0 * (Smat1**n)
+        Smat = self.identity(n_size) + 2.0 * (Smat1**n)
 
         ttu = self.convers(ttu)
         ttw = ttu - Smat @ ttu  # Work with perturbations
 
         b = 1.0 / Smat.diagonal()  # Simple preconditioner
-        arr = self.convers(np.arange(self._n2d))
-        pre = self.csc_matrix((b, (arr, arr)), shape=(self._n2d, self._n2d))
+        arr = self.convers(np.arange(n_size))
+        pre = self.csc_matrix((b, (arr, arr)), shape=(n_size, n_size))
 
         tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
         if code != 0:
@@ -150,7 +170,7 @@ class TriangularFilter(Filter):
         return self.tonumpy(tts)
 
     def _compute_full(self, n, kl, ttuv, tol=1e-5, maxiter=150000) -> np.ndarray:
-        if type(kl) is float:
+        if isinstance(kl, (float, int, np.number)):
             kl = np.ones(2 * self._n2d) * kl
 
         Smat1 = self.csc_matrix(
@@ -201,9 +221,9 @@ class TriangularFilter(Filter):
             Float can be passed to be applied for entire mesh or array with scales for each node.
             Size of the array must match the size of the input data
         ux : np.ndarray
-            Eastward velocity component at mesh nodes.
+            Eastward velocity component.
         vy : np.ndarray
-            Northward velocity component at mesh nodes.
+            Northward velocity component.
 
         Returns
         -------
@@ -223,7 +243,11 @@ class TriangularFilter(Filter):
         uxn = ux
         vyn = vy
 
-        if self._full:
+        is_elem = len(uxn) == self._e2d
+        if is_elem and self._full:
+            raise ValueError("Coupled full metric filtering not supported for elements. Please use full=False or switch to nodal filtering.")
+
+        if self._full and not is_elem:
             ttuv = self._compute_full(n, k, np.concatenate((uxn, vyn)))
             return ttuv[0 : self._n2d], ttuv[self._n2d : 2 * self._n2d]
         else:
@@ -244,7 +268,7 @@ class TriangularFilter(Filter):
             Float can be passed to be applied for entire mesh or array with scales for each node.
             Size of the array must match the size of the input data
         data : np.ndarray
-            Scalar field values at mesh nodes.
+            Scalar field values.
 
         Returns
         -------
@@ -259,8 +283,12 @@ class TriangularFilter(Filter):
         if n < 1:
             raise ValueError("Filter order must be positive")
 
+        is_elem = len(data) == self._e2d
+        if is_elem and self._full:
+            raise ValueError("Coupled full metric filtering not supported for elements. Please use full=False or switch to nodal filtering.")
+
         return np.array(
-            self._compute_full(n, k, data) if self._full else self._compute(n, k, data)
+            self._compute_full(n, k, data) if (self._full and not is_elem) else self._compute(n, k, data)
         )
 
     def prepare(
@@ -276,6 +304,7 @@ class TriangularFilter(Filter):
         full: bool = False,
         mask: np.ndarray | None = None,
         gpu: bool = False,
+        filter_elements: bool = False,
     ):
         """
         Prepare filter for a specific triangular mesh.
@@ -307,6 +336,8 @@ class TriangularFilter(Filter):
             Element mask where True indicates ocean (default: all ocean).
         gpu : bool, optional
             True to enable GPU acceleration (default: False).
+        filter_elements : bool, optional
+            True to assemble filter operators for elements in addition to nodes (default: False).
 
         Notes
         -----
@@ -393,6 +424,19 @@ class TriangularFilter(Filter):
         self._ss = self._ss[mask_sp]
         self._ii = self._ii[mask_sp]
         self._jj = self._jj[mask_sp]
+        
+        if filter_elements:
+            r_earth = 6400.0 if meshtype == 'm' else 6371.0 # Default earth radius if spherical
+            edges, edge_tri, ed2d_in = find_and_sort_edges_and_triangles(n2d, nn_num, nn_pos, ne_num, ne_pos)
+            tcenter = calculate_triangle_centers(e2d, tri, xcoord, ycoord, meshtype, cyclic_length)
+            edges, edge_tri = orient_edges(edges.shape[1], edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length)
+            edge_dxdy, edge_cross_dxdy = calculate_dimensional_quantities(edges.shape[1], ed2d_in, edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length, r_earth, cartesian)
+            ee_pos, ee_num, weights, dxcell = calculate_laplacian_weights(e2d, ed2d_in, edge_tri, edge_dxdy, edge_cross_dxdy)
+            smooth_m, metric_m = build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full, Mt, dxcell)
+            ss_e, ii_e, jj_e = assemble_from_intermediate(e2d, ee_num, ee_pos, smooth_m)
+            self._ss_e = jnp.array(ss_e)
+            self._ii_e = jnp.array(ii_e)
+            self._jj_e = jnp.array(jj_e)
 
         self.set_backend("gpu" if gpu else "cpu")
 
@@ -466,8 +510,11 @@ class TriangularFilter(Filter):
         if mask is None:
             mask: np.ndarray = np.zeros(data.shape, dtype=bool)
 
+        is_elem = len(data) == self._e2d
+        area_arr = np.array(self._elem_area) if is_elem else np.array(self._area)
+
         not_mask = ~mask
-        selected_area = self._area[not_mask]
+        selected_area = area_arr[not_mask]
 
         spectra[0] = np.sum(selected_area * (np.square(data))[not_mask]) / np.sum(
             selected_area
@@ -532,8 +579,11 @@ class TriangularFilter(Filter):
         unod = ux
         vnod = vy
 
+        is_elem = len(ux) == self._e2d
+        area_arr = np.array(self._elem_area) if is_elem else np.array(self._area)
+
         not_mask = ~mask
-        selected_area = self._area[not_mask]
+        selected_area = area_arr[not_mask]
         spectra[0] = np.sum(
             selected_area * (np.square(unod) + np.square(vnod))[not_mask]
         ) / np.sum(selected_area)

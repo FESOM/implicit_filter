@@ -1,4 +1,9 @@
-from implicit_filter import Filter, TriangularFilter, NemoFilter
+from ..filter import Filter
+from ..triangular_filter import TriangularFilter
+try:
+    from ..nemo_filter import NemoFilter
+except Exception:
+    NemoFilter = None
 from ._jax_function import (
     transform_vector_to_nodes,
     transform_to_nodes,

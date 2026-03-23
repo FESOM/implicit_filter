@@ -1,9 +1,25 @@
 from .filter import Filter
 from .triangular_filter import TriangularFilter
-from .fesom_filter import FesomFilter
-from .icon_filter import IconFilter
-from .nemo_filter import NemoFilter
-from .latlon_filter import LatLonFilter
+
+try:
+    from .fesom_filter import FesomFilter
+except Exception:
+    FesomFilter = None
+
+try:
+    from .icon_filter import IconFilter
+except Exception:
+    IconFilter = None
+
+try:
+    from .nemo_filter import NemoFilter
+except Exception:
+    NemoFilter = None
+
+try:
+    from .latlon_filter import LatLonFilter
+except Exception:
+    LatLonFilter = None
 from .utils._auxiliary import make_tri, convert_to_wavenumbers
 from .utils.conversion_tools import (
     transform_velocity_to_nodes,

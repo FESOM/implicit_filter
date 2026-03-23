@@ -36,6 +36,7 @@ Key Features
 ------------
 
 * **Mesh Agnostic**: Can work on triangular or quadrilateral mesh. Native support for **FESOM**, **ICON**, **NEMO**, and regular **Longitude-Latitude** meshes.
+* **Element and Node Filtering**: Supports filtering on both mesh nodes and elements (triangles) natively for triangular meshes, automatically adjusting based on input data size.
 * **Variable scale filtering**: Filter size can be set individually for each mesh node.
 * **GPU Accelerated**: optimized for Nvidia GPUs using `CuPy <https://cupy.dev/>`_ for massive performance gains.
 * **Efficient**: Optimised for handling even the largest datasets.
@@ -126,10 +127,15 @@ The ``implicit_filter`` package provides several interactive Jupyter notebook ex
 .. grid:: 1 2 2 3
    :gutter: 3
 
-   .. grid-item-card:: 📐 Basic Triangular Mesh
+   .. grid-item-card:: 📐 Basic Triangular Mesh (Nodes)
       :link: https://github.com/FESOM/implicit_filter/blob/main/examples/basic_triangular_mesh.ipynb
 
       A quick start tutorial on how to apply the filter to spatial data defined on unstructured triangular meshes.
+
+   .. grid-item-card:: 📐 Basic Triangular Mesh (Elements)
+      :link: https://github.com/FESOM/implicit_filter/blob/main/examples/element_filtering_example.ipynb
+
+      A quick start tutorial on how to apply the filter to spatial data defined on the elements level of unstructured triangular meshes.
 
    .. grid-item-card:: 🌍 Latitude-Longitude Grid
       :link: https://github.com/FESOM/implicit_filter/blob/main/examples/lat_long_grid_example.ipynb

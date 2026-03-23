@@ -26,9 +26,9 @@ For full mathematical formulation, please refer to our [paper in JAMES](http://d
 
 ## ✨ Key Features
 *   **🌐 Mesh Agnostic**: Can work on triangular or quadrilateral mesh. Native support for **FESOM**, **ICON**, **NEMO**, and regular **Longitude-Latitude** meshes.
+*   **♺ Element and Node Filtering**: Supports filtering on both mesh nodes and elements (triangles) natively for triangular meshes, automatically adjusting based on input data size.
 *   **Variable scale filtering**: Filter size can be set individually for each mesh node 
 *   **🚀 GPU Accelerated**: optimized for Nvidia GPUs using [CuPy](https://cupy.dev/) for massive performance gains.
-* **Variable scale filering**
 *   **⚡ Efficient**: Optimised for handling even the largest datasets.
 *   **💾 Smart Caching**: Save and reload computed filter matrices to avoid redundant calculations.
 

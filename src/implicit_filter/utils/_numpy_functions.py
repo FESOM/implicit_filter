@@ -1,7 +1,6 @@
 from typing import Tuple
 
 import numpy as np
-import pandas as pd
 
 
 def make_smooth(
@@ -149,7 +148,7 @@ def convert_to_tcells(
 
 
 def calculate_global_nemo_neighbourhood(
-    e2d: int, nx: int, ny: int, north_adj: pd.Series
+    e2d: int, nx: int, ny: int, north_adj
 ) -> tuple[np.ndarray, int]:
     """
     Calculate neighbourhood of each cell in NEMO global mesh
