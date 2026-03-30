@@ -14,12 +14,13 @@ from implicit_filter.utils._auxiliary import (
     areas,
     find_and_sort_edges_and_triangles,
     calculate_triangle_centers,
-    orient_edges,
-    create_triangle_to_edge_map,
-    calculate_dimensional_quantities,
-    calculate_laplacian_weights,
-    build_smoothing_and_metric,
-    assemble_from_intermediate
+)
+from implicit_filter.utils._jax_elem_function import (
+    vectorized_orient_edges,
+    vectorized_calculate_dimensional_quantities,
+    fast_calculate_laplacian_weights,
+    fast_build_smoothing_and_metric,
+    fast_assemble_from_intermediate,
 )
 from implicit_filter.utils._jax_function import (
     make_smooth,
@@ -426,14 +427,20 @@ class TriangularFilter(Filter):
         self._jj = self._jj[mask_sp]
         
         if filter_elements:
-            r_earth = 6400.0 if meshtype == 'm' else 6371.0 # Default earth radius if spherical
             edges, edge_tri, ed2d_in = find_and_sort_edges_and_triangles(n2d, nn_num, nn_pos, ne_num, ne_pos)
             tcenter = calculate_triangle_centers(e2d, tri, xcoord, ycoord, meshtype, cyclic_length)
-            edges, edge_tri = orient_edges(edges.shape[1], edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length)
-            edge_dxdy, edge_cross_dxdy = calculate_dimensional_quantities(edges.shape[1], ed2d_in, edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length, r_earth, cartesian)
-            ee_pos, ee_num, weights, dxcell = calculate_laplacian_weights(e2d, ed2d_in, edge_tri, edge_dxdy, edge_cross_dxdy)
-            smooth_m, metric_m = build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full, Mt, dxcell)
-            ss_e, ii_e, jj_e = assemble_from_intermediate(e2d, ee_num, ee_pos, smooth_m)
+            if meshtype == 'm':
+                edges, edge_tri = vectorized_orient_edges(edges.shape[1], edges, edge_tri, tcenter, xcoord, ycoord)
+                edge_dxdy, edge_cross_dxdy = vectorized_calculate_dimensional_quantities(edges.shape[1], ed2d_in, edges, edge_tri, tcenter, xcoord, ycoord)
+            else:
+                # Fall back to original for spherical meshes
+                from implicit_filter.utils._auxiliary import orient_edges, calculate_dimensional_quantities
+                r_earth = 6371.0
+                edges, edge_tri = orient_edges(edges.shape[1], edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length)
+                edge_dxdy, edge_cross_dxdy = calculate_dimensional_quantities(edges.shape[1], ed2d_in, edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length, r_earth, cartesian)
+            ee_pos, ee_num, weights, dxcell = fast_calculate_laplacian_weights(e2d, ed2d_in, edge_tri, edge_dxdy, edge_cross_dxdy)
+            smooth_m, metric_m = fast_build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full, Mt, dxcell)
+            ss_e, ii_e, jj_e = fast_assemble_from_intermediate(e2d, ee_num, ee_pos, smooth_m)
             self._ss_e = jnp.array(ss_e)
             self._ii_e = jnp.array(ii_e)
             self._jj_e = jnp.array(jj_e)
