@@ -32,7 +32,7 @@ class LatLonFilter(Filter):
 
     Attributes
     ----------
-    _e2d : int
+    _n2d : int
         Total number of grid points (nx * ny)
     _nx : int
         Number of longitude points
@@ -58,7 +58,7 @@ class LatLonFilter(Filter):
         st = lambda ar: str(ar)
 
         # Transform and initialize attributes with default values
-        transform_attribute(self, "_e2d", it, 0)
+        transform_attribute(self, "_n2d", it, 0)
         transform_attribute(self, "_nx", it, 0)
         transform_attribute(self, "_ny", it, 0)
         transform_attribute(self, "_ss", ar, None)
@@ -107,8 +107,8 @@ class LatLonFilter(Filter):
         warn_unused_gpu_argument(gpu)
         nx = len(longitude)
         ny = len(latitude)
-        e2d = nx * ny
-        self._e2d = e2d
+        n2d = nx * ny
+        self._n2d = n2d
         self._nx = nx
         self._ny = ny
 
@@ -125,27 +125,27 @@ class LatLonFilter(Filter):
         ycoord = np.reshape(ycoord, [nx * ny])
 
         self._mask_n = (
-            np.ones(self._e2d, dtype=bool) if mask is None else mask.flatten()
+            np.ones(self._n2d, dtype=bool) if mask is None else mask.flatten()
         )
 
         if local:
-            ee_pos, nza = calculate_local_regular_neighbourhood(e2d, nx, ny)
+            ee_pos, nza = calculate_local_regular_neighbourhood(n2d, nx, ny)
         else:
-            ee_pos, nza = calculate_global_regular_neighbourhood(e2d, nx, ny)
+            ee_pos, nza = calculate_global_regular_neighbourhood(n2d, nx, ny)
 
         rad = math.pi / 180.0
 
         if cartesian:
-            Mt = np.ones(e2d)
+            Mt = np.ones(n2d)
         else:
             Mt = np.cos(np.sum(rad * ycoord[ee_pos], axis=0) / 4.0)
 
-        hh = np.ones((4, e2d))  # Edge lengths
-        hc = np.ones((4, e2d))  # Distance to next cell centers
+        hh = np.ones((4, n2d))  # Edge lengths
+        hc = np.ones((4, n2d))  # Distance to next cell centers
         r_earth = R_EARTH
 
         # Fill ee_pos, arrangement is W;N;E;S
-        for i in range(e2d):
+        for i in range(n2d):
             if ee_pos[1, i] == i:
                 hc[1, i] = rad * r_earth * (ycoord[i] - ycoord[ee_pos[3, i]])  # S
             else:
@@ -191,7 +191,7 @@ class LatLonFilter(Filter):
         jj = np.zeros(nza, dtype="int")
 
         nn = 0
-        for n in range(e2d):
+        for n in range(n2d):
             no = nn
             for m in range(4):
                 if ee_pos[m, n] != n and self._mask_n[ee_pos[m, n]] != 0:
@@ -231,7 +231,7 @@ class LatLonFilter(Filter):
     ) -> np.ndarray:
         k_arg = k  # pre-broadcast value; the V-cycle path needs a scalar k
         if isinstance(k, (float, int, np.number)):
-            k = np.ones(self._e2d) * k
+            k = np.ones(self._n2d) * k
 
         scaling_vector = -1.0 / np.square(k)
         data_smat1 = self._ss * scaling_vector[self._jj]
@@ -243,7 +243,7 @@ class LatLonFilter(Filter):
             return x + 2.0 * y
 
         diag_mask = self._ii == self._jj
-        Smat1_diag = jnp.zeros(self._e2d).at[self._ii[diag_mask]].add(data_smat1[diag_mask])
+        Smat1_diag = jnp.zeros(self._n2d).at[self._ii[diag_mask]].add(data_smat1[diag_mask])
         approx_diag_Smat = 1.0 + 2.0 * (Smat1_diag ** n)
         
         def precond(x):
@@ -271,7 +271,7 @@ class LatLonFilter(Filter):
             tts = solve_with_vcycle(
                 ss=-np.asarray(self._ss), ii=self._ii, jj=self._jj,
                 area=np.square(np.asarray(self._area, dtype=np.float64)),
-                n_size=int(self._e2d), n=n,
+                n_size=int(self._n2d), n=n,
                 k=validate_scalar_k(k_arg), apply_A=apply_A,
                 b_pert=ttw, x0_pert=x0_pert, tol=tol, maxiter=maxiter,
                 options=self.preconditioner_options,
@@ -318,9 +318,9 @@ class LatLonFilter(Filter):
         if n < 1:
             raise ValueError("Filter order must be positive")
 
-        x0_flat = np.reshape(x0, self._e2d) if x0 is not None else None
+        x0_flat = np.reshape(x0, self._n2d) if x0 is not None else None
         return np.reshape(
-            self._compute(n, k, np.reshape(data, self._e2d), x0=x0_flat), (self._nx, self._ny)
+            self._compute(n, k, np.reshape(data, self._n2d), x0=x0_flat), (self._nx, self._ny)
         )
 
     def compute_velocity(
@@ -359,15 +359,15 @@ class LatLonFilter(Filter):
         if n < 1:
             raise ValueError("Filter order must be positive")
 
-        ux0_flat = np.reshape(ux0, self._e2d) if ux0 is not None else None
-        vy0_flat = np.reshape(vy0, self._e2d) if vy0 is not None else None
+        ux0_flat = np.reshape(ux0, self._n2d) if ux0 is not None else None
+        vy0_flat = np.reshape(vy0, self._n2d) if vy0 is not None else None
 
         return (
             np.reshape(
-                self._compute(n, k, np.reshape(ux, self._e2d), x0=ux0_flat), (self._nx, self._ny)
+                self._compute(n, k, np.reshape(ux, self._n2d), x0=ux0_flat), (self._nx, self._ny)
             ),
             np.reshape(
-                self._compute(n, k, np.reshape(vy, self._e2d), x0=vy0_flat), (self._nx, self._ny)
+                self._compute(n, k, np.reshape(vy, self._n2d), x0=vy0_flat), (self._nx, self._ny)
             ),
         )
 
@@ -403,7 +403,7 @@ class LatLonFilter(Filter):
             [1:] : Variance at each wavelength k
         """
         nr = len(k)
-        tt = np.reshape(data, self._e2d)
+        tt = np.reshape(data, self._n2d)
         spectra = np.zeros(nr + 1)
         if mask is None:
             mask: np.ndarray = np.zeros(tt.shape, dtype=bool)
@@ -464,8 +464,8 @@ class LatLonFilter(Filter):
         """
 
         nr = len(k)
-        unod = np.reshape(ux, self._e2d)
-        vnod = np.reshape(vy, self._e2d)
+        unod = np.reshape(ux, self._n2d)
+        vnod = np.reshape(vy, self._n2d)
 
         spectra = np.zeros(nr + 1)
         if mask is None:
