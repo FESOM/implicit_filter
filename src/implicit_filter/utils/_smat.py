@@ -7,7 +7,9 @@ functions of all filters.
 from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
+from jax import ops
 import numpy as np
+import jax.scipy.sparse.linalg as jspsl
 from implicit_filter.filter import Filter
 
 
@@ -105,4 +107,48 @@ def build_smat(
         row_ids = X.convers(row_ids),
         shape = (n_size, n_size)
     )
+
+def _matvec(
+    smat: SmatData, 
+    x: jnp.ndarray
+    ) -> jnp.ndarray:
+    """
+    Perform the matrix-vector product of the sparse matrix represented by 
+    SmatData with a dense vector x (data). This is used in the _batch_compute 
+    functions of the filters to apply the filter operation.
+
+    """
+    products = smat.data * x[smat.indices]
+    out = ops.segment_sum(
+        products,
+        smat.row_ids,
+        num_segments=smat.shape[0],
+    )
+    return out 
+
+def _cg_one(
+    smat: SmatData,
+    ttu: jnp.ndarray,
+    tol = 1e-6,
+    maxiter = 150_000,
+    ) -> jnp.ndarray:
+    """
+    """
+
+    def matvec(x):
+        return _matvec(smat, x)
+
+    ttw = ttu - matvec(ttu)
+
+    pre = lambda x: x / smat.diag  # Jacobi preconditioner
+
+    sol, info = jspsl.cg(
+        matvec,
+        ttw,
+        tol=tol,
+        maxiter=maxiter,
+        M=pre,
+    )
+
+    return sol + ttu, info
 
