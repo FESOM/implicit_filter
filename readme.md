@@ -28,7 +28,7 @@ For full mathematical formulation, please refer to our [paper in JAMES](http://d
 *   **🌐 Mesh Agnostic**: Can work on triangular or quadrilateral mesh. Native support for **FESOM**, **ICON**, **NEMO**, and regular **Longitude-Latitude** meshes.
 *   **♺ Element and Node Filtering**: Supports filtering on both mesh nodes and elements (triangles) natively for triangular meshes, automatically adjusting based on input data size.
 *   **Variable scale filtering**: Filter size can be set individually for each mesh node 
-*   **🚀 GPU Accelerated**: optimized for Nvidia GPUs using [CuPy](https://cupy.dev/) for massive performance gains.
+*   **🚀 GPU Accelerated**: optimized for Nvidia GPUs and Apple Silicon using [JAX](https://jax.readthedocs.io/) for massive performance gains.
 *   **⚡ Efficient**: Optimised for handling even the largest datasets.
 *   **💾 Smart Caching**: Save and reload computed filter matrices to avoid redundant calculations.
 
@@ -40,31 +40,25 @@ For full mathematical formulation, please refer to our [paper in JAMES](http://d
 If you do not require GPU acceleration, install directly from GitHub:
 
 ```bash
-python -m pip install git+https://github.com/FESOM/implicit_filter.git
+python -m pip install "implicit_filter[cpu] @ git+https://github.com/FESOM/implicit_filter.git"
 ```
 2. GPU Installation (Recommended)
 
-For optimal performance, usage of an Nvidia GPU is highly recommended. You must install cupy.
-
-Option A: Automatic (via extras)
-Install the package with the tag matching your CUDA version (check via nvidia-smi):
-
-### For CUDA 11.x
-```bash
-python -m pip install "implicit_filter[gpu_c11] @ git+https://github.com/FESOM/implicit_filter.git"
-```
+For optimal performance, usage of an Nvidia GPU or Apple Silicon is highly recommended. The package uses JAX for hardware acceleration.
 
 ### For CUDA 12.x
 ```bash
-python -m pip install "implicit_filter[gpu_c12] @ git+https://github.com/FESOM/implicit_filter.git"
+python -m pip install "implicit_filter[cuda12] @ git+https://github.com/FESOM/implicit_filter.git"
 ```
 
-Option B: Manual
-Install CuPy separately before installing the package:
-
+### For CUDA 11.x
 ```bash
-pip install cupy-cuda12x  # Adjust for your CUDA version
-python -m pip install git+https://github.com/FESOM/implicit_filter.git
+python -m pip install "implicit_filter[cuda11] @ git+https://github.com/FESOM/implicit_filter.git"
+```
+
+### For Apple Silicon (M1/M2/M3)
+```bash
+python -m pip install "implicit_filter[apple] @ git+https://github.com/FESOM/implicit_filter.git"
 ```
 
 ## 🚀 Quick Start
@@ -101,12 +95,17 @@ distance = 100  # Target filter size (e.g., km)
 filtered_data = flter.compute(1, 2*math.pi / distance, unfiltered_data)
 ```
 
-You can switch between CPU and GPU at runtime without restarting:
+You can switch between CPU and GPU at runtime using the `set_backend` method:
 
 ```python
 flter.set_backend("cpu")
 # or 
 flter.set_backend("gpu")
+```
+
+For advanced performance, you can also warm-start the iterative solver if you have a good initial guess (e.g., from a previous time step or similar filtering scale):
+```python
+filtered_data = flter.compute(1, 2*math.pi / distance, unfiltered_data, x0=previous_guess)
 ```
 
 ## 🤝 Support & Feature Requests
