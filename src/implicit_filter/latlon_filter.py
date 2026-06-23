@@ -10,9 +10,10 @@ from implicit_filter.utils._numpy_functions import (
 from implicit_filter.filter import Filter
 from implicit_filter.utils.utils import (
     SolverNotConvergedError,
-    get_backend,
     transform_attribute,
 )
+import jax.numpy as jnp
+from jax.scipy.sparse.linalg import cg
 
 
 class LatLonFilter(Filter):
@@ -43,8 +44,7 @@ class LatLonFilter(Filter):
         Column indices for sparse matrix entries
     _area : np.ndarray
         Area associated with each grid cell
-    _backend : str
-        Computational backend ('cpu' or 'gpu')
+
     _mask_n : np.ndarray
         Boolean mask for valid grid points (False indicates land)
     """
@@ -63,9 +63,6 @@ class LatLonFilter(Filter):
         transform_attribute(self, "_ii", ar, None)
         transform_attribute(self, "_jj", ar, None)
         transform_attribute(self, "_area", ar, None)
-        transform_attribute(self, "_backend", st, "cpu")
-
-        self.set_backend(self._backend)
 
     def prepare(
         self,
@@ -214,88 +211,54 @@ class LatLonFilter(Filter):
         mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
 
         self._ss = self._ss[mask_sp]
-        self._ii = self._ii[mask_sp]
         self._jj = self._jj[mask_sp]
 
-        self.set_backend("gpu" if gpu else "cpu")
 
-    def get_backend(self) -> str:
-        """
-        Get current computational backend.
-
-        Returns
-        -------
-        str
-            Current backend ('cpu' or 'gpu').
-        """
-        return self._backend
-
-    def set_backend(self, backend: str):
-        """
-        Set computational backend for filtering operations.
-
-        Parameters
-        ----------
-        backend : str
-            Desired backend ('cpu' or 'gpu').
-
-        Notes
-        -----
-        Configures appropriate sparse linear algebra functions for the backend.
-        """
-        (
-            self.csc_matrix,
-            self.identity,
-            self.diags,
-            self.cg,
-            self.convers,
-            self.tonumpy,
-        ) = get_backend(backend)
-        self._backend = backend
 
     def _compute(
         self,
         n: int,
         k: float | np.ndarray,
         data: np.ndarray,
+        x0: np.ndarray | None = None,
         maxiter: int = 150_000,
         tol: float = 1e-6,
     ) -> np.ndarray:
-        if type(k) is float:
+        if isinstance(k, (float, int, np.number)):
             k = np.ones(self._e2d) * k
 
-        Smat1 = self.csc_matrix(
-            (
-                self.convers(self._ss),
-                (self.convers(self._ii), self.convers(self._jj)),
-            ),
-            shape=(self._e2d, self._e2d),
-        )
-
         scaling_vector = -1.0 / np.square(k)
-        nnz_per_column = np.diff(self.tonumpy(Smat1.indptr))
-        repeats_on_cpu = self.tonumpy(nnz_per_column)
-        multipliers = np.repeat(scaling_vector, repeats_on_cpu)
-        Smat1.data *= self.convers(multipliers)
+        data_smat1 = self._ss * scaling_vector[self._jj]
 
-        Smat = self.identity(self._e2d) + 2.0 * (Smat1**n)
+        def apply_A(x):
+            y = x
+            for _ in range(n):
+                y = jnp.zeros_like(x).at[self._ii].add(data_smat1 * y[self._jj])
+            return x + 2.0 * y
 
-        ttu = self.convers(data)
-        ttw = ttu - Smat @ ttu  # Work with perturbations
+        diag_mask = self._ii == self._jj
+        Smat1_diag = jnp.zeros(self._e2d).at[self._ii[diag_mask]].add(data_smat1[diag_mask])
+        approx_diag_Smat = 1.0 + 2.0 * (Smat1_diag ** n)
+        
+        def precond(x):
+            return x / approx_diag_Smat
 
-        pre = self.diags(1.0 / Smat.diagonal())  # Simple preconditioner
+        ttu = jnp.array(data)
+        ttw = ttu - apply_A(ttu)  # Work with perturbations
 
-        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
-        if code != 0:
+        x0_pert = None if x0 is None else (jnp.array(x0) - ttu)
+
+        tts, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=precond)
+        if code is not None and code != 0:
             raise SolverNotConvergedError(
                 "Solver has not converged without metric terms",
                 [f"output code with code: {code}"],
             )
 
         tts += ttu
-        return self.tonumpy(tts)
+        return np.array(tts)
 
-    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray) -> np.ndarray:
+    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None) -> np.ndarray:
         """
         Apply filter to scalar field on lat-lon grid.
 
@@ -309,6 +272,8 @@ class LatLonFilter(Filter):
             Size of the array must match the size of the input data
         data : np.ndarray
             Scalar field values on grid (shape: (nx, ny)).
+        x0 : np.ndarray | None
+            Initial guess for the solver.
 
         Returns
         -------
@@ -323,12 +288,13 @@ class LatLonFilter(Filter):
         if n < 1:
             raise ValueError("Filter order must be positive")
 
+        x0_flat = np.reshape(x0, self._e2d) if x0 is not None else None
         return np.reshape(
-            self._compute(n, k, np.reshape(data, self._e2d)), (self._nx, self._ny)
+            self._compute(n, k, np.reshape(data, self._e2d), x0=x0_flat), (self._nx, self._ny)
         )
 
     def compute_velocity(
-        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray
+        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray, ux0: np.ndarray | None = None, vy0: np.ndarray | None = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Apply filter to velocity components on lat-lon grid.
@@ -345,6 +311,10 @@ class LatLonFilter(Filter):
             Eastward velocity component (shape: (nx, ny)).
         vy : np.ndarray
             Northward velocity component (shape: (nx, ny)).
+        ux0 : np.ndarray | None
+            Initial guess for ux.
+        vy0 : np.ndarray | None
+            Initial guess for vy.
 
         Returns
         -------
@@ -359,12 +329,15 @@ class LatLonFilter(Filter):
         if n < 1:
             raise ValueError("Filter order must be positive")
 
+        ux0_flat = np.reshape(ux0, self._e2d) if ux0 is not None else None
+        vy0_flat = np.reshape(vy0, self._e2d) if vy0 is not None else None
+
         return (
             np.reshape(
-                self._compute(n, k, np.reshape(ux, self._e2d)), (self._nx, self._ny)
+                self._compute(n, k, np.reshape(ux, self._e2d), x0=ux0_flat), (self._nx, self._ny)
             ),
             np.reshape(
-                self._compute(n, k, np.reshape(vy, self._e2d)), (self._nx, self._ny)
+                self._compute(n, k, np.reshape(vy, self._e2d), x0=vy0_flat), (self._nx, self._ny)
             ),
         )
 
@@ -412,13 +385,15 @@ class LatLonFilter(Filter):
             selected_area
         )
 
+        x0 = None
         for i in range(nr):
-            ttu = self._compute(n, k[i], tt)
-            ttu -= tt
-
-            ttu[mask] = 0.0
+            ttu = self._compute(n, k[i], tt, x0=x0)
+            x0 = ttu
+            
+            ttu_diff = ttu - tt
+            ttu_diff[mask] = 0.0
             spectra[i + 1] = np.sum(
-                selected_area * (np.square(ttu))[not_mask]
+                selected_area * (np.square(ttu_diff))[not_mask]
             ) / np.sum(selected_area)
 
         return spectra
@@ -472,18 +447,20 @@ class LatLonFilter(Filter):
             selected_area * (np.square(unod) + np.square(vnod))[not_mask]
         ) / np.sum(selected_area)
 
+        ux0, vy0 = None, None
         for i in range(nr):
-            ttu = self._compute(n, k[i], unod)
-            ttv = self._compute(n, k[i], vnod)
+            ttu = self._compute(n, k[i], unod, x0=ux0)
+            ttv = self._compute(n, k[i], vnod, x0=vy0)
+            ux0, vy0 = ttu, ttv
 
-            ttu -= unod
-            ttv -= vnod
+            ttu_diff = ttu - unod
+            ttv_diff = ttv - vnod
 
-            ttu[mask] = 0.0
-            ttv[mask] = 0.0
+            ttu_diff[mask] = 0.0
+            ttv_diff[mask] = 0.0
 
             spectra[i + 1] = np.sum(
-                selected_area * (np.square(ttu) + np.square(ttv))[not_mask]
+                selected_area * (np.square(ttu_diff) + np.square(ttv_diff))[not_mask]
             ) / np.sum(selected_area)
 
         return spectra

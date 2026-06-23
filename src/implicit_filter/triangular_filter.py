@@ -22,8 +22,8 @@ from implicit_filter.utils._jax_function import (
 from implicit_filter.utils.utils import (
     SolverNotConvergedError,
     transform_attribute,
-    get_backend,
 )
+from jax.scipy.sparse.linalg import cg
 from implicit_filter.filter import Filter
 
 
@@ -84,7 +84,7 @@ class TriangularFilter(Filter):
         **kwargs : keyword arguments
             Keyword arguments passed to the base class constructor.
         """
-        self.backend = "cpu"  # If initial_data doesn't contain backend, cpu is used
+
         super().__init__(initial_data, kwargs)
         # Transform to JAX array
         jx = lambda ar: jnp.array(ar)
@@ -108,86 +108,77 @@ class TriangularFilter(Filter):
         transform_attribute(self, "_n2d", it, 0)
         transform_attribute(self, "_e2d", it, 0)
         transform_attribute(self, "_full", bl, False)
-        transform_attribute(self, "_backend", st, "cpu")
 
-        self.set_backend(self.backend)
-
-    def _compute(self, n, kl, ttu, tol=1e-6, maxiter=150000) -> np.ndarray:
-        if type(kl) is float:
+    def _compute(self, n, kl, ttu, x0=None, tol=1e-6, maxiter=150000) -> np.ndarray:
+        if isinstance(kl, (float, int, np.number)):
             kl = np.ones(ttu.shape) * kl
 
-        Smat1 = self.csc_matrix(
-            (
-                self.convers(self._ss),
-                (self.convers(self._ii), self.convers(self._jj)),
-            ),
-            shape=(self._n2d, self._n2d),
-        )
-
         scaling_vector = 1.0 / np.square(kl)
-        nnz_per_column = np.diff(self.tonumpy(Smat1.indptr))
-        repeats_on_cpu = self.tonumpy(nnz_per_column)
-        multipliers = np.repeat(scaling_vector, repeats_on_cpu)
-        Smat1.data *= self.convers(multipliers)
+        data = self._ss * scaling_vector[self._jj]
 
-        Smat = self.identity(self._n2d) + 2.0 * (Smat1**n)
+        def apply_A(x):
+            y = x
+            for _ in range(n):
+                y = jnp.zeros_like(x).at[self._ii].add(data * y[self._jj])
+            return x + 2.0 * y
 
-        ttu = self.convers(ttu)
-        ttw = ttu - Smat @ ttu  # Work with perturbations
+        diag_mask = self._ii == self._jj
+        Smat1_diag = jnp.zeros(self._n2d).at[self._ii[diag_mask]].add(data[diag_mask])
+        approx_diag_Smat = 1.0 + 2.0 * (Smat1_diag ** n)
+        
+        def precond(x):
+            return x / approx_diag_Smat
 
-        b = 1.0 / Smat.diagonal()  # Simple preconditioner
-        arr = self.convers(np.arange(self._n2d))
-        pre = self.csc_matrix((b, (arr, arr)), shape=(self._n2d, self._n2d))
+        ttu = jnp.array(ttu)
+        ttw = ttu - apply_A(ttu)  # Work with perturbations
+        x0_pert = None if x0 is None else (jnp.array(x0) - ttu)
 
-        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
-        if code != 0:
+        tts, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=precond)
+        if code is not None and code != 0:
             raise SolverNotConvergedError(
                 "Solver has not converged without metric terms",
                 [f"output code with code: {code}"],
             )
 
         tts += ttu
-        return self.tonumpy(tts)
+        return np.array(tts)
 
-    def _compute_full(self, n, kl, ttuv, tol=1e-5, maxiter=150000) -> np.ndarray:
-        if type(kl) is float:
+    def _compute_full(self, n, kl, ttuv, x0=None, tol=1e-5, maxiter=150000) -> np.ndarray:
+        if isinstance(kl, (float, int, np.number)):
             kl = np.ones(2 * self._n2d) * kl
 
-        Smat1 = self.csc_matrix(
-            (
-                self.convers(self._ss) * (1.0 / np.square(kl)),
-                (self.convers(self._ii), self.convers(self._jj)),
-            ),
-            shape=(2 * self._n2d, 2 * self._n2d),
-        )
-
         scaling_vector = 1.0 / np.square(kl)
-        nnz_per_column = np.diff(self.tonumpy(Smat1.indptr))
-        repeats_on_cpu = self.tonumpy(nnz_per_column)
-        multipliers = np.repeat(scaling_vector, repeats_on_cpu)
-        Smat1.data *= self.convers(multipliers)
+        data = self._ss * scaling_vector[self._jj]
 
-        Smat = self.identity(2 * self._n2d) + 2.0 * (Smat1**n)
+        def apply_A(x):
+            y = x
+            for _ in range(n):
+                y = jnp.zeros_like(x).at[self._ii].add(data * y[self._jj])
+            return x + 2.0 * y
 
-        ttuv = self.convers(ttuv)
-        ttw = ttuv - Smat @ ttuv  # Work with perturbations
+        diag_mask = self._ii == self._jj
+        Smat1_diag = jnp.zeros(2 * self._n2d).at[self._ii[diag_mask]].add(data[diag_mask])
+        approx_diag_Smat = 1.0 + 2.0 * (Smat1_diag ** n)
+        
+        def precond(x):
+            return x / approx_diag_Smat
 
-        b = 1.0 / Smat.diagonal()  # Simple preconditioner
-        arr = self.convers(np.arange(2 * self._n2d))
-        pre = self.csc_matrix((b, (arr, arr)), shape=(2 * self._n2d, 2 * self._n2d))
+        ttuv = jnp.array(ttuv)
+        ttw = ttuv - apply_A(ttuv)  # Work with perturbations
+        x0_pert = None if x0 is None else (jnp.array(x0) - ttuv)
 
-        tts, code = self.cg(Smat, ttw, None, tol, maxiter, pre)
-        if code != 0:
+        tts, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=precond)
+        if code is not None and code != 0:
             raise SolverNotConvergedError(
                 "Solver has not converged with metric terms",
                 [f"output code with code: {code}"],
             )
 
         tts += ttuv
-        return self.tonumpy(tts)
+        return np.array(tts)
 
     def compute_velocity(
-        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray
+        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray, ux0: np.ndarray | None = None, vy0: np.ndarray | None = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Apply filter to velocity components on triangular mesh.
@@ -204,6 +195,10 @@ class TriangularFilter(Filter):
             Eastward velocity component at mesh nodes.
         vy : np.ndarray
             Northward velocity component at mesh nodes.
+        ux0 : np.ndarray | None
+            Initial guess for ux.
+        vy0 : np.ndarray | None
+            Initial guess for vy.
 
         Returns
         -------
@@ -224,14 +219,15 @@ class TriangularFilter(Filter):
         vyn = vy
 
         if self._full:
-            ttuv = self._compute_full(n, k, np.concatenate((uxn, vyn)))
+            uv0 = np.concatenate((ux0, vy0)) if ux0 is not None and vy0 is not None else None
+            ttuv = self._compute_full(n, k, np.concatenate((uxn, vyn)), x0=uv0)
             return ttuv[0 : self._n2d], ttuv[self._n2d : 2 * self._n2d]
         else:
-            ttu = self._compute(n, k, uxn)
-            ttv = self._compute(n, k, vyn)
+            ttu = self._compute(n, k, uxn, x0=ux0)
+            ttv = self._compute(n, k, vyn, x0=vy0)
             return ttu, ttv
 
-    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray) -> np.ndarray:
+    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None) -> np.ndarray:
         """
         Apply filter to scalar field on triangular mesh.
 
@@ -245,6 +241,8 @@ class TriangularFilter(Filter):
             Size of the array must match the size of the input data
         data : np.ndarray
             Scalar field values at mesh nodes.
+        x0 : np.ndarray | None
+            Initial guess for the solver.
 
         Returns
         -------
@@ -260,7 +258,7 @@ class TriangularFilter(Filter):
             raise ValueError("Filter order must be positive")
 
         return np.array(
-            self._compute_full(n, k, data) if self._full else self._compute(n, k, data)
+            self._compute_full(n, k, data, x0=x0) if self._full else self._compute(n, k, data, x0=x0)
         )
 
     def prepare(
@@ -394,41 +392,8 @@ class TriangularFilter(Filter):
         self._ii = self._ii[mask_sp]
         self._jj = self._jj[mask_sp]
 
-        self.set_backend("gpu" if gpu else "cpu")
 
-    def get_backend(self) -> str:
-        """
-        Get current computational backend.
 
-        Returns
-        -------
-        str
-            Current backend ('cpu' or 'gpu').
-        """
-        return self.backend
-
-    def set_backend(self, backend: str):
-        """
-        Set computational backend for filtering operations.
-
-        Parameters
-        ----------
-        backend : str
-            Desired backend ('cpu' or 'gpu').
-
-        Notes
-        -----
-        Configures appropriate sparse linear algebra functions for the backend.
-        """
-        (
-            self.csc_matrix,
-            self.identity,
-            self.diags,
-            self.cg,
-            self.convers,
-            self.tonumpy,
-        ) = get_backend(backend)
-        self.backend = backend
 
     def compute_spectra_scalar(
         self,
@@ -473,13 +438,15 @@ class TriangularFilter(Filter):
             selected_area
         )
 
+        x0 = None
         for i in range(nr):
-            ttu = self.compute(n, k[i], data)
-            ttu -= data
+            ttu = self.compute(n, k[i], data, x0=x0)
+            x0 = ttu
 
-            ttu[mask] = 0.0
+            ttu_diff = ttu - data
+            ttu_diff[mask] = 0.0
             spectra[i + 1] = np.sum(
-                selected_area * (np.square(ttu))[not_mask]
+                selected_area * (np.square(ttu_diff))[not_mask]
             ) / np.sum(selected_area)
 
         return spectra
@@ -538,17 +505,19 @@ class TriangularFilter(Filter):
             selected_area * (np.square(unod) + np.square(vnod))[not_mask]
         ) / np.sum(selected_area)
 
+        ux0, vy0 = None, None
         for i in range(nr):
-            ttu, ttv = self.compute_velocity(n, k[i], unod, vnod)
+            ttu, ttv = self.compute_velocity(n, k[i], unod, vnod, ux0=ux0, vy0=vy0)
+            ux0, vy0 = ttu, ttv
 
-            ttu -= unod
-            ttv -= vnod
+            ttu_diff = ttu - unod
+            ttv_diff = ttv - vnod
 
-            ttu[mask] = 0.0
-            ttv[mask] = 0.0
+            ttu_diff[mask] = 0.0
+            ttv_diff[mask] = 0.0
 
             spectra[i + 1] = np.sum(
-                selected_area * (np.square(ttu) + np.square(ttv))[not_mask]
+                selected_area * (np.square(ttu_diff) + np.square(ttv_diff))[not_mask]
             ) / np.sum(selected_area)
 
         return spectra

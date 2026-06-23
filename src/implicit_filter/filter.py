@@ -16,32 +16,23 @@ class Filter(ABC):
         for key in kwargs:
             setattr(self, key, kwargs[key])
 
-    @abstractmethod
+    def get_backend(self) -> str:
+        import jax
+        return jax.config.jax_platforms or "gpu"
+
     def set_backend(self, backend: str):
         """
-        Set the computational backend for filter operations.
-
-        Parameters
-        ----------
-        backend : str
-            Name of the backend to use (e.g., 'cpu', 'gpu').
+        Force JAX to use a specific backend (e.g. 'cpu' or 'gpu').
+        This is useful if you want to run on CPU while the GPU is busy.
         """
-        pass
+        import jax
+        if backend.lower() == "cpu":
+            jax.config.update("jax_platforms", "cpu")
+        else:
+            jax.config.update("jax_platforms", "gpu,cpu")
 
     @abstractmethod
-    def get_backend(self) -> str:
-        """
-        Get the current computational backend.
-
-        Returns
-        -------
-        str
-            Name of the active backend.
-        """
-        pass
-
-    @abstractmethod
-    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray) -> np.ndarray:
+    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None) -> np.ndarray:
         """
         Compute the filtered data using a specified filter size.
         Data must be placed on mesh nodes
@@ -59,6 +50,10 @@ class Filter(ABC):
         data : np.ndarray
             NumPy array containing data to be filtered.
 
+        x0 : np.ndarray | None, optional
+            Optional initial guess for the CG solver. Can be provided to accelerate convergence.
+            Defaults to None.
+
         Returns:
         --------
         np.ndarray
@@ -68,7 +63,7 @@ class Filter(ABC):
 
     @abstractmethod
     def compute_velocity(
-        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray
+        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray, ux0: np.ndarray | None = None, vy0: np.ndarray | None = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the filtered velocity data using a specified filter size.
@@ -89,6 +84,12 @@ class Filter(ABC):
 
         vy : np.ndarray
             NumPy array containing northwards velocity component to be filtered.
+
+        ux0 : np.ndarray | None, optional
+            Optional initial guess for the x-component CG solver. Defaults to None.
+            
+        vy0 : np.ndarray | None, optional
+            Optional initial guess for the y-component CG solver. Defaults to None.
 
         Returns:
         --------
