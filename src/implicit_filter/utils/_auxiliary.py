@@ -371,7 +371,7 @@ def convert_to_wavenumbers(dist, dxm):
 
 def find_adjacent_points_north(
     ds_mm=None, lon_lat_prec_degrees: float = None
-) -> tuple:
+) -> tuple[any, int]:
     """
     Fix rounding erros in NEMO grid using linear regression
 
@@ -390,6 +390,11 @@ def find_adjacent_points_north(
         Pandas Series containing the indices of adjacent points at northern border.
 
     """
+    import pandas as pd
+    import xarray as xr
+    from pandas import Series
+    from sklearn.linear_model import LinearRegression
+
     # load mesh mask
     ds_mm = ds_mm.squeeze(drop=True)
     ds_mm = ds_mm.assign_coords(

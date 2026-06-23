@@ -3,9 +3,10 @@ Error handling tests: verify that invalid inputs raise appropriate exceptions.
 """
 import numpy as np
 import pytest
-from implicit_filter import TriangularFilter
-from implicit_filter.utils._auxiliary import make_tri
-from implicit_filter.utils.utils import get_backend
+from implicit_filter.triangular_filter import TriangularFilter
+from implicit_filter.utils.utils import (
+    SolverNotConvergedError,
+)
 
 
 def build_filter(filter_elements=False, full=False):
@@ -20,6 +21,7 @@ def build_filter(filter_elements=False, full=False):
         ycoord[i, :] = yy
     for i in range(ny):
         xcoord[:, i] = xx
+    from implicit_filter.utils._auxiliary import make_tri
     tri = make_tri(nodnum, nx, ny)
     n2d = len(xcoord.flatten())
     e2d = len(tri)
@@ -78,16 +80,3 @@ class TestFullMetricWithElements:
         filt, _, e2d = build_filter(filter_elements=True, full=True)
         with pytest.raises(ValueError, match="[Ff]ull"):
             filt.compute_velocity(1, 5.0, np.ones(e2d), np.ones(e2d))
-
-
-class TestInvalidBackend:
-    """Requesting an unsupported backend must raise."""
-
-    def test_invalid_backend_string(self):
-        with pytest.raises(NotImplementedError):
-            get_backend("tpu")
-
-    def test_invalid_backend_on_filter(self):
-        filt, _, _ = build_filter()
-        with pytest.raises(NotImplementedError):
-            filt.set_backend("quantum")

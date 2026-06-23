@@ -332,4 +332,3 @@ class NemoFilter(LatLonFilter):
         self._ii = self._ii[mask_sp]
         self._jj = self._jj[mask_sp]
 
-        self.set_backend("gpu" if gpu else "cpu")

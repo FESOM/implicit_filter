@@ -32,18 +32,19 @@ dynamic = ["dependencies"]
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-gpu_c11 = [
-    "cupy-cuda11x"
+cpu = [
+    "jax[cpu]"
 ]
-gpu_c12 = [
-    "cupy-cuda12x"
+cuda11 = [
+    "jax[cuda11_pip]"
 ]
-gpu = [
-    "cupy"
+cuda12 = [
+    "jax[cuda12]"
 ]
-amgx = [
-    "pyamgx"
+apple = [
+    "jax[apple]"
 ]
+
 
 [project.urls]
 Homepage = "https://github.com/FESOM/implicit_filter"

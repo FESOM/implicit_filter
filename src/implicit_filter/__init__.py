@@ -1,3 +1,6 @@
+import jax
+jax.config.update("jax_enable_x64", True)
+
 from .filter import Filter
 from .triangular_filter import TriangularFilter
 

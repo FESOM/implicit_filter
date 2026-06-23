@@ -21,7 +21,6 @@ pip
 pyparsing
 python-dateutil
 pytz
-scipy
 setuptools
 six
 tornado

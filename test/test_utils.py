@@ -7,7 +7,6 @@ from implicit_filter.utils.utils import (
     TheHollyHandErrorOfAntioch,
     SizeMissmatchError,
     transform_attribute,
-    get_backend,
 )
 
 def test_errors():
@@ -42,30 +41,4 @@ def test_transform_attribute():
     transform_attribute(dummy, "attr2", lambda x: x * 2, fill=99)
     assert dummy.attr2 == 99
 
-def test_get_backend_cpu():
-    from scipy.sparse import csc_matrix, identity, diags
-    
-    csc, ident, diag, cg, convers, tonumpy = get_backend("cpu")
-    
-    assert csc is csc_matrix
-    assert ident is identity
-    assert diag is diags
-    
-    # convers is jnp.array, tonumpy is np.array
-    import jax.numpy as jnp
-    import numpy as np
-    assert convers is jnp.array
-    assert tonumpy is np.array
 
-@patch('warnings.warn')
-def test_get_backend_gpu_fallback(mock_warn):
-    # If cupy is missing or no gpu device, it falls back to CPU
-    csc, ident, diag, cg, convers, tonumpy = get_backend("gpu")
-    
-    mock_warn.assert_called()
-    assert convers.__name__ == "array" # jnp.array
-    assert tonumpy.__name__ == "array" # np.array
-
-def test_get_backend_invalid():
-    with pytest.raises(NotImplementedError):
-        get_backend("tpu")
