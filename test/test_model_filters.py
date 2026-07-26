@@ -159,8 +159,108 @@ class TestIconConventions:
 class TestIconSeaLandMask:
     """ICON encodes ocean as the negative cell_sea_land_mask codes.
 
-    -2 inner ocean, -1 boundary ocean, +1 boundary land, +2 inner land.
+    Verified against all 50 grids in the DKRZ public pool
+    (/pool/data/ICON/grids/public, providers edzw and mpim) carrying the
+    variable, spanning 2016-12-13 to 2025-10-08 and 15 distinct grid-generator
+    revisions. Every one declares the identical long_name:
+
+        "sea (-2 inner, -1 boundary) land (2 inner, 1 boundary) mask for the cell"
+
+    and no grid contains any value outside {-2,-1,0,1,2}. The value sets that
+    actually occur are exercised below.
     """
+
+    def test_global_grid_codes(self):
+        """Global (_G) grids use all four codes."""
+        _, _, e2d = icon_dataset()
+        codes = np.array([(-2, -1, 1, 2)[i % 4] for i in range(e2d)])
+        filt = IconFilter()
+        filt.prepare_from_data_array(icon_dataset(codes)[0], mask=True)
+        elem_area = np.asarray(filt._elem_area)
+        assert np.all(elem_area[codes > 0] == 0.0)
+        assert np.all(elem_area[codes < 0] > 0.0)
+
+    def test_ocean_grid_codes_without_inner_land(self):
+        """Ocean (_O) grids drop inner land, leaving {-2,-1,+1} (8 real grids)."""
+        _, _, e2d = icon_dataset()
+        codes = np.array([(-2, -1, 1)[i % 3] for i in range(e2d)])
+        filt = IconFilter()
+        filt.prepare_from_data_array(icon_dataset(codes)[0], mask=True)
+        elem_area = np.asarray(filt._elem_area)
+        assert np.all(elem_area[codes == 1] == 0.0), "+1 boundary land must be masked"
+        assert np.all(elem_area[codes < 0] > 0.0)
+
+    def test_all_sea_grid_is_all_ocean(self):
+        _, _, e2d = icon_dataset()
+        codes = np.array([(-2, -1)[i % 2] for i in range(e2d)])
+        filt = IconFilter()
+        filt.prepare_from_data_array(icon_dataset(codes)[0], mask=True)
+        assert np.all(np.asarray(filt._elem_area) > 0.0)
+
+
+class TestIconUnpopulatedMask:
+    """Six real grids carry cell_sea_land_mask filled entirely with zeros.
+
+    e.g. icon_grid_0030_R02B03_G.nc, whose land-sea information lives in the
+    sibling icon_grid_0030_R02B03_Glsm.nc, and icon_grid_0023_R02B07_G.nc
+    (sibling icon_grid_0023_R02B07_G_slm.nc). Interpreting an all-zero mask
+    with "ocean == code < 0" would mark every cell as land and produce a
+    silently degenerate filter with zero areas everywhere.
+    """
+
+    def test_all_zero_mask_raises(self):
+        _, _, e2d = icon_dataset()
+        codes = np.zeros(e2d, dtype=int)
+        filt = IconFilter()
+        with pytest.raises(ValueError, match="no sea cells"):
+            filt.prepare_from_data_array(icon_dataset(codes)[0], mask=True)
+
+    def test_error_points_at_the_sibling_file(self):
+        _, _, e2d = icon_dataset()
+        filt = IconFilter()
+        with pytest.raises(ValueError, match=r"_[Gs]?lsm|_slm|separate"):
+            filt.prepare_from_data_array(
+                icon_dataset(np.zeros(e2d, dtype=int))[0], mask=True
+            )
+
+    def test_error_reports_the_values_found(self):
+        _, _, e2d = icon_dataset()
+        filt = IconFilter()
+        with pytest.raises(ValueError, match=r"\[0\]"):
+            filt.prepare_from_data_array(
+                icon_dataset(np.zeros(e2d, dtype=int))[0], mask=True
+            )
+
+    def test_all_land_mask_also_raises(self):
+        """A mask with no sea at all is equally unusable."""
+        _, _, e2d = icon_dataset()
+        codes = np.full(e2d, 2)
+        filt = IconFilter()
+        with pytest.raises(ValueError, match="no sea cells"):
+            filt.prepare_from_data_array(icon_dataset(codes)[0], mask=True)
+
+    def test_mask_false_still_works_on_such_a_grid(self):
+        """The escape hatch must remain available."""
+        _, _, e2d = icon_dataset()
+        filt = IconFilter()
+        filt.prepare_from_data_array(
+            icon_dataset(np.zeros(e2d, dtype=int))[0], mask=False
+        )
+        assert np.all(np.asarray(filt._elem_area) > 0.0)
+
+    def test_explicit_array_mask_still_works_on_such_a_grid(self):
+        _, _, e2d = icon_dataset()
+        explicit = np.ones(e2d, dtype=bool)
+        explicit[0] = False
+        filt = IconFilter()
+        filt.prepare_from_data_array(
+            icon_dataset(np.zeros(e2d, dtype=int))[0], mask=explicit
+        )
+        assert np.asarray(filt._elem_area)[0] == 0.0
+
+
+class TestIconSeaLandMaskBehaviour:
+    """Behavioural consequences of the mask."""
 
     def test_land_cells_are_excluded(self):
         ds, _, e2d = icon_dataset()

@@ -17,8 +17,34 @@ ever excluded. The branch flipped the sign of `cell_sea_land_mask`, applied a
 recoding, then overwrote the result with a fresh read, and finished with
 `astype(bool)`, which maps every nonzero ICON code (`-2, -1, +1, +2`) to `True`.
 
-Ocean is now `cell_sea_land_mask < 0`, matching the ICON convention
-(`-2` inner ocean, `-1` boundary ocean, `+1` boundary land, `+2` inner land).
+Ocean is now `cell_sea_land_mask < 0`.
+
+**Convention verified against the ICON grid pool**, not assumed. All 50 grids in
+`/pool/data/ICON/grids/public` (providers `edzw` and `mpim`) that carry the
+variable — spanning **2016-12-13 to 2025-10-08 and 15 distinct grid-generator
+revisions** — declare the identical `long_name`:
+
+> `sea (-2 inner, -1 boundary) land (2 inner, 1 boundary) mask for the cell`
+
+No grid contains any value outside `{-2,-1,0,1,2}`. Two populated variants occur
+and both are handled: global (`_G`) grids use all four codes, while ocean (`_O`)
+grids omit inner land and use `{-2,-1,+1}`. Checked against the real files, the
+resulting ocean fraction is ~69% for global grids (consistent with Earth's ~71%
+ocean) and 94–96% for ocean-only grids.
+
+#### ICON grids with an unpopulated mask are now rejected
+
+Six grids in the same pool — including `icon_grid_0005_R02B04_G.nc`,
+`icon_grid_0030_R02B03_G.nc`, `icon_grid_0037_R02B11_G.nc` and the Torus test
+grid — contain `cell_sea_land_mask` filled entirely with zeros. Their land-sea
+information lives in a sibling file (`icon_grid_0030_R02B03_Glsm.nc`,
+`icon_grid_0023_R02B07_G_slm.nc`).
+
+Under `ocean == code < 0` such a grid would mark **every cell as land**, giving
+zero areas everywhere and a silently degenerate filter. (The previous code was
+equally wrong here, for a different reason.) `mask=True` on a grid with no sea
+cells now raises `ValueError` naming the sibling-file convention and the
+`mask=False` / explicit-array alternatives.
 
 **Impact.** Measured on the ICON R2B04 grid `icon_grid_0043_R02B04_G.nc`
 (20480 cells, 30.7% land), filtering an SST-like field with land cells zeroed:

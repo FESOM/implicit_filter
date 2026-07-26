@@ -98,13 +98,29 @@ class IconFilter(TriangularFilter):
             pass
         elif mask:
             if "cell_sea_land_mask" in grid2d:
-                # ICON encodes: -2 inner ocean, -1 boundary ocean,
-                #               +1 boundary land, +2 inner land.
+                # ICON convention, declared verbatim in the long_name of every
+                # grid in the public pool from 2016 to 2025 (50 files, 15
+                # grid-generator revisions):
+                #     "sea (-2 inner, -1 boundary) land (2 inner, 1 boundary)
+                #      mask for the cell"
                 # Ocean is therefore exactly the negative codes. Note that a
                 # sign flip followed by astype(bool) does NOT work: every
-                # nonzero code maps to True, which marks the whole grid as
-                # ocean and makes the mask a no-op.
-                mask = grid2d["cell_sea_land_mask"].values < 0
+                # nonzero code maps to True, marking the whole grid as ocean
+                # and making the mask a no-op.
+                codes = grid2d["cell_sea_land_mask"].values
+                if not np.any(codes < 0):
+                    present = np.unique(codes).tolist()
+                    raise ValueError(
+                        "'cell_sea_land_mask' in this grid contains no sea "
+                        f"cells (values present: {present}). Several ICON "
+                        "grids ship this variable unpopulated (all zero) and "
+                        "carry the land-sea mask in a separate file instead, "
+                        "named like icon_grid_XXXX_..._Glsm.nc or "
+                        "..._G_slm.nc. Point the filter at that file, pass an "
+                        "explicit boolean mask array as `mask=`, or use "
+                        "mask=False to treat every cell as ocean."
+                    )
+                mask = codes < 0
             else:
                 raise KeyError(
                     f"In the file grid file there's no ocean mask under default name 'cell_sea_land_mask'"
