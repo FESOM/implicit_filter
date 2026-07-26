@@ -75,10 +75,15 @@ data = xr.open_dataset(path + "ssh.nc")
 unfiltered_data = data['ssh'].values[0, :]
 
 # 2. Initialize Filter
-# You can enable GPU immediately during initialization or later at any point
 flter = FesomFilter()
-flter.prepare_from_file(mesh_path, gpu=True) 
-# Note: If JAX prints a warning about GPU unavailability ignore it. 
+flter.prepare_from_file(mesh_path)
+# Note: If JAX prints a warning about GPU unavailability ignore it.
+
+# 2b. Select the backend
+# Importing implicit_filter currently pins JAX to CPU, and the `gpu=`
+# argument on prepare_from_file() is not yet implemented. Call set_backend
+# explicitly to run on the GPU:
+flter.set_backend("gpu")
 
 # 3. Caching (Optional but Recommended)
 # Save auxiliary arrays to disk. These are mesh-specific and 
@@ -101,6 +106,47 @@ You can switch between CPU and GPU at runtime using the `set_backend` method:
 flter.set_backend("cpu")
 # or 
 flter.set_backend("gpu")
+
+flter.get_backend()   # -> "cpu" or "gpu"
+```
+
+> **Note on GPU selection.** Importing `implicit_filter` sets JAX's platform to
+> CPU for the whole process. `set_backend("gpu")` is therefore required to use a
+> GPU, and it also affects any other JAX code running in the same interpreter.
+
+## 🔺 Filtering on elements
+
+For triangular meshes the filter works on **nodes** (vertices) or on
+**elements** (triangle centres). The element operator is not built by default —
+ask for it with `filter_elements=True`:
+
+```python
+flter = FesomFilter()
+flter.prepare_from_file(mesh_path, filter_elements=True)
+
+filtered_nodes    = flter.compute(1, 2*math.pi / distance, data_on_nodes)
+filtered_elements = flter.compute(1, 2*math.pi / distance, data_on_elements)
+```
+
+Whether the data sits on nodes or elements is inferred from its length. On a
+mesh with as many elements as nodes that is ambiguous, so you can say it
+outright:
+
+```python
+filtered = flter.compute(1, k, data, on="elements")   # or on="nodes"
+```
+
+### Element weighting scheme
+
+The element Laplacian supports two weightings, selected at `prepare` time:
+
+| `elem_weights` | Behaviour |
+| --- | --- |
+| `"equilateral"` (default) | Fixed `sqrt(3)/area` coefficient — the finite-volume weight for an equilateral triangle. Depends only on cell area, ignores cell shape. This is the long-standing behaviour and is the default so existing results stay reproducible. |
+| `"geometric"` | Uses the per-edge weights computed from the actual mesh geometry. Identical to the above on an equilateral mesh; more accurate on anisotropic or strongly graded meshes. |
+
+```python
+flter.prepare_from_file(mesh_path, filter_elements=True, elem_weights="geometric")
 ```
 
 For advanced performance, you can also warm-start the iterative solver if you have a good initial guess (e.g., from a previous time step or similar filtering scale):

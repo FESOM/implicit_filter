@@ -8,7 +8,7 @@ from implicit_filter import TriangularFilter
 from implicit_filter.utils._auxiliary import make_tri
 
 
-def build_filter():
+def build_filter(filter_elements=True):
     Lx = 10
     xx = np.arange(0, Lx + 1, dtype=float)
     yy = np.arange(0, Lx + 1, dtype=float)
@@ -28,7 +28,7 @@ def build_filter():
     filt.prepare(
         n2d, e2d, tri, xcoord.flatten(), ycoord.flatten(),
         meshtype='m', cartesian=True, full=False,
-        filter_elements=True,
+        filter_elements=filter_elements,
     )
     return filt, n2d, e2d
 
@@ -92,3 +92,44 @@ class TestSaveLoad:
 
         np.testing.assert_allclose(ux_after, ux_before, atol=1e-10)
         np.testing.assert_allclose(vy_after, vy_before, atol=1e-10)
+
+
+class TestSaveLoadWithoutElements:
+    """filter_elements=False is the default; its cache must round-trip too."""
+
+    def test_roundtrip_loads(self, save_path):
+        filt, _, _ = build_filter(filter_elements=False)
+        filt.save_to_file(save_path)
+        # Must not raise "Object arrays cannot be loaded when allow_pickle=False"
+        TriangularFilter.load_from_file(save_path)
+
+    def test_roundtrip_node_compute(self, save_path):
+        filt, n2d, _ = build_filter(filter_elements=False)
+        np.random.seed(42)
+        data = np.random.randn(n2d)
+
+        result_before = filt.compute(1, 5.0, data)
+        filt.save_to_file(save_path)
+        loaded = TriangularFilter.load_from_file(save_path)
+        result_after = loaded.compute(1, 5.0, data)
+
+        np.testing.assert_allclose(result_after, result_before, atol=1e-10)
+
+    def test_unset_attributes_stay_none(self, save_path):
+        """Element operators were never built; they must load back as None."""
+        filt, _, _ = build_filter(filter_elements=False)
+        filt.save_to_file(save_path)
+        loaded = TriangularFilter.load_from_file(save_path)
+
+        assert loaded._ss_e is None
+        assert loaded._ii_e is None
+        assert loaded._jj_e is None
+
+    def test_element_compute_still_rejected_after_load(self, save_path):
+        """The loaded filter must keep reporting that elements weren't prepared."""
+        filt, _, e2d = build_filter(filter_elements=False)
+        filt.save_to_file(save_path)
+        loaded = TriangularFilter.load_from_file(save_path)
+
+        with pytest.raises(ValueError, match="filter_elements"):
+            loaded.compute(1, 5.0, np.ones(e2d))

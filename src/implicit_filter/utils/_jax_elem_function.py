@@ -136,23 +136,56 @@ def fast_calculate_laplacian_weights(e2d, ed2d_in, edge_tri, edge_dxdy, edge_cro
     return ee_pos, ee_num, weights, dxcell
 
 
-def fast_build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full_form, Mt=None, dxcell=None):
+def fast_build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full_form, Mt=None,
+                                    dxcell=None, weights=None, scheme="equilateral"):
     """
     Fully vectorized construction of smoothing and metric matrices.
     No Python loops.
+
+    Parameters
+    ----------
+    scheme : {'equilateral', 'geometric'}
+        Weighting of the off-diagonal (inter-element) Laplacian entries.
+
+        ``'equilateral'`` (default, historical behaviour) uses a fixed
+        ``-sqrt(3) / elem_area``. This is the finite-volume coefficient
+        ``edge_length / centroid_distance`` evaluated for an equilateral
+        triangle: for side ``s`` the area is ``sqrt(3) s^2 / 4`` and the
+        distance between the centroids of two cells sharing an edge is
+        ``s / sqrt(3)``, so the ratio is exactly ``sqrt(3)``. It therefore
+        depends only on cell area and ignores the actual cell shape.
+
+        ``'geometric'`` uses the per-edge weights computed from the mesh by
+        :func:`fast_calculate_laplacian_weights`, giving
+        ``-weights[k] / elem_area``. The two schemes coincide on an
+        equilateral mesh and diverge as cells become anisotropic.
+
+    weights : np.ndarray, optional
+        ``(3, e2d)`` per-edge weights. Required when ``scheme='geometric'``.
     """
+    if scheme not in ("equilateral", "geometric"):
+        raise ValueError(
+            f"Unknown elem_weights scheme {scheme!r}; expected 'equilateral' or 'geometric'"
+        )
+    if scheme == "geometric" and weights is None:
+        raise ValueError("scheme='geometric' requires the per-edge weights array")
+
     smooth_m = np.zeros((4, e2d))
     metric = np.zeros((4, e2d))
 
     # Mask for elements with positive area
     valid = elem_area > 0
 
-    off_diag = -np.sqrt(3) / np.where(valid, elem_area, 1.0)  # avoid div/0
+    safe_area = np.where(valid, elem_area, 1.0)  # avoid div/0
+    off_diag = -np.sqrt(3) / safe_area
 
     # Fill off-diagonal entries: rows 1, 2, 3 (for neighbors 0, 1, 2)
     for k in range(3):
         active = valid & (ee_num > k)
-        smooth_m[k + 1, active] = off_diag[active]
+        if scheme == "geometric":
+            smooth_m[k + 1, active] = -weights[k, active] / safe_area[active]
+        else:
+            smooth_m[k + 1, active] = off_diag[active]
 
     # Diagonal = negative sum of off-diagonals
     smooth_m[0, :] = -np.sum(smooth_m[1:, :], axis=0)

@@ -94,7 +94,11 @@ Here is a complete example of how to load a FESOM mesh, prepare the filter, and 
 
    # 2. Initialize Filter
    flter = FesomFilter()
-   flter.prepare_from_file(mesh_path, gpu=True) 
+   flter.prepare_from_file(mesh_path)
+
+   # 2b. Select the backend. Importing implicit_filter pins JAX to CPU, and
+   # the `gpu=` argument is not yet implemented, so ask for the GPU here:
+   flter.set_backend("gpu")
 
    # 3. Caching (Optional but Recommended)
    flter.save_to_file("filter_cache")
@@ -111,8 +115,52 @@ You can switch between CPU and GPU at runtime using the `set_backend` method:
 .. code-block:: python
 
    flter.set_backend("cpu")
-   # or 
+   # or
    flter.set_backend("gpu")
+
+   flter.get_backend()   # -> "cpu" or "gpu"
+
+.. note::
+
+   Importing ``implicit_filter`` sets JAX's platform to CPU for the whole
+   process. ``set_backend("gpu")`` is therefore required to use a GPU, and it
+   also affects any other JAX code running in the same interpreter.
+
+Filtering on elements
+---------------------
+
+For triangular meshes the filter works on **nodes** (vertices) or on
+**elements** (triangle centres). The element operator is not built by default;
+request it with ``filter_elements=True``:
+
+.. code-block:: python
+
+   flter = FesomFilter()
+   flter.prepare_from_file(mesh_path, filter_elements=True)
+
+   filtered_nodes    = flter.compute(1, k, data_on_nodes)
+   filtered_elements = flter.compute(1, k, data_on_elements)
+
+Placement is inferred from the length of the data. On a mesh with as many
+elements as nodes that is ambiguous, so it can be stated explicitly:
+
+.. code-block:: python
+
+   filtered = flter.compute(1, k, data, on="elements")   # or on="nodes"
+
+The element Laplacian supports two weighting schemes, chosen at ``prepare``
+time via ``elem_weights``:
+
+``'equilateral'`` (default)
+   Fixed ``sqrt(3)/area`` coefficient — the finite-volume weight for an
+   equilateral triangle. Depends only on cell area and ignores cell shape.
+   This is the long-standing behaviour, kept as the default so that existing
+   results remain reproducible.
+
+``'geometric'``
+   Uses the per-edge weights computed from the actual mesh geometry. Identical
+   to ``'equilateral'`` on an equilateral mesh; more accurate on anisotropic or
+   strongly graded meshes.
 
 For advanced performance, you can warm-start the iterative solver if you have a good initial guess (e.g., from a previous time step):
 

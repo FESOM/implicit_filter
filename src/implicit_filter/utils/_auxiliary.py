@@ -3,6 +3,16 @@ from typing import Tuple
 
 import numpy as np
 
+#: Earth's radius in kilometres.
+#:
+#: Single source of truth for every module that converts angular coordinates to
+#: physical distances. It was previously hardcoded per call site, with the
+#: element branch of ``TriangularFilter.prepare`` using 6371 while the nodal
+#: geometry here and ``LatLonFilter`` used 6400 -- so one prepared filter mixed
+#: two radii 0.45% apart. Changing this value rescales the nodal operator, so it
+#: is deliberately kept at the long-standing 6400.
+R_EARTH = 6400.0
+
 
 def neighboring_triangles(n2d: int, e2d: int, tri: np.ndarray):
     """
@@ -95,7 +105,10 @@ def neighbouring_nodes(
     # Initialize an array to store the positions of neighboring nodes for each node.
     nn_num = np.zeros([n2d], dtype=int)
     check = np.zeros([n2d], dtype=int)
-    aux = np.zeros([20], dtype=int)
+    # Scratch buffer holding the neighbours of the node currently being
+    # processed. Sized by n2d because node valence is unbounded on
+    # unstructured meshes; only entries [0:cc] are ever read.
+    aux = np.zeros([n2d], dtype=int)
     for j in range(n2d):
         cc = 0
         for m in range(ne_num[j]):
@@ -200,7 +213,7 @@ def areas(
     dx = np.zeros([e2d, 3], dtype=float)
     dy = np.zeros([e2d, 3], dtype=float)
     elem_area = np.zeros([e2d])
-    r_earth = 6400  # Earth's radius, assuming units in kilometers
+    r_earth = R_EARTH  # Earth's radius in kilometres (see module constant)
     Mt = np.ones([e2d])
 
     if meshtype == "m":
@@ -390,10 +403,17 @@ def find_adjacent_points_north(
         Pandas Series containing the indices of adjacent points at northern border.
 
     """
-    import pandas as pd
-    import xarray as xr
-    from pandas import Series
-    from sklearn.linear_model import LinearRegression
+    try:
+        import pandas as pd
+        from sklearn.linear_model import LinearRegression
+    except ImportError as exc:  # pragma: no cover - exercised via import blocking
+        raise ImportError(
+            "Resolving the NEMO north-fold row correspondence requires pandas "
+            "and scikit-learn, which are optional dependencies. Install them "
+            "with:  pip install 'implicit_filter[nemo]'\n"
+            "Alternatively use NemoFilter(...) with neighb='west-east' or "
+            "neighb='local', which do not need them."
+        ) from exc
 
     # load mesh mask
     ds_mm = ds_mm.squeeze(drop=True)
@@ -444,7 +464,6 @@ def find_adjacent_points_north(
                         break
 
     # filter adjacent x for outliers
-    import pandas as pd
     adjacent_x = pd.Series(
         x_corr,
         name="adjacent_x",
@@ -455,7 +474,6 @@ def find_adjacent_points_north(
     ).dropna()
 
     # fit clean adjacent indices
-    from sklearn.linear_model import LinearRegression
     lr = LinearRegression()
     lr.fit(
         np.array(adjacent_x_sanitized.index).reshape(-1, 1),

@@ -1,31 +1,16 @@
-Bottleneck
-certifi
-cftime
-contourpy
-cycler
-fastrlock
-fonttools
+# Direct runtime dependencies only.
+#
+# Hardware-specific JAX builds are selected through the extras declared in
+# pyproject.toml: implicit_filter[cpu] / [cuda11] / [cuda12] / [apple].
+# Plain "jax" here keeps a bare `pip install implicit_filter` importable; the
+# extras layer the accelerator plugins onto the same distribution.
+#
+# netCDF4 is not imported directly, but xarray needs it as the engine for the
+# .nc mesh files that every prepare_from_file() entry point reads.
+#
+# pandas and scikit-learn are deliberately absent: they are imported lazily,
+# and only by the NEMO north-fold helper. Install them via implicit_filter[nemo].
 jax
-jaxlib
-kiwisolver
-matplotlib
-munkres
-netCDF4
-numexpr
 numpy
-opt-einsum
-packaging
-pandas
-Pillow
-pip
-pyparsing
-python-dateutil
-pytz
-setuptools
-six
-tornado
-typing_extensions
-wheel
 xarray
-requests
-scikit-learn
+netCDF4
