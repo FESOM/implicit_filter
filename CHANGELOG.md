@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+### Backward compatibility
+
+Audited against the pre-review baseline by running identical code on both
+revisions and diffing the results.
+
+**Nothing was removed.** No package-level export, class, method or function
+disappeared. Every signature change is a parameter *appended at the end with a
+default* (`elem_weights`, `filter_elements`, `on`), so existing positional and
+keyword calls bind exactly as before. `test_backward_compatibility.py` pins
+this.
+
+**Cache files interoperate in both directions.** A cache written by the previous
+version loads here, and a cache written here loads under the previous version,
+both producing identical filtered output.
+
+Three behaviour changes are worth knowing about:
+
+| change | who is affected | impact |
+| --- | --- | --- |
+| `get_backend()` returns `'gpu'` instead of `'gpu,cpu'` | code comparing the return value to the literal `"gpu,cpu"` | now round-trips through `set_backend()`, which the old value did not |
+| ICON `mask=True` on a grid whose mask is all zeros now raises | the 6 such grids in the public pool | previously returned the input **completely unfiltered** (all-zero operator), silently |
+| filtered values shift on spherical/non-uniform meshes | see the float32 note below | ~1e-9 – 1e-7 relative |
+
+Everything else — filtering on nodes and elements, velocity, spectra,
+`full=True`, `LatLonFilter`, the conversion helpers, error types for invalid
+input — was verified byte-for-byte identical.
+
+`pandas` and `scikit-learn` were briefly moved to an optional `[nemo]` extra and
+have been **restored to the base requirements**: `neighb='full'` is
+`NemoFilter`'s default, so a plain `pip install implicit_filter` must keep
+working on that path. They are still imported lazily and still produce a clear
+message naming the extra if absent.
+
+The trimming of `requirements.txt` does mean packages the old pin set installed
+transitively (`matplotlib`, `requests`, `Bottleneck`, `numexpr`, and build tools
+like `pip`/`setuptools`/`wheel`) are no longer pulled in. The package never
+imported them; only a user script that relied on `implicit_filter` to supply
+them would notice.
+
 ### ⚠️ Changes that affect numerical output
 
 Two fixes in this release change computed results. Everything else in it was
