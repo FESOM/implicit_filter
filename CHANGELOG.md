@@ -79,6 +79,50 @@ Also restores the exact constant-null-space property (operator row sums
 `6e-7` → `2e-15`) and removes a JAX `FutureWarning` that is scheduled to become
 a hard error in `prepare()`.
 
+### NEMO mesh compatibility
+
+Verified against real NEMO mesh-mask files of two generations. Output for
+already-supported meshes is bit-identical; the changes only affect meshes that
+previously failed.
+
+| mesh | `local` | `west-east` | `full` |
+| --- | --- | --- | --- |
+| ORCA05, NEMO ≥3.6 (722×511) | ✅ unchanged | ✅ unchanged | ✅ unchanged |
+| ORCA1, NEMO v2.2 (362×292) | ✅ **now works** | ✅ **now works** | ⚠️ clear error |
+
+#### Pre-3.6 NEMO mesh files are now supported
+
+The meaning of the `_0` suffix changed between NEMO generations:
+
+| | NEMO ≤3.4 | NEMO ≥3.6 |
+| --- | --- | --- |
+| 3D scale factors | `e3t`, `e3u`, `e3v` | `e3t_0`, `e3u_0`, `e3v_0` |
+| 1D reference levels | `e3t_0`, `e3w_0` | `e3t_1d`, `e3w_1d` |
+
+`NemoFilter` hardcoded the ≥3.6 names, so an older mesh failed with a bare
+`AttributeError: 'Dataset' object has no attribute 'e3u_0'`. Both conventions
+are now accepted.
+
+Selection is by **dimensionality, not name**: a legacy mesh does contain
+`e3t_0`, but as the 1D reference profile. A name-based fallback would silently
+pick a 1D array of the wrong length instead of the 3D field, so a candidate is
+accepted only if it carries `(z, y, x)`.
+
+#### Clearer diagnostics for unsupported meshes
+
+- **North-fold detection.** `neighb='full'` matches the redundant northern row
+  against its partner column by column, greedily and injectively. On grids where
+  a column's only candidate is already taken the match comes up short — on the
+  real ORCA1 mesh, 359 of 360 columns match — which surfaced as an opaque
+  `ValueError: Length of values (359) does not match length of index (360)` from
+  inside pandas. It now reports how many columns failed and points to
+  `neighb='west-east'` / `'local'`. The matching itself is unchanged, as
+  altering it would change results on grids where it currently succeeds.
+- **Vertical dimension naming.** The code requires the vertical dimension to be
+  named `z` (as NEMO writes it), but files processed through CDO often carry
+  `nav_lev` or `deptht`. That now names the offending dimension and gives the
+  `ds.rename({...: 'z'})` remedy, instead of reporting a missing variable.
+
 ### Fixed
 
 - `LatLonFilter.prepare` with a land mask produced misaligned sparse arrays

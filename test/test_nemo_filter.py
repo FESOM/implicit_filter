@@ -60,9 +60,40 @@ def make_nemo_dataset(nx=NX, ny=NY):
     )
 
 
-def build_filter(neighb="local"):
+def make_legacy_nemo_dataset(nx=NX, ny=NY):
+    """A pre-3.6 NEMO mesh_mask, as written by NEMO 2.x/3.x.
+
+    The `_0` suffix changed meaning between NEMO generations:
+
+        old (<=3.4)   e3t / e3u / e3v    3D scale factors
+                      e3t_0 / e3w_0      1D reference levels  (t, z)
+        new (3.6+)    e3t_0/e3u_0/e3v_0  3D scale factors
+                      e3t_1d / e3w_1d    1D reference levels
+
+    So an old mesh *does* contain `e3t_0` -- but it is the 1D profile, not the
+    field the filter needs. Selecting by name alone silently picks the wrong
+    variable; selection must go by dimensionality.
+
+    Modelled on /work/ab0995/a270125/OLD_MA/mesh_mask_nemo.v2.2.nc
+    (ORCA1, National Oceanography Centre, 2012).
+    """
+    ds = make_nemo_dataset(nx, ny)
+    nz = ds.sizes["z"]
+    legacy = ds.drop_vars(["e3u_0", "e3v_0", "e3t_0"])
+    for new, old in (("e3u_0", "e3u"), ("e3v_0", "e3v"), ("e3t_0", "e3t")):
+        legacy[old] = (["z", "y", "x"], ds[new].values)
+    # the 1D reference profile, which legacy files store under the _0 names
+    legacy["e3t_0"] = (["z"], np.ones(nz))
+    legacy["e3w_0"] = (["z"], np.ones(nz))
+    return legacy
+
+
+def build_filter(neighb="local", ds=None):
     filt = NemoFilter()
-    filt.prepare_from_data_array(make_nemo_dataset(), vl=0, mask=False, neighb=neighb)
+    filt.prepare_from_data_array(
+        make_nemo_dataset() if ds is None else ds,
+        vl=0, mask=False, neighb=neighb,
+    )
     return filt
 
 
@@ -135,6 +166,152 @@ class TestGridAssembly:
         filt = build_filter()
         off = dense_offdiagonals(filt)
         assert all(v > 0 for v in off.values())
+
+
+class TestLegacyNemoNaming:
+    """Pre-3.6 NEMO mesh_mask files must be supported.
+
+    Verified against a real ORCA1 mesh (NEMO v2.2, 2012): it has e3t/e3u/e3v
+    as the 3D scale factors and a 1D e3t_0, and previously failed with a bare
+    `AttributeError: 'Dataset' object has no attribute 'e3u_0'`.
+    """
+
+    def test_legacy_mesh_prepares(self):
+        filt = build_filter(ds=make_legacy_nemo_dataset())
+        assert filt._e2d == NX * NY
+        assert len(filt._ss) == len(filt._ii) == len(filt._jj)
+
+    def test_legacy_matches_modern_when_equivalent(self):
+        """The two conventions describe the same grid, so must agree exactly."""
+        modern = build_filter(ds=make_nemo_dataset())
+        legacy = build_filter(ds=make_legacy_nemo_dataset())
+        np.testing.assert_array_equal(
+            np.asarray(modern._ss), np.asarray(legacy._ss)
+        )
+        np.testing.assert_array_equal(
+            np.asarray(modern._area), np.asarray(legacy._area)
+        )
+
+    def test_legacy_1d_reference_profile_is_not_used(self):
+        """A legacy mesh's 1D e3t_0 must be ignored in favour of 3D e3t.
+
+        If the 1D profile were picked up, the constant-1.0 values here would
+        differ from the modern dataset's 3D field and the operators would not
+        match.
+        """
+        legacy = make_legacy_nemo_dataset()
+        legacy["e3t_0"] = (["z"], np.full(legacy.sizes["z"], 999.0))
+        filt = build_filter(ds=legacy)
+        modern = build_filter(ds=make_nemo_dataset())
+        np.testing.assert_array_equal(
+            np.asarray(filt._ss), np.asarray(modern._ss)
+        )
+
+    def test_legacy_constant_field_preserved(self):
+        filt = build_filter(ds=make_legacy_nemo_dataset())
+        result = filt.compute(1, 0.5, np.full((NX, NY), 3.0))
+        np.testing.assert_allclose(result, 3.0, atol=1e-5)
+
+
+class TestMissingScaleFactors:
+    """A mesh with neither convention must say so clearly."""
+
+    def test_missing_scale_factor_raises_keyerror(self):
+        ds = make_nemo_dataset().drop_vars(["e3u_0"])
+        filt = NemoFilter()
+        with pytest.raises(KeyError, match="e3u"):
+            filt.prepare_from_data_array(ds, vl=0, mask=False, neighb="local")
+
+    def test_error_mentions_both_conventions(self):
+        ds = make_nemo_dataset().drop_vars(["e3v_0"])
+        filt = NemoFilter()
+        with pytest.raises(KeyError, match=r"e3v_0.*e3v|e3v.*e3v_0"):
+            filt.prepare_from_data_array(ds, vl=0, mask=False, neighb="local")
+
+
+class TestVerticalDimensionNaming:
+    """The vertical dimension must be named 'z'.
+
+    NEMO writes mesh_mask.nc with dims (t, z, y, x), but files that have been
+    through CDO or other tooling often carry 'nav_lev' or 'deptht' instead. The
+    diagnostic should name the offending dimension rather than just reporting a
+    missing variable.
+    """
+
+    @pytest.mark.parametrize("dim", ["nav_lev", "deptht", "depth"])
+    def test_renamed_vertical_dim_is_named_in_the_error(self, dim):
+        ds = make_nemo_dataset().rename({"z": dim})
+        filt = NemoFilter()
+        with pytest.raises(KeyError, match=dim):
+            filt.prepare_from_data_array(ds, vl=0, mask=False, neighb="local")
+
+    @pytest.mark.parametrize("dim", ["nav_lev", "deptht"])
+    def test_error_says_to_rename_to_z(self, dim):
+        ds = make_nemo_dataset().rename({"z": dim})
+        filt = NemoFilter()
+        with pytest.raises(KeyError, match="rename"):
+            filt.prepare_from_data_array(ds, vl=0, mask=False, neighb="local")
+
+    def test_renaming_to_z_makes_it_work(self):
+        """The remedy the error suggests must actually work."""
+        ds = make_nemo_dataset().rename({"z": "nav_lev"})
+        filt = NemoFilter()
+        filt.prepare_from_data_array(
+            ds.rename({"nav_lev": "z"}), vl=0, mask=False, neighb="local"
+        )
+        assert filt._e2d == NX * NY
+
+
+class TestNorthFoldDetectionFailure:
+    """neighb='full' resolves the north-fold row correspondence by matching
+    rounded coordinates column by column, injectively. On some grids a column's
+    only candidate is consumed by an earlier column and the match comes up
+    short -- observed on a real ORCA1 mesh (NEMO v2.2), where row -2 matches
+    359 of 360 columns.
+
+    That surfaced as `ValueError: Length of values (359) does not match length
+    of index (360)` from deep inside pandas. The failure must instead say what
+    went wrong and what to do about it.
+    """
+
+    @staticmethod
+    def starved_dataset():
+        # interior columns of the redundant row repeat a longitude that occurs
+        # only once in the corresponding row, so one column cannot be matched
+        nx, ny = 6, 5
+        lon = np.tile(np.arange(nx) * 10.0, (ny, 1))
+        lon[-1, 2] = lon[-1, 1]          # duplicate -> starves the greedy match
+        lat = np.tile(np.arange(ny)[:, None] * 5.0, (1, nx))
+        lat[-1, :] = lat[-2, :]
+        return xr.Dataset(
+            {"glamt": (["y", "x"], lon), "gphit": (["y", "x"], lat)},
+            coords={"x": np.arange(nx), "y": np.arange(ny)},
+        )
+
+    def test_raises_actionable_error(self):
+        from implicit_filter.utils._auxiliary import find_adjacent_points_north
+
+        with pytest.raises(ValueError, match="north"):
+            find_adjacent_points_north(self.starved_dataset(), 1e-5)
+
+    def test_error_reports_how_many_columns_failed(self):
+        from implicit_filter.utils._auxiliary import find_adjacent_points_north
+
+        with pytest.raises(ValueError, match=r"\b1\b.*column|column.*\b1\b"):
+            find_adjacent_points_north(self.starved_dataset(), 1e-5)
+
+    def test_error_suggests_other_neighbourhoods(self):
+        from implicit_filter.utils._auxiliary import find_adjacent_points_north
+
+        with pytest.raises(ValueError, match="west-east|local"):
+            find_adjacent_points_north(self.starved_dataset(), 1e-5)
+
+    def test_not_a_bare_pandas_length_error(self):
+        from implicit_filter.utils._auxiliary import find_adjacent_points_north
+
+        with pytest.raises(ValueError) as excinfo:
+            find_adjacent_points_north(self.starved_dataset(), 1e-5)
+        assert "does not match length of index" not in str(excinfo.value)
 
 
 class TestFiltering:

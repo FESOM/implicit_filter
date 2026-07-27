@@ -463,6 +463,25 @@ def find_adjacent_points_north(
                         x_corr.append(x_c)
                         break
 
+    # Every reference column must have found a distinct partner. The match is
+    # greedy and injective, so a column whose only candidate was already taken
+    # yields no entry -- observed on a real ORCA1 mesh (NEMO v2.2), where 359
+    # of 360 columns match. Left unchecked this surfaces as an opaque pandas
+    # "Length of values does not match length of index".
+    n_expected = len(ilon_redundant.x.data)
+    if len(x_corr) != n_expected:
+        missing = n_expected - len(x_corr)
+        raise ValueError(
+            f"Could not resolve the north-fold row correspondence: {missing} "
+            f"of {n_expected} columns in the redundant northern row found no "
+            "unmatched partner in the corresponding row (matching rounded "
+            f"coordinates at a precision of {lon_lat_prec_degrees} degrees). "
+            "This grid's north fold is not resolvable by this method. Use "
+            "NemoFilter(...) with neighb='west-east' (zonal periodicity, no "
+            "north fold) or neighb='local' (no periodic connections), or "
+            "adjust lon_lat_prec_degrees."
+        )
+
     # filter adjacent x for outliers
     adjacent_x = pd.Series(
         x_corr,
