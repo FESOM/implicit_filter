@@ -151,8 +151,10 @@ def test_latlon_vcycle_matches_direct_and_jacobi(prepared_latlon):
     out = f.compute(n, k, data2d)
     # The vcycle path must actually have run (this config is mild enough
     # that Jacobi would also pass the numeric bounds).
-    assert ("P", "latlon") in f.vcycle_cache
-    assert len(f.vcycle_cache[("P", "latlon")]) >= 1     # genuinely multilevel
+    p_keys = [key for key in f.vcycle_cache
+              if key[0] == "P" and key[1] == "latlon"]
+    assert p_keys, f.vcycle_cache.keys()
+    assert len(f.vcycle_cache[p_keys[0]]) >= 1           # genuinely multilevel
     f.set_preconditioner("jacobi")
     assert np.abs(np.reshape(out, int(f._e2d)) - x_true).max() < 1e-8
     assert np.abs(out - ref).max() < 5e-2

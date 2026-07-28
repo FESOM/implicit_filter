@@ -253,13 +253,15 @@ def main():
                 M = vc.make_vcycle_preconditioner(data_kn)
                 A_sys = lambda x: area_j * apply_A(x)
                 b_sys = area_j * ttw
-                # nnz-based work of one V-cycle in fine-operator applications
+                # nnz-based work of one V-cycle in fine-operator applications.
+                # Per smoothed level: pre-smooth with zero guess (degree-1
+                # matvecs) + residual (1) + post-smooth (degree) = 2*degree
+                # level matvecs; plus one R and one P application per level.
+                # The +1 outside is CG's own operator application.
                 nnz_apply = 2 * n * len(ss)
                 nnz_lvls = [len(c[0]) for c in data_kn.A_coo]
                 nnz_P = [len(c[0]) for c in data_kn.P_coo]
-                cyc = ((2 * opts["degree"]) * sum(nnz_lvls)
-                       + 2 * (nnz_lvls[0] if nnz_lvls else 0)
-                       + 2 * sum(nnz_P))
+                cyc = (2 * opts["degree"]) * sum(nnz_lvls) + 2 * sum(nnz_P)
                 matvec_equiv = 1.0 + cyc / nnz_apply
                 extra = {"t_hierarchy": t_hier, "t_setup_kn": t_setup,
                          "sizes": list(data_kn.sizes),
@@ -286,6 +288,21 @@ def main():
                 relres = float(jnp.linalg.norm(ttw - apply_A(x))
                                / jnp.linalg.norm(ttw))
                 converged = relres <= tol and it < args.maxiter
+                retried = False
+                if (not converged and args.precond == "vcycle"
+                        and it < args.maxiter):
+                    # Mirror the production path's bounded retry: the kernel
+                    # stops on the D-weighted residual, which can leave the
+                    # unweighted one marginally above tol; production
+                    # continues once at tol/10 before declaring failure.
+                    retried = True
+                    x, it2 = vc.pcg_kernel(A_sys, b_sys, M, tol * 0.1,
+                                           args.maxiter, x)
+                    x.block_until_ready()
+                    it += int(it2)
+                    relres = float(jnp.linalg.norm(ttw - apply_A(x))
+                                   / jnp.linalg.norm(ttw))
+                    converged = relres <= tol
                 t_kernel = []
                 if converged:
                     for _ in range(args.repeats):
@@ -296,7 +313,10 @@ def main():
                 t_e2e = []
                 if (converged and tol == args.tol
                         and args.precond in ("jacobi", "vcycle")):
-                    flt.set_preconditioner(args.precond)
+                    # set_preconditioner clears the instance cache, so it
+                    # must not be re-issued per record (hierarchy rebuild).
+                    if flt.get_preconditioner() != args.precond:
+                        flt.set_preconditioner(args.precond)
                     field_in = np.asarray(field)
                     flt.compute(n, k, field_in)          # warm-up
                     for _ in range(args.repeats):
@@ -305,6 +325,7 @@ def main():
                         t_e2e.append(time.perf_counter() - t0)
                 rec = {**rec_base, **extra, "tol": tol, "iters": it,
                        "relres": relres, "converged": converged,
+                       "retried": retried,
                        "t_first": t_first, "t_kernel_med": median(t_kernel),
                        "t_kernel_runs": t_kernel,
                        "t_e2e_med": median(t_e2e), "t_e2e_runs": t_e2e}

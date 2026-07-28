@@ -40,6 +40,12 @@ class Filter(ABC):
         """
         Force JAX to use a specific backend (e.g. 'cpu' or 'gpu').
         This is useful if you want to run on CPU while the GPU is busy.
+
+        With the split CUDA plugin (``jax[cuda12]``) installed, ``'gpu'``
+        selects the concrete ``cuda`` platform (JAX's ``"gpu"`` alias also
+        probes a ROCm stub whose failure would abort GPU selection). JAX
+        fixes its platform set on first array use, so call this before the
+        first compute in the process.
         """
         import importlib.util
         import jax
@@ -101,11 +107,19 @@ class Filter(ABC):
         if unknown:
             raise ValueError(f"Unknown V-cycle option(s) {sorted(unknown)}; "
                              f"valid: {sorted(_VCYCLE_OPTION_DEFAULTS)}")
+        merged = {**_VCYCLE_OPTION_DEFAULTS, **options}
+        if merged["degree"] < 1 or merged["n_cycles"] < 1 \
+                or merged["max_levels"] < 1 or merged["max_coarse"] < 1:
+            raise ValueError("degree, n_cycles, max_levels and max_coarse "
+                             "must be positive integers")
+        if not merged["alpha"] > 1.0:
+            raise ValueError("alpha must be > 1 (the Chebyshev interval is "
+                             "[lam_max/alpha, lam_max])")
         if preconditioner == "vcycle":
             from implicit_filter.utils._vcycle import _require_pyamg
             _require_pyamg()
         self.preconditioner_name = preconditioner
-        self.preconditioner_options = {**_VCYCLE_OPTION_DEFAULTS, **options}
+        self.preconditioner_options = merged
         self.vcycle_cache = {}
 
     @abstractmethod

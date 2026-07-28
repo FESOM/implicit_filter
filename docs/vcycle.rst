@@ -54,9 +54,10 @@ preconditioned by one V-cycle on ``Â``:
   safety), dense Cholesky factorization of the coarsest level.
 * **Apply** (inside CG): degree-3 Chebyshev pre/post-smoothing per level
   plus the exact coarse solve — matvec-only JAX code that runs unchanged
-  on CPU and GPU. One V-cycle costs roughly 8–10 operator applications,
-  so at 10–1000× fewer iterations the net win is large; measured factors
-  are recorded per mesh in the benchmark report.
+  on CPU and GPU. One V-cycle iteration costs several operator
+  applications (measured ≈5–7 on the benchmark meshes; the exact factor
+  is recorded per mesh in the benchmark report), so at 10–1000× fewer
+  iterations the net win is large.
 * **Convergence gate**: CG stops on the D-weighted residual, so the
   unweighted residual ``‖b − Ax‖/‖b‖`` is verified after the solve (with
   one bounded retry at a tighter tolerance) and

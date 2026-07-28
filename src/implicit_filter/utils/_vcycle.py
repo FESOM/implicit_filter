@@ -415,20 +415,23 @@ def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
 
     k = float(k)
     area_np = np.asarray(area, dtype=np.float64)
-    h_key = ("P", tag)
+    # The system fingerprint guards against a re-prepared instance reusing a
+    # hierarchy from the previous mesh (same tag, different operator).
+    sys_id = (tag, int(n_size), int(len(ss)))
+    h_key = ("P",) + sys_id
     if h_key not in cache:
         S = sp.csr_matrix(
             (np.asarray(ss, dtype=np.float64),
              (np.asarray(ii), np.asarray(jj))), shape=(n_size, n_size))
-        cache[("S", tag)] = S
+        cache[("S",) + sys_id] = S
         cache[h_key] = build_hierarchy(
             S, area_np,
             max_levels=options["max_levels"], max_coarse=options["max_coarse"],
             strength=options["strength"], seed=options["seed"])
-    d_key = ("data", tag, int(n), k)
+    d_key = ("data",) + sys_id + (int(n), k)
     if d_key not in cache:
         cache[d_key] = setup_vcycle(
-            cache[("S", tag)], area_np, k, n, cache[h_key],
+            cache[("S",) + sys_id], area_np, k, n, cache[h_key],
             degree=options["degree"], alpha=options["alpha"],
             n_cycles=options["n_cycles"], seed=options["seed"],
             lam_safety=options["lam_safety"])
@@ -440,6 +443,8 @@ def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
 
     x, _ = cg(apply_A_hat, b_hat, x0=x0_pert, tol=tol, maxiter=maxiter, M=M)
     b_norm = jnp.linalg.norm(b_pert)
+    if float(b_norm) == 0.0:
+        return x
     rel = float(jnp.linalg.norm(b_pert - apply_A(x)) / b_norm)
     if rel > tol:
         x, _ = cg(apply_A_hat, b_hat, x0=x, tol=tol * 0.1, maxiter=maxiter, M=M)
