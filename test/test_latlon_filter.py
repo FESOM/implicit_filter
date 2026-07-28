@@ -28,6 +28,21 @@ class TestMaskedPrepare:
             f"got ss={len(filt._ss)} ii={len(filt._ii)} jj={len(filt._jj)}"
         )
 
+    def test_masked_triplets_exclude_land(self):
+        # Guards the mask_sp filtering step itself: no stored entry may
+        # touch a land point (constant-preservation and shape tests pass
+        # even if that filtering is dropped, because row sums stay zero).
+        lon, lat = build_grid()
+        mask = np.ones((len(lon), len(lat)), dtype=bool)
+        mask[4, 4] = False  # one land point
+
+        filt = LatLonFilter()
+        filt.prepare(lat, lon, cartesian=True, local=True, mask=mask)
+
+        land_flat = np.flatnonzero(~mask.flatten())
+        assert not np.isin(np.asarray(filt._ii), land_flat).any()
+        assert not np.isin(np.asarray(filt._jj), land_flat).any()
+
     def test_masked_compute_runs(self):
         lon, lat = build_grid()
         mask = np.ones((len(lon), len(lat)), dtype=bool)

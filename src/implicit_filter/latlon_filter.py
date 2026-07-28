@@ -211,7 +211,9 @@ class LatLonFilter(Filter):
         # Create a mask where both _ii and _jj are not 0
         mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
 
- 
+        self._ss = self._ss[mask_sp]
+        self._ii = self._ii[mask_sp]
+        self._jj = self._jj[mask_sp]
 
 
 
