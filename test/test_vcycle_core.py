@@ -107,6 +107,17 @@ def test_setup_rejects_structural_asymmetry(tiny_setup):
         vc.setup_vcycle(S_bad.tocsr(), area, 2 * math.pi / 500.0, 2, P_ops)
 
 
+def test_setup_warns_on_storage_roundoff_asymmetry(tiny_filter):
+    # Filter caches saved by older versions store the stencil in float32;
+    # the resulting ~1e-8 asymmetry must warn and proceed, not fail.
+    S, area = extract_S_area(tiny_filter)
+    S32 = S.astype(np.float32).astype(np.float64)
+    area32 = area.astype(np.float32).astype(np.float64)
+    with pytest.warns(RuntimeWarning, match="storage-precision"):
+        data = vc.setup_vcycle(S32, area32, 2 * math.pi / 500.0, 2, [])
+    assert data.sizes == (121,)
+
+
 def test_setup_lam_safety_applied(tiny_setup):
     S, area, P_ops = tiny_setup
     k = 2 * math.pi / 500.0

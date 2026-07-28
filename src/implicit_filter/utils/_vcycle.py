@@ -18,6 +18,7 @@ Apply: matvec-only JAX closure (Chebyshev(3) pre/post smoothing, exact
 coarse solve) -- traceable inside ``jax.scipy.sparse.linalg.cg``; identical
 on CPU and GPU.
 """
+import warnings
 from dataclasses import dataclass
 from typing import Callable, Tuple
 
@@ -27,7 +28,16 @@ import scipy.linalg as sla
 import jax.numpy as jnp
 import jax.scipy.linalg as jsl
 
-_SYM_RTOL = 1e-10
+# Two-tier symmetry gate for A_hat = D*A. Below _SYM_RTOL_CLEAN the
+# asymmetry is float64 roundoff of the Galerkin products (silent). Between
+# the tiers it is storage-precision roundoff -- filter caches saved by older
+# package versions hold the stencil in float32 (measured 9.3e-9 on the 7.4M
+# ICON cache) -- harmless for a preconditioner, so warn and symmetrize.
+# Above _SYM_RTOL_HARD the operator is structurally asymmetric (wrong D
+# side, stretched lat-lon grid: measured 0.6 on NEMO/FOCI) and proceeding
+# would hide broken numerics.
+_SYM_RTOL_CLEAN = 1e-10
+_SYM_RTOL_HARD = 1e-6
 _POWER_ITERS = 30
 
 
@@ -123,23 +133,31 @@ def filter_matrix(S, k, n):
 def _assert_roundoff_symmetric(A, label):
     """Return the symmetrized matrix, refusing structural asymmetry.
 
-    Roundoff-scale asymmetry (from the D-weighted product) is averaged away;
-    anything above ``_SYM_RTOL`` relative means the fine-level weighting is
-    wrong (D on the wrong side) or the mesh/stencil is unsupported, and
-    silently symmetrizing would hide a broken preconditioner.
+    Roundoff-scale asymmetry is averaged away (silently below
+    ``_SYM_RTOL_CLEAN``, with a warning up to ``_SYM_RTOL_HARD`` -- the
+    storage-precision tier for float32-saved filter caches). Anything above
+    the hard gate means the fine-level weighting is wrong (D on the wrong
+    side) or the mesh/stencil is unsupported, and silently symmetrizing
+    would hide a broken preconditioner.
     """
     diff = (A - A.T).tocoo()
     denom = max(np.abs(A.data).max(), 1e-300)
     rel = (np.abs(diff.data).max() / denom) if diff.nnz else 0.0
-    if rel > _SYM_RTOL:
+    if rel > _SYM_RTOL_HARD:
         raise ValueError(
             f"{label} is asymmetric (relative asymmetry {rel:.3e} > "
-            f"{_SYM_RTOL:.1e}). This indicates a structurally wrong "
+            f"{_SYM_RTOL_HARD:.1e}). This indicates a structurally wrong "
             "fine-level weighting (D on the wrong side) or an unsupported "
-            "mesh/stencil; refusing to build the V-cycle. Jacobi "
-            "preconditioning remains available via "
-            "set_preconditioner('jacobi')."
+            "mesh/stencil (e.g. a stretched lat-lon grid); refusing to "
+            "build the V-cycle. Jacobi preconditioning remains available "
+            "via set_preconditioner('jacobi')."
         )
+    if rel > _SYM_RTOL_CLEAN:
+        warnings.warn(
+            f"{label}: relative asymmetry {rel:.3e} is above float64 "
+            "roundoff but within the storage-precision tier (typical for "
+            "filter caches saved in float32); symmetrizing and proceeding.",
+            RuntimeWarning, stacklevel=2)
     return ((A + A.T) * 0.5).tocsr()
 
 
@@ -307,13 +325,13 @@ def make_vcycle_preconditioner(data: VcycleData) -> Callable:
     return M
 
 
-def pcg_counted(apply_A, b, M, x0=None, *, tol, maxiter):
-    """Preconditioned CG that reports iteration count and true residual.
+def pcg_kernel(apply_A, b, M, tol, maxiter, x0=None):
+    """Preconditioned CG loop as a pure JAX computation (jit-safe).
 
     Replicates the algorithm and stopping rule of
-    ``jax.scipy.sparse.linalg.cg`` (``||r||_2 <= tol * ||b||_2``) so counts
-    are representative of the production path; used by tests and benchmarks
-    only. Returns ``(x, iterations, final relative residual)``.
+    ``jax.scipy.sparse.linalg.cg`` (``||r||_2 <= tol * ||b||_2``). Returns
+    ``(x, iterations)`` as JAX values; see :func:`pcg_counted` for the
+    convenience wrapper.
     """
     import jax
 
@@ -341,6 +359,18 @@ def pcg_counted(apply_A, b, M, x0=None, *, tol, maxiter):
         return x, r, p, gamma_new, it + 1
 
     x, r, p, gamma, it = jax.lax.while_loop(cond, body, (x, r, z, gamma, 0))
+    return x, it
+
+
+def pcg_counted(apply_A, b, M, x0=None, *, tol, maxiter):
+    """Preconditioned CG that reports iteration count and true residual.
+
+    Counts are representative of the production ``jax.scipy`` CG (same
+    algorithm and stopping rule); used by tests and benchmarks only.
+    Returns ``(x, iterations, final relative residual)``.
+    """
+    x, it = pcg_kernel(apply_A, b, M, tol, maxiter, x0)
+    b = jnp.asarray(b, dtype=jnp.float64)
     relres = float(jnp.linalg.norm(b - apply_A(x)) / jnp.linalg.norm(b))
     return x, int(it), relres
 

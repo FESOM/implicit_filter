@@ -158,6 +158,21 @@ def test_latlon_vcycle_matches_direct_and_jacobi(prepared_latlon):
     assert np.abs(out - ref).max() < 5e-2
 
 
+def test_latlon_stretched_grid_rejected_with_clear_error():
+    # On stretched grids the lat-lon FV stencil weighted by cell area is
+    # structurally asymmetric (measured 0.6 relative on the real NEMO/FOCI
+    # grid), so the V-cycle setup must refuse it loudly instead of running
+    # broken numerics. Uniform grids remain supported.
+    lon = np.linspace(0.0, 20.0, 45)
+    lat = np.concatenate([np.linspace(-10.0, 0.0, 15),
+                          np.linspace(0.5, 10.0, 25)])   # non-uniform spacing
+    f = LatLonFilter()
+    f.prepare(lat, lon, cartesian=True, local=True)
+    f.set_preconditioner("vcycle")
+    with pytest.raises(ValueError, match="asymmet"):
+        f.compute(2, 0.5, np.ones((f._nx, f._ny)))
+
+
 def test_full_metric_terms_rejected():
     x, y, tri = structured_tri_mesh(11, 11, 10.0)
     f = TriangularFilter()
