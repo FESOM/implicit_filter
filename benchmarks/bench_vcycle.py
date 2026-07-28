@@ -334,6 +334,13 @@ def main():
                       f"relres={relres:.2e} conv={converged} "
                       f"t_kernel={median(t_kernel)} t_e2e={median(t_e2e)}",
                       flush=True)
+                del solve
+            # Free device memory pinned by this record before the next one:
+            # jitted closures bake the per-(k,n) operators into the compile
+            # cache, which at n=2 on multi-million-node meshes is ~5 GB per
+            # record and OOMs the GPU if left to accumulate.
+            del M
+            jax.clear_caches()
 
 
 if __name__ == "__main__":

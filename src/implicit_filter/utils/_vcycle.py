@@ -435,6 +435,15 @@ def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
             degree=options["degree"], alpha=options["alpha"],
             n_cycles=options["n_cycles"], seed=options["seed"],
             lam_safety=options["lam_safety"])
+        # Keep only the most recent per-(k, n) setup per system: at n=2 the
+        # fine-level operator holds the sparse power of S on the device, and
+        # accumulating one copy per filter scale exhausts GPU memory on
+        # multi-million-node meshes (~5 GB each at 7.4M nodes). Re-setup for
+        # a revisited scale is sub-second at 10^5 and ~10 s at 10^7 nodes;
+        # the k-independent hierarchy is kept.
+        for stale in [q for q in cache
+                      if q[0] == "data" and q != d_key and q[1] == tag]:
+            cache.pop(stale)
 
     M = make_vcycle_preconditioner(cache[d_key])
     area_j = jnp.asarray(area_np)
