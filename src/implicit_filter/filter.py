@@ -41,9 +41,15 @@ class Filter(ABC):
         Force JAX to use a specific backend (e.g. 'cpu' or 'gpu').
         This is useful if you want to run on CPU while the GPU is busy.
         """
+        import importlib.util
         import jax
         if backend.lower() == "cpu":
             jax.config.update("jax_platforms", "cpu")
+        elif importlib.util.find_spec("jax_cuda12_plugin") is not None:
+            # With the split CUDA plugin, JAX's "gpu" alias also probes a
+            # ROCm stub whose failure is fatal in an explicit platform
+            # list; name the concrete platform instead.
+            jax.config.update("jax_platforms", "cuda,cpu")
         else:
             jax.config.update("jax_platforms", "gpu,cpu")
         # Cached V-cycle arrays live on the previously selected device.
