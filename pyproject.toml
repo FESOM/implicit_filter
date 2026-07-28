@@ -50,11 +50,18 @@ nemo = [
     "pandas",
     "scikit-learn"
 ]
+# Required only by set_preconditioner("vcycle"): pyamg builds the multigrid
+# hierarchy at setup time; the apply phase is pure JAX.
+vcycle = [
+    "pyamg",
+    "scipy"
+]
 test = [
     "pytest",
     "scipy",
     "pandas",
-    "scikit-learn"
+    "scikit-learn",
+    "pyamg"
 ]
 
 
