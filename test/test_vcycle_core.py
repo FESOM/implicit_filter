@@ -85,3 +85,32 @@ def test_single_level_when_small(tiny_filter):
     S, area = extract_S_area(tiny_filter)
     P_ops = vc.build_hierarchy(S, area, max_coarse=1000)     # 121 <= 1000
     assert P_ops == []
+
+
+# ---------------------------------------------------------------- setup
+
+
+def test_setup_determinism(tiny_setup):
+    S, area, P_ops = tiny_setup
+    k = 2 * math.pi / 500.0
+    d1 = vc.setup_vcycle(S, area, k, 2, P_ops)
+    d2 = vc.setup_vcycle(S, area, k, 2, P_ops)
+    assert d1.lam_max == d2.lam_max
+    assert np.array_equal(np.asarray(d1.coarse_chol), np.asarray(d2.coarse_chol))
+
+
+def test_setup_rejects_structural_asymmetry(tiny_setup):
+    S, area, P_ops = tiny_setup
+    S_bad = S.tolil(copy=True)
+    S_bad[0, 1] = S_bad[0, 1] + 1.0        # break K = D S symmetry structurally
+    with pytest.raises(ValueError, match="asymmet"):
+        vc.setup_vcycle(S_bad.tocsr(), area, 2 * math.pi / 500.0, 2, P_ops)
+
+
+def test_setup_lam_safety_applied(tiny_setup):
+    S, area, P_ops = tiny_setup
+    k = 2 * math.pi / 500.0
+    raw = vc.setup_vcycle(S, area, k, 2, P_ops, lam_safety=1.0)
+    saf = vc.setup_vcycle(S, area, k, 2, P_ops, lam_safety=1.1)
+    for a, b in zip(raw.lam_max, saf.lam_max):
+        assert b == pytest.approx(1.1 * a, rel=1e-12)
