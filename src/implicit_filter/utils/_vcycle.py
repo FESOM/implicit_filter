@@ -343,3 +343,80 @@ def pcg_counted(apply_A, b, M, x0=None, *, tol, maxiter):
     x, r, p, gamma, it = jax.lax.while_loop(cond, body, (x, r, z, gamma, 0))
     relres = float(jnp.linalg.norm(b - apply_A(x)) / jnp.linalg.norm(b))
     return x, int(it), relres
+
+
+def validate_scalar_k(kl):
+    """Return the scalar filter wavenumber, rejecting spatially varying k.
+
+    The V-cycle is built for one operator per (k, n); a varying k breaks the
+    symmetry of D*A (it would need a diagonal similarity transform). Accepts
+    a scalar or a constant array.
+    """
+    if isinstance(kl, (float, int, np.number)):
+        return float(kl)
+    uniq = np.unique(np.asarray(kl))
+    if uniq.size != 1:
+        raise ValueError(
+            "The V-cycle preconditioner supports only a scalar filter "
+            "scale; got a spatially varying k. Use "
+            "set_preconditioner('jacobi') for variable scales.")
+    return float(uniq[0])
+
+
+def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
+                      x0_pert, tol, maxiter, options, cache, tag):
+    """Solve ``A x = b_pert`` via CG on the symmetrized system with M = V-cycle.
+
+    The CG runs on ``(D A) x = D b_pert`` (SPD), preconditioned by one
+    V-cycle per iteration. ``ss/ii/jj`` must be the PSD-convention stencil
+    ``S = D^{-1} K`` (pass ``-ss`` for the lat-lon family). ``apply_A`` is
+    the host's matrix-free operator for the *original* system; the
+    symmetrized operator is ``area * apply_A(x)``. ``cache`` is the filter
+    instance's runtime dict; ``tag`` distinguishes the node/element/lat-lon
+    systems sharing one instance.
+
+    Because CG stops on the D-weighted residual, the unweighted residual is
+    verified afterwards (with one bounded tighter-tolerance retry); jax's cg
+    reports no status, so this gate is the convergence check.
+    """
+    from jax.scipy.sparse.linalg import cg
+
+    from .utils import SolverNotConvergedError
+
+    k = float(k)
+    area_np = np.asarray(area, dtype=np.float64)
+    h_key = ("P", tag)
+    if h_key not in cache:
+        S = sp.csr_matrix(
+            (np.asarray(ss, dtype=np.float64),
+             (np.asarray(ii), np.asarray(jj))), shape=(n_size, n_size))
+        cache[("S", tag)] = S
+        cache[h_key] = build_hierarchy(
+            S, area_np,
+            max_levels=options["max_levels"], max_coarse=options["max_coarse"],
+            strength=options["strength"], seed=options["seed"])
+    d_key = ("data", tag, int(n), k)
+    if d_key not in cache:
+        cache[d_key] = setup_vcycle(
+            cache[("S", tag)], area_np, k, n, cache[h_key],
+            degree=options["degree"], alpha=options["alpha"],
+            n_cycles=options["n_cycles"], seed=options["seed"],
+            lam_safety=options["lam_safety"])
+
+    M = make_vcycle_preconditioner(cache[d_key])
+    area_j = jnp.asarray(area_np)
+    apply_A_hat = lambda x: area_j * apply_A(x)
+    b_hat = area_j * b_pert
+
+    x, _ = cg(apply_A_hat, b_hat, x0=x0_pert, tol=tol, maxiter=maxiter, M=M)
+    b_norm = jnp.linalg.norm(b_pert)
+    rel = float(jnp.linalg.norm(b_pert - apply_A(x)) / b_norm)
+    if rel > tol:
+        x, _ = cg(apply_A_hat, b_hat, x0=x, tol=tol * 0.1, maxiter=maxiter, M=M)
+        rel = float(jnp.linalg.norm(b_pert - apply_A(x)) / b_norm)
+        if rel > tol:
+            raise SolverNotConvergedError(
+                "V-cycle-preconditioned CG did not reach the requested "
+                f"tolerance (achieved {rel:.3e} > {tol:.3e})",
+                [f"tag={tag}", f"n={n}", f"k={k}"])
+    return x

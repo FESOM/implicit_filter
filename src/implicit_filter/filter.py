@@ -3,6 +3,11 @@ from typing import Tuple, Iterable
 
 import numpy as np
 
+_VCYCLE_OPTION_DEFAULTS = {
+    "degree": 3, "alpha": 4.0, "n_cycles": 1, "max_levels": 6,
+    "max_coarse": 1000, "seed": 42, "lam_safety": 1.1, "strength": "symmetric",
+}
+
 
 class Filter(ABC):
     """
@@ -41,6 +46,61 @@ class Filter(ABC):
             jax.config.update("jax_platforms", "cpu")
         else:
             jax.config.update("jax_platforms", "gpu,cpu")
+        # Cached V-cycle arrays live on the previously selected device.
+        self.vcycle_cache = {}
+
+    def get_preconditioner(self) -> str:
+        """
+        Report the active CG preconditioner: ``'jacobi'`` (default),
+        ``'none'`` or ``'vcycle'``.
+        """
+        return getattr(self, "preconditioner_name", "jacobi")
+
+    def set_preconditioner(self, preconditioner: str | None = "jacobi", **options):
+        """
+        Select the preconditioner used by the CG solver.
+
+        Parameters
+        ----------
+        preconditioner : str | None
+            ``'jacobi'`` (default) is the one-level diagonal preconditioner.
+            ``'none'`` (or ``None``) disables preconditioning: plain CG.
+            ``'vcycle'`` enables the multilevel V-cycle preconditioner
+            (requires the ``implicit_filter[vcycle]`` extra), which removes
+            the convergence failures of Jacobi-CG for stiff configurations,
+            e.g. biharmonic filters at large filter-scale-to-resolution
+            ratios. Only scalar (spatially uniform) filter scales are
+            supported by the V-cycle.
+        **options
+            Advanced V-cycle knobs overriding evidence-backed defaults:
+            ``degree`` (Chebyshev degree per pre/post smooth, 3),
+            ``alpha`` (spectral interval divisor, 4.0),
+            ``n_cycles`` (V-cycles per CG iteration, 1),
+            ``max_levels`` (hierarchy depth, 6),
+            ``max_coarse`` (direct-solve threshold, 1000),
+            ``seed`` (hierarchy/power-iteration seed, 42),
+            ``lam_safety`` (safety factor on the smoothing bound, 1.1),
+            ``strength`` (pyamg strength-of-connection, 'symmetric').
+
+        Notes
+        -----
+        The preconditioner choice is runtime state (like the backend): it is
+        not persisted by :meth:`save_to_file`.
+        """
+        preconditioner = "none" if preconditioner is None else preconditioner.lower()
+        if preconditioner not in ("none", "jacobi", "vcycle"):
+            raise ValueError(f"Unknown preconditioner {preconditioner!r}; "
+                             "expected 'none', 'jacobi' or 'vcycle'")
+        unknown = set(options) - set(_VCYCLE_OPTION_DEFAULTS)
+        if unknown:
+            raise ValueError(f"Unknown V-cycle option(s) {sorted(unknown)}; "
+                             f"valid: {sorted(_VCYCLE_OPTION_DEFAULTS)}")
+        if preconditioner == "vcycle":
+            from implicit_filter.utils._vcycle import _require_pyamg
+            _require_pyamg()
+        self.preconditioner_name = preconditioner
+        self.preconditioner_options = {**_VCYCLE_OPTION_DEFAULTS, **options}
+        self.vcycle_cache = {}
 
     @abstractmethod
     def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None) -> np.ndarray:
