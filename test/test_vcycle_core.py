@@ -114,3 +114,142 @@ def test_setup_lam_safety_applied(tiny_setup):
     saf = vc.setup_vcycle(S, area, k, 2, P_ops, lam_safety=1.1)
     for a, b in zip(raw.lam_max, saf.lam_max):
         assert b == pytest.approx(1.1 * a, rel=1e-12)
+
+
+# ---------------------------------------------------------------- apply
+
+
+def _rhs(S, A, seed=42):
+    """Perturbation RHS b = x - A x, the production compute() convention."""
+    field = np.random.default_rng(seed).normal(size=S.shape[0])
+    return np.asarray(field - A @ field)
+
+
+def _coo_of(S):
+    C = S.tocoo()
+    return jnp.asarray(C.row), jnp.asarray(C.col), jnp.asarray(C.data)
+
+
+def _make_apply_A(S, k, n):
+    """The production matrix-free operator: I + 2 (S/k^2)^n via scatter-add."""
+    ii, jj, ss = _coo_of(S)
+    kl2 = 1.0 / k**2
+
+    def apply_A(x):
+        y = x
+        for _ in range(n):
+            y = jnp.zeros_like(x).at[ii].add(ss * kl2 * y[jj])
+        return x + 2.0 * y
+
+    return apply_A
+
+
+@pytest.fixture(scope="module")
+def stiff_M(tiny_setup):
+    S, area, P_ops = tiny_setup
+    n, L = 2, 500.0
+    k = 2 * math.pi / L
+    A = vc.filter_matrix(S, k, n)
+    data = vc.setup_vcycle(S, area, k, n, P_ops)
+    return S, area, A, vc.make_vcycle_preconditioner(data)
+
+
+def test_stationary_vcycle_contracts_monotonically(stiff_M):
+    # x_{m+1} = x_m + M(D(b - A x_m)) must contract on its own -- this catches
+    # sign/area-weighting errors that Krylov optimality masks (mutation-proven:
+    # M(r)=V(r), M(r)=-V(Dr) and M(r)=V(D^2 r) all pass Krylov-level tests).
+    S, area, A, M = stiff_M
+    b = _rhs(S, A)
+    x = np.zeros(S.shape[0])
+    norms = [np.linalg.norm(b)]
+    for _ in range(6):
+        r = b - A @ x
+        x = x + np.asarray(M(jnp.asarray(area * r)))
+        norms.append(np.linalg.norm(b - A @ x))
+    for prev, cur in zip(norms, norms[1:]):
+        assert cur < prev, norms
+    assert norms[-1] < 1e-2 * norms[0], norms
+
+
+def test_M_is_spd(stiff_M):
+    # CG requires an SPD preconditioner; guards the smoothing order and
+    # R = P^T after any refactor. (The FGMRES-based reference suite had no
+    # SPD test; the CG host needs one.)
+    S, area, A, M = stiff_M
+    rng = np.random.default_rng(7)
+    for _ in range(5):
+        u = rng.normal(size=S.shape[0])
+        v = rng.normal(size=S.shape[0])
+        Mu = np.asarray(M(jnp.asarray(u)))
+        Mv = np.asarray(M(jnp.asarray(v)))
+        sym_err = abs(np.dot(Mu, v) - np.dot(u, Mv))
+        scale = np.linalg.norm(Mu) * np.linalg.norm(v) + 1e-300
+        assert sym_err / scale < 1e-10
+        assert np.dot(u, Mu) > 0.0
+
+
+def test_M_is_linear(stiff_M):
+    S, area, A, M = stiff_M
+    rng = np.random.default_rng(3)
+    x = jnp.asarray(rng.normal(size=S.shape[0]))
+    y = jnp.asarray(rng.normal(size=S.shape[0]))
+    lhs = np.asarray(M(2.5 * x + y))
+    rhs = 2.5 * np.asarray(M(x)) + np.asarray(M(y))
+    assert np.linalg.norm(lhs - rhs) / np.linalg.norm(rhs) < 1e-10
+
+
+@pytest.mark.parametrize("n,L,bound", [(1, 100.0, 1e-7), (2, 100.0, 1e-7),
+                                       (2, 500.0, 1e-6)])
+def test_pcg_vcycle_matches_spsolve(tiny_setup, n, L, bound):
+    # (2, 500) bound relaxed with condition-number justification: measured
+    # dense cond2 ~ 6e5 on this mesh, so cond*tol is the honest floor.
+    S, area, P_ops = tiny_setup
+    k = 2 * math.pi / L
+    A = vc.filter_matrix(S, k, n)
+    b = _rhs(S, A)
+    data = vc.setup_vcycle(S, area, k, n, P_ops)
+    M = vc.make_vcycle_preconditioner(data)
+    apply_A = _make_apply_A(S, k, n)
+    area_j = jnp.asarray(area)
+    x, iters, relres = vc.pcg_counted(lambda v: area_j * apply_A(v),
+                                      jnp.asarray(area * b), M,
+                                      tol=1e-9, maxiter=200)
+    x_ref = np.asarray(sp.linalg.spsolve(sp.csc_matrix(A), b))
+    err = np.linalg.norm(np.asarray(x) - x_ref) / np.linalg.norm(x_ref)
+    assert err < bound
+    assert iters <= 40                                   # failure-region regression
+
+
+def test_vcycle_beats_jacobi_iterations(tiny_setup):
+    S, area, P_ops = tiny_setup
+    n, L = 2, 500.0
+    k = 2 * math.pi / L
+    A = vc.filter_matrix(S, k, n)
+    b = _rhs(S, A)
+    apply_A = _make_apply_A(S, k, n)
+    kl2 = 1.0 / k**2
+    diag_A = jnp.asarray(1.0 + 2.0 * (np.asarray(S.diagonal()) * kl2) ** n)
+    _, it_jac, _ = vc.pcg_counted(apply_A, jnp.asarray(b),
+                                  lambda r: r / diag_A,
+                                  tol=1e-9, maxiter=100_000)
+    data = vc.setup_vcycle(S, area, k, n, P_ops)
+    M = vc.make_vcycle_preconditioner(data)
+    area_j = jnp.asarray(area)
+    _, it_v, _ = vc.pcg_counted(lambda v: area_j * apply_A(v),
+                                jnp.asarray(area * b), M,
+                                tol=1e-9, maxiter=100_000)
+    assert it_v * 5 <= it_jac        # >=5x fewer iterations on the stiff cell
+
+
+def test_single_level_is_direct_solve(tiny_filter):
+    S, area = extract_S_area(tiny_filter)
+    n, L = 2, 500.0
+    k = 2 * math.pi / L
+    A = vc.filter_matrix(S, k, n)
+    b = _rhs(S, A)
+    data = vc.setup_vcycle(S, area, k, n, [])         # 121 nodes, no coarsening
+    M = vc.make_vcycle_preconditioner(data)
+    x = np.asarray(M(jnp.asarray(area * b)))          # M == A_hat^{-1} exactly
+    x_ref = np.asarray(sp.linalg.spsolve(sp.csc_matrix(A), b))
+    err = np.linalg.norm(x - x_ref)
+    assert err / np.linalg.norm(x_ref) < 1e-10

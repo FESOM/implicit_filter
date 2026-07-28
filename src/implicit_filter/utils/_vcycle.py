@@ -233,3 +233,113 @@ def setup_vcycle(S, area, k, n, P_ops, *, degree=3, alpha=4.0, n_cycles=1,
         sizes=tuple(A_l.shape[0] for A_l in levels),
         degree=int(degree), alpha=float(alpha), n_cycles=int(n_cycles),
     )
+
+
+def _coo_matvec(coo, x):
+    ss, ii, jj, n_rows = coo
+    return jnp.zeros(n_rows, dtype=x.dtype).at[ii].add(ss * x[jj])
+
+
+def _cheb_smooth(A_coo, inv_diag, theta, delta, degree, b, x=None):
+    """Chebyshev(degree) on the diag-scaled level operator.
+
+    Damps the interval [theta - delta, theta + delta]. A fixed polynomial in
+    the operator, so the whole V-cycle stays linear and symmetric on the SPD
+    A_hat; no inner products, matvec-only. The ``x is None`` branch exploits
+    the zero initial guess of pre-smoothing, saving one matvec per level.
+    """
+    sigma = theta / delta
+    rho = 1.0 / sigma
+    if x is None:
+        r = b
+        z = inv_diag * r
+        d = z / theta
+        x = d
+    else:
+        r = b - _coo_matvec(A_coo, x)
+        z = inv_diag * r
+        d = z / theta
+        x = x + d
+    for _ in range(degree - 1):
+        rho_new = 1.0 / (2.0 * sigma - rho)
+        r = b - _coo_matvec(A_coo, x)
+        z = inv_diag * r
+        d = (rho_new * rho) * d + (2.0 * rho_new / delta) * z
+        x = x + d
+        rho = rho_new
+    return x
+
+
+def make_vcycle_preconditioner(data: VcycleData) -> Callable:
+    """Return ``M(r_hat) ~= A_hat^{-1} r_hat``: JAX-traceable, linear, SPD.
+
+    The caller must pass residuals of the *symmetrized* system ``(D A) x =
+    D b``; inside ``jax.scipy.sparse.linalg.cg`` on that system this is
+    automatic. The recursion unrolls at trace time (the level count is
+    static Python), so ``M`` works under jit on CPU and GPU identically.
+    With an empty hierarchy the cycle degenerates to the exact dense solve.
+    """
+    n_levels = len(data.A_coo)          # smoothed levels; coarse solve is extra
+    intervals = []
+    for lam in data.lam_max:
+        lam_min = lam / data.alpha
+        intervals.append(((lam + lam_min) / 2.0, (lam - lam_min) / 2.0))
+
+    def cycle(level, b):
+        if level == n_levels:
+            return jsl.cho_solve((data.coarse_chol, data.coarse_lower), b)
+        A_coo = data.A_coo[level]
+        inv_d = data.inv_diags[level]
+        theta, delta = intervals[level]
+        x = _cheb_smooth(A_coo, inv_d, theta, delta, data.degree, b)
+        r = b - _coo_matvec(A_coo, x)
+        e = cycle(level + 1, _coo_matvec(data.R_coo[level], r))
+        x = x + _coo_matvec(data.P_coo[level], e)
+        return _cheb_smooth(A_coo, inv_d, theta, delta, data.degree, b, x)
+
+    def M(r):
+        b_hat = jnp.asarray(r, dtype=jnp.float64)
+        x = cycle(0, b_hat)
+        for _ in range(data.n_cycles - 1):
+            x = x + cycle(0, b_hat - _coo_matvec(data.A_coo[0], x))
+        return x
+
+    return M
+
+
+def pcg_counted(apply_A, b, M, x0=None, *, tol, maxiter):
+    """Preconditioned CG that reports iteration count and true residual.
+
+    Replicates the algorithm and stopping rule of
+    ``jax.scipy.sparse.linalg.cg`` (``||r||_2 <= tol * ||b||_2``) so counts
+    are representative of the production path; used by tests and benchmarks
+    only. Returns ``(x, iterations, final relative residual)``.
+    """
+    import jax
+
+    b = jnp.asarray(b, dtype=jnp.float64)
+    x = jnp.zeros_like(b) if x0 is None else jnp.asarray(x0, dtype=jnp.float64)
+    atol2 = (tol * jnp.linalg.norm(b)) ** 2
+
+    r = b - apply_A(x)
+    z = M(r)
+    gamma = jnp.vdot(r, z)
+
+    def cond(state):
+        x, r, p, gamma, it = state
+        return (jnp.vdot(r, r) > atol2) & (it < maxiter)
+
+    def body(state):
+        x, r, p, gamma, it = state
+        q = apply_A(p)
+        alpha = gamma / jnp.vdot(p, q)
+        x = x + alpha * p
+        r = r - alpha * q
+        z = M(r)
+        gamma_new = jnp.vdot(r, z)
+        p = z + (gamma_new / gamma) * p
+        return x, r, p, gamma_new, it + 1
+
+    x, r, p, gamma, it = jax.lax.while_loop(cond, body, (x, r, z, gamma, 0))
+    relres = float(jnp.linalg.norm(b - apply_A(x)) / jnp.linalg.norm(b))
+    return x, int(it), relres
