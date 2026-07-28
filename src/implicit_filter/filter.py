@@ -17,8 +17,19 @@ class Filter(ABC):
             setattr(self, key, kwargs[key])
 
     def get_backend(self) -> str:
+        """
+        Report the currently selected backend as ``'cpu'`` or ``'gpu'``.
+
+        The returned value is always accepted by :meth:`set_backend`, so the
+        two round-trip. JAX stores a platform *priority list* (e.g.
+        ``'gpu,cpu'``); this reports the platform that would actually be
+        preferred rather than that raw string.
+        """
         import jax
-        return jax.config.jax_platforms or "gpu"
+        platforms = jax.config.jax_platforms
+        if not platforms:
+            return "gpu"
+        return "cpu" if platforms.split(",")[0].strip().lower() == "cpu" else "gpu"
 
     def set_backend(self, backend: str):
         """
@@ -192,8 +203,18 @@ class Filter(ABC):
         ----------
         file : str
             Output file path (.npz extension recommended)
+
+        Notes
+        -----
+        Attributes that were never populated (e.g. the element operators when
+        the filter was prepared with ``filter_elements=False``) are omitted
+        rather than written as ``None``. NPZ cannot store ``None`` without
+        pickling, and the resulting file would not be readable by
+        :meth:`load_from_file`, which loads with ``allow_pickle=False``.
+        Omitted attributes are restored as ``None`` on load.
         """
-        np.savez(file, **self.__getstate__())
+        state = {k: v for k, v in self.__getstate__().items() if v is not None}
+        np.savez(file, **state)
 
     @classmethod
     def load_from_file(cls, file: str):

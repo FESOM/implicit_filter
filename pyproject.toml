@@ -16,7 +16,7 @@ authors = [{ name = "Kacper Nowak", email = "kacper.nowak@awi.de" },
            { name = "Willi Rath", email = "wrath@geomar.de" }]
 
 classifiers = [
-    "Development Status :: 5 - Production",
+    "Development Status :: 5 - Production/Stable",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Environment :: GPU",
@@ -43,6 +43,18 @@ cuda12 = [
 ]
 apple = [
     "jax[apple]"
+]
+# Required only by NemoFilter(neighb='full'), which uses a linear fit to
+# resolve the north-fold row correspondence.
+nemo = [
+    "pandas",
+    "scikit-learn"
+]
+test = [
+    "pytest",
+    "scipy",
+    "pandas",
+    "scikit-learn"
 ]
 
 

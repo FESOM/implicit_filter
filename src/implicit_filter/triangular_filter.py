@@ -9,6 +9,7 @@ import jax
 jax.config.update("jax_platforms", "cpu")
 
 from implicit_filter.utils._auxiliary import (
+    R_EARTH,
     neighboring_triangles,
     neighbouring_nodes,
     areas,
@@ -94,7 +95,7 @@ class TriangularFilter(Filter):
             Keyword arguments passed to the base class constructor.
         """
 
-        super().__init__(initial_data, kwargs)
+        super().__init__(*initial_data, **kwargs)
         # Transform to JAX array
         jx = lambda ar: jnp.array(ar)
         bl = lambda ar: bool(ar)
@@ -121,8 +122,46 @@ class TriangularFilter(Filter):
         transform_attribute(self, "_e2d", it, 0)
         transform_attribute(self, "_full", bl, False)
 
-    def _compute(self, n, kl, ttu, x0=None, tol=1e-6, maxiter=150000) -> np.ndarray:
-        is_elem = (len(ttu) == self._e2d)
+    def _resolve_target(self, length: int, on: str | None) -> bool:
+        """
+        Decide whether data of the given length lives on elements or nodes.
+
+        Parameters
+        ----------
+        length : int
+            Length of the data array.
+        on : {'nodes', 'elements', None}
+            Explicit placement. ``None`` infers it from the length, which is
+            ambiguous when the mesh has as many elements as nodes.
+
+        Returns
+        -------
+        bool
+            True if the data is on elements.
+        """
+        if on is None:
+            return length == self._e2d
+        if on == "elements":
+            if length != self._e2d:
+                raise ValueError(
+                    f"data length {length} does not match the element count "
+                    f"{self._e2d} implied by on='elements'"
+                )
+            return True
+        if on == "nodes":
+            if length != self._n2d:
+                raise ValueError(
+                    f"data length {length} does not match the node count "
+                    f"{self._n2d} implied by on='nodes'"
+                )
+            return False
+        raise ValueError(
+            f"on={on!r} is not valid; expected 'nodes', 'elements' or None"
+        )
+
+    def _compute(self, n, kl, ttu, x0=None, tol=1e-6, maxiter=150000, is_elem=None) -> np.ndarray:
+        if is_elem is None:
+            is_elem = (len(ttu) == self._e2d)
         if is_elem and self._ss_e is None:
             raise ValueError("Filter was not prepared with filter_elements=True")
 
@@ -199,7 +238,8 @@ class TriangularFilter(Filter):
         return np.array(tts)
 
     def compute_velocity(
-        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray, ux0: np.ndarray | None = None, vy0: np.ndarray | None = None
+        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray, ux0: np.ndarray | None = None,
+        vy0: np.ndarray | None = None, on: str | None = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Apply filter to velocity components on triangular mesh.
@@ -220,6 +260,9 @@ class TriangularFilter(Filter):
             Initial guess for ux.
         vy0 : np.ndarray | None
             Initial guess for vy.
+        on : {'nodes', 'elements'}, optional
+            Where the data lives. Inferred from length by default; pass it
+            explicitly on a mesh with as many elements as nodes.
 
         Returns
         -------
@@ -229,7 +272,8 @@ class TriangularFilter(Filter):
         Raises
         ------
         ValueError
-            If filter order n < 1.
+            If filter order n < 1, or if ``on`` is unrecognised or disagrees
+            with the length of the input.
         SolverNotConvergedError
             If linear solver fails to converge.
         """
@@ -239,7 +283,7 @@ class TriangularFilter(Filter):
         uxn = ux
         vyn = vy
 
-        is_elem = len(uxn) == self._e2d
+        is_elem = self._resolve_target(len(uxn), on)
         if is_elem and self._full:
             raise ValueError("Coupled full metric filtering not supported for elements. Please use full=False or switch to nodal filtering.")
 
@@ -248,11 +292,12 @@ class TriangularFilter(Filter):
             ttuv = self._compute_full(n, k, np.concatenate((uxn, vyn)), x0=uv0)
             return ttuv[0 : self._n2d], ttuv[self._n2d : 2 * self._n2d]
         else:
-            ttu = self._compute(n, k, uxn, x0=ux0)
-            ttv = self._compute(n, k, vyn, x0=vy0)
+            ttu = self._compute(n, k, uxn, x0=ux0, is_elem=is_elem)
+            ttv = self._compute(n, k, vyn, x0=vy0, is_elem=is_elem)
             return ttu, ttv
 
-    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None) -> np.ndarray:
+    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None,
+                on: str | None = None) -> np.ndarray:
         """
         Apply filter to scalar field on triangular mesh.
 
@@ -268,6 +313,10 @@ class TriangularFilter(Filter):
             Scalar field values.
         x0 : np.ndarray | None
             Initial guess for the solver.
+        on : {'nodes', 'elements'}, optional
+            Where the data lives. By default this is inferred from the length
+            of ``data``, which is ambiguous on a mesh with as many elements as
+            nodes; pass it explicitly to remove the ambiguity.
 
         Returns
         -------
@@ -277,17 +326,20 @@ class TriangularFilter(Filter):
         Raises
         ------
         ValueError
-            If filter order n < 1.
+            If filter order n < 1, or if ``on`` is unrecognised or disagrees
+            with the length of ``data``.
         """
         if n < 1:
             raise ValueError("Filter order must be positive")
 
-        is_elem = len(data) == self._e2d
+        is_elem = self._resolve_target(len(data), on)
         if is_elem and self._full:
             raise ValueError("Coupled full metric filtering not supported for elements. Please use full=False or switch to nodal filtering.")
 
         return np.array(
-            self._compute_full(n, k, data, x0=x0) if (self._full and not is_elem) else self._compute(n, k, data, x0=x0)
+            self._compute_full(n, k, data, x0=x0)
+            if (self._full and not is_elem)
+            else self._compute(n, k, data, x0=x0, is_elem=is_elem)
         )
 
     def prepare(
@@ -304,6 +356,7 @@ class TriangularFilter(Filter):
         mask: np.ndarray | None = None,
         gpu: bool = False,
         filter_elements: bool = False,
+        elem_weights: str = "equilateral",
     ):
         """
         Prepare filter for a specific triangular mesh.
@@ -337,19 +390,42 @@ class TriangularFilter(Filter):
             True to enable GPU acceleration (default: False).
         filter_elements : bool, optional
             True to assemble filter operators for elements in addition to nodes (default: False).
+        elem_weights : {'equilateral', 'geometric'}, optional
+            Weighting used for the element (triangle) Laplacian. Ignored unless
+            ``filter_elements=True``.
+
+            - ``'equilateral'`` (default): fixed ``-sqrt(3)/elem_area``
+              off-diagonal. This is the finite-volume coefficient
+              ``edge_length/centroid_distance`` evaluated for an equilateral
+              triangle, so it depends only on cell area and ignores cell shape.
+              This is the historical behaviour and is kept as the default so
+              that existing results remain reproducible.
+            - ``'geometric'``: uses the per-edge weights actually computed from
+              the mesh geometry. Identical to ``'equilateral'`` on an
+              equilateral mesh; more accurate on anisotropic or graded meshes.
+
+        Raises
+        ------
+        ValueError
+            If ``elem_weights`` is not one of the supported schemes.
 
         Notes
         -----
         Coordinates are expected in degrees while cyclic_length is in radians.
         The mask is converted to nodal representation where True indicates land.
         """
+        if elem_weights not in ("equilateral", "geometric"):
+            raise ValueError(
+                f"Unknown elem_weights {elem_weights!r}; "
+                "expected 'equilateral' or 'geometric'"
+            )
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
         self._n2d = n2d
         self._e2d = e2d
         self._full = full
 
         if mask is None:
-            mask = np.ones(e2d, dtype=np.bool)
+            mask = np.ones(e2d, dtype=np.bool_)
         ne_num, ne_pos = neighboring_triangles(n2d, e2d, tri)
         nn_num, nn_pos = neighbouring_nodes(n2d, tri, ne_num, ne_pos)
         area, elem_area, dx, dy, Mt = areas(
@@ -432,12 +508,18 @@ class TriangularFilter(Filter):
                 edge_dxdy, edge_cross_dxdy = vectorized_calculate_dimensional_quantities(edges.shape[1], ed2d_in, edges, edge_tri, tcenter, xcoord, ycoord)
             else:
                 # Fall back to original for spherical meshes
+                from implicit_filter.utils import _auxiliary
                 from implicit_filter.utils._auxiliary import orient_edges, calculate_dimensional_quantities
-                r_earth = 6371.0
+                # Read at call time so the shared constant stays the single
+                # source of truth (and remains patchable in tests).
+                r_earth = _auxiliary.R_EARTH
                 edges, edge_tri = orient_edges(edges.shape[1], edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length)
                 edge_dxdy, edge_cross_dxdy = calculate_dimensional_quantities(edges.shape[1], ed2d_in, edges, edge_tri, tcenter, xcoord, ycoord, meshtype, cyclic_length, r_earth, cartesian)
             ee_pos, ee_num, weights, dxcell = fast_calculate_laplacian_weights(e2d, ed2d_in, edge_tri, edge_dxdy, edge_cross_dxdy)
-            smooth_m, metric_m = fast_build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full, Mt, dxcell)
+            smooth_m, metric_m = fast_build_smoothing_and_metric(
+                e2d, n2d, ee_num, ee_pos, elem_area, full, Mt, dxcell,
+                weights=weights, scheme=elem_weights,
+            )
             ss_e, ii_e, jj_e = fast_assemble_from_intermediate(e2d, ee_num, ee_pos, smooth_m)
             self._ss_e = jnp.array(ss_e)
             self._ii_e = jnp.array(ii_e)

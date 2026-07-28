@@ -11,6 +11,8 @@ class IconFilter(TriangularFilter):
         full: bool = False,
         mask: np.ndarray | bool = False,
         gpu: bool = False,
+        filter_elements: bool = False,
+        elem_weights: str = "equilateral",
     ):
         """
         Configure filter using an ICON grid file.
@@ -28,10 +30,19 @@ class IconFilter(TriangularFilter):
             - False to treat all cells as ocean (default)
         gpu : bool, optional
             True to enable GPU acceleration (default: False).
+        filter_elements : bool, optional
+            True to also assemble the element (triangle) filter operator,
+            enabling filtering of element-based fields (default: False).
+        elem_weights : {'equilateral', 'geometric'}, optional
+            Element Laplacian weighting scheme. See
+            :meth:`TriangularFilter.prepare`. Ignored unless
+            ``filter_elements=True``.
 
         """
         grid2d = xr.open_dataset(grid_file)
-        self.prepare_from_data_array(grid2d, full, mask, gpu)
+        self.prepare_from_data_array(
+            grid2d, full, mask, gpu, filter_elements, elem_weights
+        )
 
     def prepare_from_data_array(
         self,
@@ -39,6 +50,8 @@ class IconFilter(TriangularFilter):
         full: bool = False,
         mask: np.ndarray | bool = False,
         gpu: bool = False,
+        filter_elements: bool = False,
+        elem_weights: str = "equilateral",
     ):
         """
         Configure filter using an xarray Dataset containing ICON grid data.
@@ -56,6 +69,12 @@ class IconFilter(TriangularFilter):
             - False: All ocean cells (default)
         gpu : bool, optional
             GPU acceleration flag (default: False).
+        filter_elements : bool, optional
+            True to also assemble the element (triangle) filter operator
+            (default: False).
+        elem_weights : {'equilateral', 'geometric'}, optional
+            Element Laplacian weighting scheme. See
+            :meth:`TriangularFilter.prepare`.
 
         Raises
         ------
@@ -79,11 +98,29 @@ class IconFilter(TriangularFilter):
             pass
         elif mask:
             if "cell_sea_land_mask" in grid2d:
-                mask = grid2d["cell_sea_land_mask"].values * -1
-                mask[mask == 2] = 1
-                mask[mask == -2] = -1
-                mask = grid2d["cell_sea_land_mask"].values * -1
-                mask = mask.astype(np.bool)
+                # ICON convention, declared verbatim in the long_name of every
+                # grid in the public pool from 2016 to 2025 (50 files, 15
+                # grid-generator revisions):
+                #     "sea (-2 inner, -1 boundary) land (2 inner, 1 boundary)
+                #      mask for the cell"
+                # Ocean is therefore exactly the negative codes. Note that a
+                # sign flip followed by astype(bool) does NOT work: every
+                # nonzero code maps to True, marking the whole grid as ocean
+                # and making the mask a no-op.
+                codes = grid2d["cell_sea_land_mask"].values
+                if not np.any(codes < 0):
+                    present = np.unique(codes).tolist()
+                    raise ValueError(
+                        "'cell_sea_land_mask' in this grid contains no sea "
+                        f"cells (values present: {present}). Several ICON "
+                        "grids ship this variable unpopulated (all zero) and "
+                        "carry the land-sea mask in a separate file instead, "
+                        "named like icon_grid_XXXX_..._Glsm.nc or "
+                        "..._G_slm.nc. Point the filter at that file, pass an "
+                        "explicit boolean mask array as `mask=`, or use "
+                        "mask=False to treat every cell as ocean."
+                    )
+                mask = codes < 0
             else:
                 raise KeyError(
                     f"In the file grid file there's no ocean mask under default name 'cell_sea_land_mask'"
@@ -104,4 +141,6 @@ class IconFilter(TriangularFilter):
             full=full,
             mask=mask,
             gpu=gpu,
+            filter_elements=filter_elements,
+            elem_weights=elem_weights,
         )

@@ -61,8 +61,15 @@ def make_smooth(
     metric : jnp.ndarray
         A 2D JAX NumPy array of shape (max_neighboring_nodes, n2d) containing the metric matrix.
     """
-    smooth_m = jnp.zeros(nn_pos.shape, dtype=jnp.float32)
-    metric = jnp.zeros(nn_pos.shape, dtype=jnp.float32)
+    # Accumulate in the inputs' precision. A hardcoded float32 buffer silently
+    # truncated the operator to ~24 bits even with jax_enable_x64 on: harmless
+    # on uniform meshes (entries are integer multiples of one common float) but
+    # costing ~1e-7..1e-4 relative accuracy on spherical or graded meshes, and
+    # breaking the exact constant-null-space property. JAX also warns that the
+    # implicit float64 -> float32 scatter will become a hard error.
+    dtype = jnp.result_type(elem_area, dx, dy, Mt)
+    smooth_m = jnp.zeros(nn_pos.shape, dtype=dtype)
+    metric = jnp.zeros(nn_pos.shape, dtype=dtype)
     aux = jnp.zeros((n2d,), dtype=jnp.int32)
 
     @jit

@@ -11,6 +11,68 @@ from implicit_filter.utils._numpy_functions import (
 from .latlon_filter import LatLonFilter
 
 
+def _select_scale_factor(ds, modern: str, legacy: str):
+    """Return the 3D vertical scale factor, across NEMO naming conventions.
+
+    The ``_0`` suffix changed meaning between NEMO generations::
+
+        NEMO <= 3.4   e3t   / e3u   / e3v     3D scale factors
+                      e3t_0 / e3w_0           1D reference levels (z,)
+        NEMO >= 3.6   e3t_0 / e3u_0 / e3v_0   3D scale factors
+                      e3t_1d / e3w_1d         1D reference levels (z,)
+
+    A legacy mesh therefore *does* contain ``e3t_0`` -- but it is the 1D
+    reference profile, not the field wanted here. Selecting by name alone would
+    silently pick a 1D array of the wrong length, so candidates are accepted
+    only if they carry the full vertical+horizontal dimensionality.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        NEMO mesh-mask dataset.
+    modern, legacy : str
+        Variable names to try, in that order.
+
+    Raises
+    ------
+    KeyError
+        If neither name is present with 3D shape.
+    """
+    for name in (modern, legacy):
+        if name in ds.variables:
+            var = ds[name]
+            if all(d in var.dims for d in ("z", "y", "x")):
+                return var
+
+    # A frequent cause is a renamed vertical dimension: NEMO writes (t, z, y, x),
+    # but files processed through CDO and similar tools often carry 'nav_lev' or
+    # 'deptht'. Say so explicitly rather than reporting a missing variable.
+    for name in (modern, legacy):
+        if name in ds.variables:
+            dims = ds[name].dims
+            if "y" in dims and "x" in dims and "z" not in dims:
+                other = [d for d in dims if d not in ("t", "y", "x")]
+                raise KeyError(
+                    f"'{name}' has dimensions {dims}, but the vertical "
+                    f"dimension must be named 'z'. Found {other!r} instead. "
+                    f"Please rename it, e.g. ds = ds.rename({{{other[0]!r}: 'z'}})"
+                    if other else
+                    f"'{name}' has dimensions {dims} and no vertical dimension; "
+                    "it must be named 'z'. Please rename it."
+                )
+
+    present = sorted(
+        v for v in ds.variables if str(v).startswith(modern.split("_")[0][:2])
+    )
+    raise KeyError(
+        f"Could not find a 3D vertical scale factor for '{modern}'. Tried "
+        f"'{modern}' (NEMO >= 3.6) and '{legacy}' (NEMO <= 3.4), requiring "
+        f"dimensions (z, y, x). Variables starting with 'e3' in this file: "
+        f"{present}. Note that older meshes store a 1D reference profile under "
+        f"the '_0' names, which cannot be used here."
+    )
+
+
 class NemoFilter(LatLonFilter):
     """
     Filter implementation specialized for NEMO ocean model grids.
@@ -208,7 +270,7 @@ class NemoFilter(LatLonFilter):
 
         # Cell heights
         h3u = np.reshape(
-            ds.e3u_0.isel(
+            _select_scale_factor(ds, "e3u_0", "e3u").isel(
                 z=vl,
                 y=slice(None, corresponds_to_redundant),
                 x=slice(None, corresponds_to_redundant),
@@ -220,7 +282,7 @@ class NemoFilter(LatLonFilter):
             nx * ny,
         )
         h3v = np.reshape(
-            ds.e3v_0.isel(
+            _select_scale_factor(ds, "e3v_0", "e3v").isel(
                 z=vl,
                 y=slice(None, corresponds_to_redundant),
                 x=slice(None, corresponds_to_redundant),
@@ -232,7 +294,7 @@ class NemoFilter(LatLonFilter):
             nx * ny,
         )
         h3t = np.reshape(
-            ds.e3t_0.isel(
+            _select_scale_factor(ds, "e3t_0", "e3t").isel(
                 z=vl,
                 y=slice(None, corresponds_to_redundant),
                 x=slice(None, corresponds_to_redundant),

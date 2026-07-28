@@ -33,6 +33,8 @@ class FesomFilter(TriangularFilter):
         metric: bool = False,
         mask: np.ndarray = None,
         gpu: bool = False,
+        filter_elements: bool = False,
+        elem_weights: str = "equilateral",
     ):
         """
         Configure filter using a FESOM mesh file.
@@ -53,6 +55,13 @@ class FesomFilter(TriangularFilter):
             Element land mask where True indicates land (default: None).
         gpu : bool, optional
             True to enable GPU acceleration (default: False).
+        filter_elements : bool, optional
+            True to also assemble the element (triangle) filter operator,
+            enabling filtering of element-based fields (default: False).
+        elem_weights : {'equilateral', 'geometric'}, optional
+            Element Laplacian weighting scheme. See
+            :meth:`TriangularFilter.prepare`. Ignored unless
+            ``filter_elements=True``.
 
         Notes
         -----
@@ -64,7 +73,8 @@ class FesomFilter(TriangularFilter):
         """
         mesh = xr.open_dataset(file)
         self.prepare_from_data_array(
-            mesh, meshtype, cartesian, cyclic_length, metric, mask, gpu
+            mesh, meshtype, cartesian, cyclic_length, metric, mask, gpu,
+            filter_elements, elem_weights,
         )
 
     def prepare_from_data_array(
@@ -76,6 +86,8 @@ class FesomFilter(TriangularFilter):
         metric: bool = False,
         mask: np.ndarray = None,
         gpu: bool = False,
+        filter_elements: bool = False,
+        elem_weights: str = "equilateral",
     ):
         """
         Configure filter using an xarray Dataset containing FESOM mesh data.
@@ -96,6 +108,12 @@ class FesomFilter(TriangularFilter):
             Element land mask (default: None).
         gpu : bool, optional
             GPU acceleration flag (default: False).
+        filter_elements : bool, optional
+            True to also assemble the element (triangle) filter operator
+            (default: False).
+        elem_weights : {'equilateral', 'geometric'}, optional
+            Element Laplacian weighting scheme. See
+            :meth:`TriangularFilter.prepare`.
 
         Raises
         ------
@@ -136,4 +154,6 @@ class FesomFilter(TriangularFilter):
             metric,
             mask,
             gpu,
+            filter_elements=filter_elements,
+            elem_weights=elem_weights,
         )

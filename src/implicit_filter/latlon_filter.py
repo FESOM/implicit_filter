@@ -3,6 +3,7 @@ from typing import Tuple, Iterable
 
 import numpy as np
 
+from implicit_filter.utils._auxiliary import R_EARTH
 from implicit_filter.utils._numpy_functions import (
     calculate_local_regular_neighbourhood,
     calculate_global_regular_neighbourhood,
@@ -50,7 +51,7 @@ class LatLonFilter(Filter):
     """
 
     def __init__(self, *initial_data, **kwargs):
-        super().__init__(initial_data, **kwargs)
+        super().__init__(*initial_data, **kwargs)
         it = lambda ar: int(ar)
         ar = lambda ar: np.array(ar)
         st = lambda ar: str(ar)
@@ -138,7 +139,7 @@ class LatLonFilter(Filter):
 
         hh = np.ones((4, e2d))  # Edge lengths
         hc = np.ones((4, e2d))  # Distance to next cell centers
-        r_earth = 6400.0
+        r_earth = R_EARTH
 
         # Fill ee_pos, arrangement is W;N;E;S
         for i in range(e2d):
@@ -211,6 +212,7 @@ class LatLonFilter(Filter):
         mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
 
         self._ss = self._ss[mask_sp]
+        self._ii = self._ii[mask_sp]
         self._jj = self._jj[mask_sp]
 
 
