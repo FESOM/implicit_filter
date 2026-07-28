@@ -125,6 +125,39 @@ def test_save_load_unaffected_by_preconditioner(prepared, tmp_path):
     prepared.set_preconditioner("jacobi")
 
 
+@pytest.fixture(scope="module")
+def prepared_latlon():
+    # Uniform cartesian grid, no land mask; 45x40 = 1800 points exceeds
+    # max_coarse=1000 so the hierarchy is genuinely multilevel.
+    lon = np.linspace(0.0, 20.0, 45)
+    lat = np.linspace(-10.0, 10.0, 40)
+    f = LatLonFilter()
+    f.prepare(lat, lon, cartesian=True, local=True)
+    return f
+
+
+def test_latlon_vcycle_matches_direct_and_jacobi(prepared_latlon):
+    f = prepared_latlon
+    rng = np.random.default_rng(13)
+    data2d = rng.normal(size=(f._nx, f._ny))
+    k, n = 0.5, 2                     # (L/dx)^4 ~ 6e5: stiff
+    # The lat-lon stencil is assembled negative-semidefinite and the solve
+    # scales by -1/k^2, so the PSD-convention operator uses -S.
+    x_true = _direct_solve(-np.asarray(f._ss), f._ii, f._jj, int(f._e2d),
+                           n, k, np.reshape(np.asarray(data2d), int(f._e2d)))
+    f.set_preconditioner("jacobi")
+    ref = f.compute(n, k, data2d)
+    f.set_preconditioner("vcycle")
+    out = f.compute(n, k, data2d)
+    # The vcycle path must actually have run (this config is mild enough
+    # that Jacobi would also pass the numeric bounds).
+    assert ("P", "latlon") in f.vcycle_cache
+    assert len(f.vcycle_cache[("P", "latlon")]) >= 1     # genuinely multilevel
+    f.set_preconditioner("jacobi")
+    assert np.abs(np.reshape(out, int(f._e2d)) - x_true).max() < 1e-8
+    assert np.abs(out - ref).max() < 5e-2
+
+
 def test_full_metric_terms_rejected():
     x, y, tri = structured_tri_mesh(11, 11, 10.0)
     f = TriangularFilter()

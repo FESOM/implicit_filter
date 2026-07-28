@@ -211,9 +211,7 @@ class LatLonFilter(Filter):
         # Create a mask where both _ii and _jj are not 0
         mask_sp = np.logical_and(self._mask_n[ii], self._mask_n[jj])
 
-        self._ss = self._ss[mask_sp]
-        self._ii = self._ii[mask_sp]
-        self._jj = self._jj[mask_sp]
+ 
 
 
 
@@ -226,6 +224,7 @@ class LatLonFilter(Filter):
         maxiter: int = 150_000,
         tol: float = 1e-6,
     ) -> np.ndarray:
+        k_arg = k  # pre-broadcast value; the V-cycle path needs a scalar k
         if isinstance(k, (float, int, np.number)):
             k = np.ones(self._e2d) * k
 
@@ -250,12 +249,27 @@ class LatLonFilter(Filter):
 
         x0_pert = None if x0 is None else (jnp.array(x0) - ttu)
 
-        tts, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=precond)
-        if code is not None and code != 0:
-            raise SolverNotConvergedError(
-                "Solver has not converged without metric terms",
-                [f"output code with code: {code}"],
-            )
+        if self.get_preconditioner() == "vcycle":
+            from implicit_filter.utils._vcycle import (
+                solve_with_vcycle, validate_scalar_k)
+
+            # The lat-lon stencil is assembled negative-semidefinite (the
+            # solve scales by -1/k^2), so the PSD-convention stencil is -S.
+            tts = solve_with_vcycle(
+                ss=-np.asarray(self._ss), ii=self._ii, jj=self._jj,
+                area=self._area, n_size=int(self._e2d), n=n,
+                k=validate_scalar_k(k_arg), apply_A=apply_A,
+                b_pert=ttw, x0_pert=x0_pert, tol=tol, maxiter=maxiter,
+                options=self.preconditioner_options,
+                cache=self.vcycle_cache, tag="latlon")
+        else:
+            M = precond if self.get_preconditioner() == "jacobi" else None
+            tts, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=M)
+            if code is not None and code != 0:
+                raise SolverNotConvergedError(
+                    "Solver has not converged without metric terms",
+                    [f"output code with code: {code}"],
+                )
 
         tts += ttu
         return np.array(tts)
