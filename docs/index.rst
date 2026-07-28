@@ -246,4 +246,5 @@ API Reference
    :maxdepth: 2
    :caption: Developer Reference
 
+   vcycle
    api

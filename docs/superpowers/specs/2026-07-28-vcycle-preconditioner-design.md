@@ -35,10 +35,16 @@ machinery is the #1 error mode (S has ~33% relative asymmetry).
 | Triangular element | `_ss_e/_ii_e/_jj_e` | `S_e` as stored | `_elem_area` |
 | Lat-lon / NEMO | `_ss/_ii/_jj` | **`−S`** (assembly is negative-semidefinite; solve uses `−1/k²` scaling) | `_area` |
 
-Setup asserts roundoff-scale symmetry of every level operator (rel ≤ 1e-10)
-and **raises** otherwise — structural asymmetry (e.g. a stretched lat-lon
-grid or NEMO north-fold rows, if the probe shows it) makes that mesh
-unsupported by the V-cycle rather than silently wrong.
+Setup asserts symmetry of every level operator with a two-tier gate:
+rel ≤ 1e-10 silent; ≤ 1e-6 warn-and-symmetrize (storage-precision roundoff —
+caches saved by older package versions store the stencil in float32;
+**measured 9.3e-9 on the 7.4M-node ICON cache**, which is therefore
+supported); above 1e-6 **raises** — structural asymmetry. **Probe result
+2026-07-28: the real NEMO/FOCI grid (366,480 points) measures 0.60** —
+stretched latitude spacing makes `D·S` structurally asymmetric (no single
+diagonal reweighting fixes both grid directions), so NEMO/stretched lat-lon
+grids are rejected with a clear error and stay on Jacobi; uniform lat-lon
+grids are supported (verified multilevel in tests).
 
 ## Algorithm (per the integration guide)
 

@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### V-cycle preconditioner (opt-in)
+
+New `set_preconditioner(name, **options)` / `get_preconditioner()` on every
+filter, mirroring `set_backend`. Choices: `'jacobi'` (default — numerically
+identical to before), `'none'` (plain CG), and `'vcycle'` — a geometric
+multigrid V-cycle (smoothed-aggregation hierarchy, Chebyshev(3) smoothing,
+exact coarse solve) applied to the symmetrized SPD system `(D·A)x = D·b`.
+It eliminates the Jacobi-CG convergence failures for stiff biharmonic
+configurations, with identical results on CPU and GPU (parity-tested).
+Setup needs the new optional extra `implicit_filter[vcycle]` (pyamg +
+scipy); the apply phase is pure JAX. Details, tuning knobs and measured
+before/after benchmarks: `docs/vcycle.rst` and
+`docs/benchmarks/vcycle_comparison.md`.
+
+Notes:
+
+- The V-cycle path verifies the true (unweighted) residual after the solve
+  and raises `SolverNotConvergedError` if the tolerance was not met — the
+  default path keeps JAX CG's silent behaviour, unchanged.
+- Supported systems: triangular nodes and elements (FESOM, ICON) and
+  uniform lat-lon grids; spatially varying `k` and the metric-terms
+  (`full=True`) system raise clear errors; structurally asymmetric
+  stencils (stretched lat-lon grids, e.g. the NEMO/FOCI ORCA grid at 0.6
+  relative asymmetry) are refused at setup.
+- `set_backend("gpu")` now selects the concrete `cuda` platform when the
+  split CUDA plugin (`jax[cuda12]`) is installed — with the plugin, JAX's
+  `"gpu"` alias also probes a ROCm stub whose failure made GPU selection
+  crash. CPU behaviour and `get_backend()` round-trips are unchanged.
+
 ### Backward compatibility
 
 Audited against the pre-review baseline by running identical code on both
