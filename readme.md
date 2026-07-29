@@ -113,6 +113,30 @@ flter.get_backend()   # -> "cpu" or "gpu"
 > **Note on GPU selection.** Importing `implicit_filter` sets JAX's platform to
 > CPU for the whole process. `set_backend("gpu")` is therefore required to use a
 > GPU, and it also affects any other JAX code running in the same interpreter.
+> JAX fixes its platform on first use, so call `set_backend` **before** the
+> first compute (or array-creating call) in the process.
+
+## 🚀 V-cycle preconditioner
+
+Biharmonic filters (`n=2`) at large filter-scale-to-resolution ratios can make
+the default Jacobi-CG solver need thousands of iterations or fail outright. The
+opt-in multigrid V-cycle preconditioner solves these stiff configurations in
+tens of iterations:
+
+```sh
+pip install "implicit_filter[vcycle]"   # pyamg + scipy, setup-time only
+```
+
+```python
+flter.set_preconditioner("vcycle")      # 'jacobi' (default) | 'none' | 'vcycle'
+filtered = flter.compute(2, 2*math.pi / distance, data)
+```
+
+Works identically on CPU and GPU; requires a spatially uniform filter scale.
+See the [documentation](https://fesom.github.io/implicit_filter/) for how it
+works, tuning knobs, limitations (e.g. curvilinear NEMO `mesh_mask` grids are
+rejected; stretched regular lat-lon grids are supported), and measured
+before/after benchmarks.
 
 ## 🔺 Filtering on elements
 

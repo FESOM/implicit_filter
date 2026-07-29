@@ -1,0 +1,154 @@
+{
+ "provenance": {
+  "argv": {
+   "mesh": "icon",
+   "backend": "cpu",
+   "precond": "vcycle",
+   "n": "2",
+   "scales_km": "100,200",
+   "tol": 1e-06,
+   "extra_tol": 1e-09,
+   "repeats": 2,
+   "maxiter": 20000,
+   "out": "benchmarks/results/bench_icon_cpu_vcycle_tail.json"
+  },
+  "host": "l40010.lvt.dkrz.de",
+  "slurm_job": "26536707",
+  "git_rev": "5d1ef7a",
+  "jax": "0.5.2",
+  "devices": [
+   "TFRT_CPU_0"
+  ],
+  "implicit_filter": "?",
+  "timestamp": "2026-07-29T12:29:10",
+  "rhs": "synthetic:seed42"
+ },
+ "records": [
+  {
+   "mesh": "icon",
+   "backend": "cpu",
+   "precond": "vcycle",
+   "n": 2,
+   "L_km": 100.0,
+   "t_hierarchy": 27.09458390902728,
+   "t_setup_kn": 27.14179167896509,
+   "sizes": [
+    7487687,
+    823133,
+    50603,
+    1982,
+    113
+   ],
+   "matvec_equiv_per_iter": 5.6853884323434345,
+   "tol": 1e-06,
+   "iters": 15,
+   "relres": 6.24265210572325e-07,
+   "converged": true,
+   "retried": false,
+   "t_first": 908.1811040509492,
+   "t_kernel_med": 836.553290527896,
+   "t_kernel_runs": [
+    836.5088205758948,
+    836.5977604798973
+   ],
+   "t_e2e_med": 859.8096952144988,
+   "t_e2e_runs": [
+    853.4922406568658,
+    866.1271497721318
+   ]
+  },
+  {
+   "mesh": "icon",
+   "backend": "cpu",
+   "precond": "vcycle",
+   "n": 2,
+   "L_km": 100.0,
+   "t_hierarchy": 27.09458390902728,
+   "t_setup_kn": 27.14179167896509,
+   "sizes": [
+    7487687,
+    823133,
+    50603,
+    1982,
+    113
+   ],
+   "matvec_equiv_per_iter": 5.6853884323434345,
+   "tol": 1e-09,
+   "iters": 27,
+   "relres": 6.524951933086992e-10,
+   "converged": true,
+   "retried": false,
+   "t_first": 1532.1374628348276,
+   "t_kernel_med": 1462.0816142784897,
+   "t_kernel_runs": [
+    1462.1279001669027,
+    1462.0353283900768
+   ],
+   "t_e2e_med": null,
+   "t_e2e_runs": []
+  },
+  {
+   "mesh": "icon",
+   "backend": "cpu",
+   "precond": "vcycle",
+   "n": 2,
+   "L_km": 200.0,
+   "t_hierarchy": 27.09458390902728,
+   "t_setup_kn": 24.421698855003342,
+   "sizes": [
+    7487687,
+    823133,
+    50603,
+    1982,
+    113
+   ],
+   "matvec_equiv_per_iter": 5.6853884323434345,
+   "tol": 1e-06,
+   "iters": 24,
+   "relres": 8.504423826548648e-07,
+   "converged": true,
+   "retried": false,
+   "t_first": 1377.8258795239963,
+   "t_kernel_med": 1306.1689552325988,
+   "t_kernel_runs": [
+    1306.2244388151448,
+    1306.1134716500528
+   ],
+   "t_e2e_med": 1329.1940410609823,
+   "t_e2e_runs": [
+    1323.6564268888906,
+    1334.731655233074
+   ]
+  },
+  {
+   "mesh": "icon",
+   "backend": "cpu",
+   "precond": "vcycle",
+   "n": 2,
+   "L_km": 200.0,
+   "t_hierarchy": 27.09458390902728,
+   "t_setup_kn": 24.421698855003342,
+   "sizes": [
+    7487687,
+    823133,
+    50603,
+    1982,
+    113
+   ],
+   "matvec_equiv_per_iter": 5.6853884323434345,
+   "tol": 1e-09,
+   "iters": 47,
+   "relres": 9.919613206618579e-10,
+   "converged": true,
+   "retried": false,
+   "t_first": 2591.597830741899,
+   "t_kernel_med": 2530.8391969455406,
+   "t_kernel_runs": [
+    2533.173344532959,
+    2528.505049358122
+   ],
+   "t_e2e_med": null,
+   "t_e2e_runs": []
+  }
+ ]
+}

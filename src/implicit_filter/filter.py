@@ -3,6 +3,11 @@ from typing import Tuple, Iterable
 
 import numpy as np
 
+_VCYCLE_OPTION_DEFAULTS = {
+    "degree": 3, "alpha": 4.0, "n_cycles": 1, "max_levels": 6,
+    "max_coarse": 1000, "seed": 42, "lam_safety": 1.1, "strength": "symmetric",
+}
+
 
 class Filter(ABC):
     """
@@ -35,12 +40,87 @@ class Filter(ABC):
         """
         Force JAX to use a specific backend (e.g. 'cpu' or 'gpu').
         This is useful if you want to run on CPU while the GPU is busy.
+
+        With the split CUDA plugin (``jax[cuda12]``) installed, ``'gpu'``
+        selects the concrete ``cuda`` platform (JAX's ``"gpu"`` alias also
+        probes a ROCm stub whose failure would abort GPU selection). JAX
+        fixes its platform set on first array use, so call this before the
+        first compute in the process.
         """
+        import importlib.util
         import jax
         if backend.lower() == "cpu":
             jax.config.update("jax_platforms", "cpu")
+        elif importlib.util.find_spec("jax_cuda12_plugin") is not None:
+            # With the split CUDA plugin, JAX's "gpu" alias also probes a
+            # ROCm stub whose failure is fatal in an explicit platform
+            # list; name the concrete platform instead.
+            jax.config.update("jax_platforms", "cuda,cpu")
         else:
             jax.config.update("jax_platforms", "gpu,cpu")
+        # Cached V-cycle arrays live on the previously selected device.
+        self.vcycle_cache = {}
+
+    def get_preconditioner(self) -> str:
+        """
+        Report the active CG preconditioner: ``'jacobi'`` (default),
+        ``'none'`` or ``'vcycle'``.
+        """
+        return getattr(self, "preconditioner_name", "jacobi")
+
+    def set_preconditioner(self, preconditioner: str | None = "jacobi", **options):
+        """
+        Select the preconditioner used by the CG solver.
+
+        Parameters
+        ----------
+        preconditioner : str | None
+            ``'jacobi'`` (default) is the one-level diagonal preconditioner.
+            ``'none'`` (or ``None``) disables preconditioning: plain CG.
+            ``'vcycle'`` enables the multilevel V-cycle preconditioner
+            (requires the ``implicit_filter[vcycle]`` extra), which removes
+            the convergence failures of Jacobi-CG for stiff configurations,
+            e.g. biharmonic filters at large filter-scale-to-resolution
+            ratios. Only scalar (spatially uniform) filter scales are
+            supported by the V-cycle.
+        **options
+            Advanced V-cycle knobs overriding evidence-backed defaults:
+            ``degree`` (Chebyshev degree per pre/post smooth, 3),
+            ``alpha`` (spectral interval divisor, 4.0),
+            ``n_cycles`` (V-cycles per CG iteration, 1),
+            ``max_levels`` (hierarchy depth, 6),
+            ``max_coarse`` (direct-solve threshold, 1000),
+            ``seed`` (hierarchy/power-iteration seed, 42),
+            ``lam_safety`` (safety factor on the smoothing bound, 1.1),
+            ``strength`` (pyamg strength-of-connection, 'symmetric').
+
+        Notes
+        -----
+        The preconditioner choice is runtime state (like the backend): it is
+        not persisted by :meth:`save_to_file`.
+        """
+        preconditioner = "none" if preconditioner is None else preconditioner.lower()
+        if preconditioner not in ("none", "jacobi", "vcycle"):
+            raise ValueError(f"Unknown preconditioner {preconditioner!r}; "
+                             "expected 'none', 'jacobi' or 'vcycle'")
+        unknown = set(options) - set(_VCYCLE_OPTION_DEFAULTS)
+        if unknown:
+            raise ValueError(f"Unknown V-cycle option(s) {sorted(unknown)}; "
+                             f"valid: {sorted(_VCYCLE_OPTION_DEFAULTS)}")
+        merged = {**_VCYCLE_OPTION_DEFAULTS, **options}
+        if merged["degree"] < 1 or merged["n_cycles"] < 1 \
+                or merged["max_levels"] < 1 or merged["max_coarse"] < 1:
+            raise ValueError("degree, n_cycles, max_levels and max_coarse "
+                             "must be positive integers")
+        if not merged["alpha"] > 1.0:
+            raise ValueError("alpha must be > 1 (the Chebyshev interval is "
+                             "[lam_max/alpha, lam_max])")
+        if preconditioner == "vcycle":
+            from implicit_filter.utils._vcycle import _require_pyamg
+            _require_pyamg()
+        self.preconditioner_name = preconditioner
+        self.preconditioner_options = merged
+        self.vcycle_cache = {}
 
     @abstractmethod
     def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None) -> np.ndarray:

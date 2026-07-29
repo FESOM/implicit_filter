@@ -160,6 +160,7 @@ class TriangularFilter(Filter):
         )
 
     def _compute(self, n, kl, ttu, x0=None, tol=1e-6, maxiter=150000, is_elem=None) -> np.ndarray:
+        kl_arg = kl  # pre-broadcast value; the V-cycle path needs a scalar k
         if is_elem is None:
             is_elem = (len(ttu) == self._e2d)
         if is_elem and self._ss_e is None:
@@ -193,17 +194,35 @@ class TriangularFilter(Filter):
         ttw = ttu - apply_A(ttu)  # Work with perturbations
         x0_pert = None if x0 is None else (jnp.array(x0) - ttu)
 
-        tts, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=precond)
-        if code is not None and code != 0:
-            raise SolverNotConvergedError(
-                "Solver has not converged without metric terms",
-                [f"output code with code: {code}"],
-            )
+        if self.get_preconditioner() == "vcycle":
+            from implicit_filter.utils._vcycle import (
+                solve_with_vcycle, validate_scalar_k)
+
+            tts = solve_with_vcycle(
+                ss=ss, ii=ii, jj=jj,
+                area=self._elem_area if is_elem else self._area,
+                n_size=n_size, n=n, k=validate_scalar_k(kl_arg),
+                apply_A=apply_A, b_pert=ttw, x0_pert=x0_pert,
+                tol=tol, maxiter=maxiter, options=self.preconditioner_options,
+                cache=self.vcycle_cache, tag="elem" if is_elem else "node")
+        else:
+            M = precond if self.get_preconditioner() == "jacobi" else None
+            tts, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=M)
+            if code is not None and code != 0:
+                raise SolverNotConvergedError(
+                    "Solver has not converged without metric terms",
+                    [f"output code with code: {code}"],
+                )
 
         tts += ttu
         return np.array(tts)
 
     def _compute_full(self, n, kl, ttuv, x0=None, tol=1e-5, maxiter=150000) -> np.ndarray:
+        if self.get_preconditioner() == "vcycle":
+            raise NotImplementedError(
+                "The V-cycle preconditioner does not support the coupled "
+                "metric-terms system (full=True); its block structure needs "
+                "a separate symmetry analysis. Use set_preconditioner('jacobi').")
         if isinstance(kl, (float, int, np.number)):
             kl = np.ones(2 * self._n2d) * kl
 

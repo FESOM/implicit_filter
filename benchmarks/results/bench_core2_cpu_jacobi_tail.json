@@ -1,0 +1,108 @@
+{
+ "provenance": {
+  "argv": {
+   "mesh": "core2",
+   "backend": "cpu",
+   "precond": "jacobi",
+   "n": "2",
+   "scales_km": "500,1000",
+   "tol": 1e-06,
+   "extra_tol": 1e-09,
+   "repeats": 3,
+   "maxiter": 20000,
+   "out": "benchmarks/results/bench_core2_cpu_jacobi_tail.json"
+  },
+  "host": "l40020.lvt.dkrz.de",
+  "slurm_job": "26536705",
+  "git_rev": "5d1ef7a",
+  "jax": "0.5.2",
+  "devices": [
+   "TFRT_CPU_0"
+  ],
+  "implicit_filter": "?",
+  "timestamp": "2026-07-29T11:30:10",
+  "rhs": "synthetic:seed42"
+ },
+ "records": [
+  {
+   "mesh": "core2",
+   "backend": "cpu",
+   "precond": "jacobi",
+   "n": 2,
+   "L_km": 500.0,
+   "matvec_equiv_per_iter": 1.0,
+   "tol": 1e-06,
+   "iters": 10853,
+   "relres": 9.915708571538216e-07,
+   "converged": true,
+   "retried": false,
+   "t_first": 925.741640380118,
+   "t_kernel_med": 921.444301913958,
+   "t_kernel_runs": [
+    924.0096957690548,
+    921.444301913958,
+    920.5539628900588
+   ],
+   "t_e2e_med": 956.9412212760653,
+   "t_e2e_runs": [
+    960.5492054789793,
+    950.1461355150677,
+    956.9412212760653
+   ]
+  },
+  {
+   "mesh": "core2",
+   "backend": "cpu",
+   "precond": "jacobi",
+   "n": 2,
+   "L_km": 500.0,
+   "matvec_equiv_per_iter": 1.0,
+   "tol": 1e-09,
+   "iters": 20000,
+   "relres": 5.87768833345154e-07,
+   "converged": false,
+   "retried": false,
+   "t_first": 1736.9923098690342,
+   "t_kernel_med": null,
+   "t_kernel_runs": [],
+   "t_e2e_med": null,
+   "t_e2e_runs": []
+  },
+  {
+   "mesh": "core2",
+   "backend": "cpu",
+   "precond": "jacobi",
+   "n": 2,
+   "L_km": 1000.0,
+   "matvec_equiv_per_iter": 1.0,
+   "tol": 1e-06,
+   "iters": 20000,
+   "relres": 6.583601673096317e-06,
+   "converged": false,
+   "retried": false,
+   "t_first": 1718.7950111050159,
+   "t_kernel_med": null,
+   "t_kernel_runs": [],
+   "t_e2e_med": null,
+   "t_e2e_runs": []
+  },
+  {
+   "mesh": "core2",
+   "backend": "cpu",
+   "precond": "jacobi",
+   "n": 2,
+   "L_km": 1000.0,
+   "matvec_equiv_per_iter": 1.0,
+   "tol": 1e-09,
+   "iters": 20000,
+   "relres": 6.583601673096317e-06,
+   "converged": false,
+   "retried": false,
+   "t_first": 1706.8332230320666,
+   "t_kernel_med": null,
+   "t_kernel_runs": [],
+   "t_e2e_med": null,
+   "t_e2e_runs": []
+  }
+ ]
+}
