@@ -209,11 +209,17 @@ def test_M_is_linear(stiff_M):
     assert np.linalg.norm(lhs - rhs) / np.linalg.norm(rhs) < 1e-10
 
 
-@pytest.mark.parametrize("n,L,bound", [(1, 100.0, 1e-7), (2, 100.0, 1e-7),
-                                       (2, 500.0, 1e-6)])
-def test_pcg_vcycle_matches_spsolve(tiny_setup, n, L, bound):
-    # (2, 500) bound relaxed with condition-number justification: measured
-    # dense cond2 ~ 6e5 on this mesh, so cond*tol is the honest floor.
+@pytest.mark.parametrize("n,L,bound,it_bound", [
+    (1, 100.0, 1e-7, 40), (2, 100.0, 1e-7, 40), (2, 500.0, 1e-6, 40),
+    # Higher filter orders: conditioning grows like (L/dx)^2n, so the error
+    # bounds follow cond*tol; iteration bounds are ~1.5x the measured counts
+    # (68 / 104 / 95). Jacobi-CG does not converge at all for any of these
+    # cells (200k-iteration cap), so the V-cycle is the only working path.
+    (3, 200.0, 1e-7, 110), (4, 100.0, 1e-5, 160), (5, 50.0, 1e-6, 150),
+])
+def test_pcg_vcycle_matches_spsolve(tiny_setup, n, L, bound, it_bound):
+    # Bounds relaxed with condition-number justification where needed:
+    # e.g. (2, 500) has dense cond2 ~ 6e5, so cond*tol is the honest floor.
     S, area, P_ops = tiny_setup
     k = 2 * math.pi / L
     A = vc.filter_matrix(S, k, n)
@@ -224,11 +230,11 @@ def test_pcg_vcycle_matches_spsolve(tiny_setup, n, L, bound):
     area_j = jnp.asarray(area)
     x, iters, relres = vc.pcg_counted(lambda v: area_j * apply_A(v),
                                       jnp.asarray(area * b), M,
-                                      tol=1e-9, maxiter=200)
+                                      tol=1e-9, maxiter=500)
     x_ref = np.asarray(sp.linalg.spsolve(sp.csc_matrix(A), b))
     err = np.linalg.norm(np.asarray(x) - x_ref) / np.linalg.norm(x_ref)
     assert err < bound
-    assert iters <= 40                                   # failure-region regression
+    assert iters <= it_bound                             # failure-region regression
 
 
 def test_vcycle_beats_jacobi_iterations(tiny_setup):

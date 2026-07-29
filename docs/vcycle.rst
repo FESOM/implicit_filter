@@ -18,6 +18,15 @@ dense solve on a ~1000-unknown coarsest level supplies the global coupling
 a one-level method fundamentally lacks. Iteration counts drop from
 thousands (or divergence) to tens, essentially independent of mesh size.
 
+Filter orders above 2 are supported as well and are *pure* failure region
+for Jacobi-CG: on the validation mesh Jacobi-CG converges for none of the
+tested ``n = 3, 4, 5`` configurations (200,000-iteration cap) while the
+V-cycle solves them in 68–212 iterations (tested through ``n = 5``,
+identically on CPU and GPU). Iteration counts grow mildly with the order,
+and so does the operator's condition number — ``(L/dx)^{2n}`` — which
+bounds the attainable accuracy in float64; keep ``n`` and the
+scale-to-resolution ratio jointly sane.
+
 Usage
 -----
 
