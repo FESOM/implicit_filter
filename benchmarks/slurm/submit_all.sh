@@ -10,7 +10,8 @@ log() { echo "$(date +%FT%T) $*" | tee -a benchmarks/results/jobs.log; }
 
 DEP_CORE2=""
 if [[ ! -f benchmarks/results/core2_cache.npz ]]; then
-    PREP=$(sbatch --parsable benchmarks/slurm/prepare_core2.sbatch)
+    # PREP_JOB lets an already-submitted prepare job be reused.
+    PREP="${PREP_JOB:-$(sbatch --parsable benchmarks/slurm/prepare_core2.sbatch)}"
     log "prepare_core2 -> $PREP"
     DEP_CORE2="--dependency=afterok:$PREP"
 fi

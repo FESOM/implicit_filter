@@ -46,7 +46,10 @@ def main():
         "symmetry gate (stretched lat-lon grids). One V-cycle iteration "
         "costs several operator applications — the measured factor is given "
         "per mesh below — so compare *work* via that factor, and wall-clock "
-        "directly.", ""]
+        "directly. — = cell not measured: the stiff biharmonic tail of the "
+        "7.4M-node ICON mesh is impractical on CPU for either method "
+        "(≈5 s per Jacobi iteration, thousands of iterations; the GPU "
+        "table covers those cells).", ""]
     for mesh in meshes:
         lines.append(f"## {mesh}")
         sz = next((r.get("sizes") for r in recs
