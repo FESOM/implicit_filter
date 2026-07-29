@@ -1,0 +1,23 @@
+26521979
+2026-07-28T16:43:38 prepare_core2 -> 26521979
+2026-07-28T16:43:38 bench_core2_cpu_jacobi -> 26522099
+2026-07-28T16:43:39 bench_core2_cpu_vcycle -> 26522100
+2026-07-28T16:43:39 bench_core2_gpu_jacobi -> 26522101
+2026-07-28T16:43:39 bench_core2_gpu_vcycle -> 26522102
+2026-07-28T16:43:39 bench_icon_cpu_jacobi -> 26522103
+2026-07-28T16:43:39 bench_icon_cpu_vcycle -> 26522105
+2026-07-28T16:43:40 bench_icon_gpu_jacobi -> 26522107
+2026-07-28T16:43:40 bench_icon_gpu_vcycle -> 26522109
+2026-07-28T16:43:40 bench_nemo_cpu_jacobi -> 26522110
+2026-07-28T16:43:40 bench_nemo_cpu_vcycle -> 26522111
+2026-07-28T16:43:40 bench_nemo_gpu_jacobi -> 26522112
+2026-07-28T16:43:41 bench_nemo_gpu_vcycle -> 26522113
+2026-07-28T17:07:27 bench_core2_cpu_vcycle (fixed harness) -> 26522570
+2026-07-28T17:07:27 bench_core2_gpu_vcycle (fixed harness) -> 26522571
+2026-07-28T17:07:27 bench_icon_cpu_vcycle (fixed harness) -> 26522573
+2026-07-28T17:07:27 bench_icon_gpu_vcycle (fixed harness) -> 26522574
+2026-07-28T17:07:27 bench_nemo_cpu_vcycle (fixed harness) -> 26522575
+2026-07-28T17:07:28 bench_nemo_gpu_vcycle (fixed harness) -> 26522576
+2026-07-28T17:41:23 bench_icon_cpu_vcycle (mem fix) -> 26523028
+2026-07-28T17:41:24 bench_icon_gpu_vcycle (mem fix) -> 26523029
+2026-07-29T11:29:43 tails -> 26536705 26536706 26536707

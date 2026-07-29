@@ -1,0 +1,108 @@
+{
+ "provenance": {
+  "argv": {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": "1,2",
+   "scales_km": "50,100,200,500,1000",
+   "tol": 1e-06,
+   "extra_tol": 1e-09,
+   "repeats": 5,
+   "maxiter": 20000,
+   "out": "benchmarks/results/bench_nemo_gpu_vcycle.json"
+  },
+  "host": "l50036.lvt.dkrz.de",
+  "slurm_job": "26522576",
+  "git_rev": "92704f7",
+  "jax": "0.5.2",
+  "devices": [
+   "cuda:0"
+  ],
+  "implicit_filter": "?",
+  "timestamp": "2026-07-28T17:13:51",
+  "rhs": "synthetic:seed42"
+ },
+ "records": [
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 1,
+   "L_km": 50.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 1.436e-01 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  },
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 1,
+   "L_km": 100.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 3.343e-01 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  },
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 1,
+   "L_km": 200.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 5.005e-01 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  },
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 1,
+   "L_km": 500.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 5.814e-01 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  },
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 1,
+   "L_km": 1000.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 5.952e-01 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  },
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 2,
+   "L_km": 50.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 3.629e-02 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  },
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 2,
+   "L_km": 100.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 1.024e-01 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  },
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 2,
+   "L_km": 200.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 1.032e-01 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  },
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 2,
+   "L_km": 500.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 1.033e-01 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  },
+  {
+   "mesh": "nemo",
+   "backend": "gpu",
+   "precond": "vcycle",
+   "n": 2,
+   "L_km": 1000.0,
+   "skipped": "A_hat_0 = D*A is asymmetric (relative asymmetry 1.033e-01 > 1.0e-06). This indicates a structurally wrong fine-level weighting (D on the wrong side) or an unsupported mesh/stencil (e.g. a stretched lat-lon grid); refusing to build the V-cycle. Jacobi preconditioning remains available via set_preconditioner('jacobi')."
+  }
+ ]
+}

@@ -1,0 +1,97 @@
+{
+ "provenance": {
+  "argv": {
+   "mesh": "icon",
+   "backend": "cpu",
+   "precond": "jacobi",
+   "n": "2",
+   "scales_km": "100,200",
+   "tol": 1e-06,
+   "extra_tol": 1e-09,
+   "repeats": 2,
+   "maxiter": 5000,
+   "out": "benchmarks/results/bench_icon_cpu_jacobi_tail.json"
+  },
+  "host": "l40015.lvt.dkrz.de",
+  "slurm_job": "26536706",
+  "git_rev": "5d1ef7a",
+  "jax": "0.5.2",
+  "devices": [
+   "TFRT_CPU_0"
+  ],
+  "implicit_filter": "?",
+  "timestamp": "2026-07-29T12:13:28",
+  "rhs": "synthetic:seed42"
+ },
+ "records": [
+  {
+   "mesh": "icon",
+   "backend": "cpu",
+   "precond": "jacobi",
+   "n": 2,
+   "L_km": 100.0,
+   "matvec_equiv_per_iter": 1.0,
+   "tol": 1e-06,
+   "iters": 166,
+   "relres": 9.986625870131553e-07,
+   "converged": true,
+   "retried": false,
+   "t_first": 869.5287325610407,
+   "t_kernel_med": 850.9123593539698,
+   "t_kernel_runs": [
+    851.424923205981,
+    850.3997955019586
+   ],
+   "t_e2e_med": 865.5194948635763,
+   "t_e2e_runs": [
+    869.6963825190905,
+    861.342607208062
+   ]
+  },
+  {
+   "mesh": "icon",
+   "backend": "cpu",
+   "precond": "jacobi",
+   "n": 2,
+   "L_km": 100.0,
+   "matvec_equiv_per_iter": 1.0,
+   "tol": 1e-09,
+   "iters": 395,
+   "relres": 8.937356086337255e-10,
+   "converged": true,
+   "retried": false,
+   "t_first": 2049.8417301678564,
+   "t_kernel_med": 2067.353138754028,
+   "t_kernel_runs": [
+    2096.818344270112,
+    2037.8879332379438
+   ],
+   "t_e2e_med": null,
+   "t_e2e_runs": []
+  },
+  {
+   "mesh": "icon",
+   "backend": "cpu",
+   "precond": "jacobi",
+   "n": 2,
+   "L_km": 200.0,
+   "matvec_equiv_per_iter": 1.0,
+   "tol": 1e-06,
+   "iters": 423,
+   "relres": 9.926476910959285e-07,
+   "converged": true,
+   "retried": false,
+   "t_first": 2175.062457074877,
+   "t_kernel_med": 2154.114957452053,
+   "t_kernel_runs": [
+    2154.851208335953,
+    2153.3787065681536
+   ],
+   "t_e2e_med": 2175.2934388093418,
+   "t_e2e_runs": [
+    2170.128123493865,
+    2180.4587541248184
+   ]
+  }
+ ]
+}
