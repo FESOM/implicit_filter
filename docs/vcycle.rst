@@ -99,10 +99,14 @@ Limitations
   ``NotImplementedError`` is raised.
 * **The mesh must yield a symmetric operator.** Setup verifies every
   level and refuses structurally asymmetric stencils with a clear error.
-  In practice: triangular meshes (FESOM, ICON) and *uniform* lat-lon
-  grids work; stretched lat-lon grids — including the NEMO/FOCI ORCA
-  grid, measured 0.6 relative asymmetry — are rejected and stay on
-  Jacobi. Caches saved by older package versions in float32 produce a
+  In practice: triangular meshes (FESOM, ICON) and all tensor-product
+  lat-lon grids work — including arbitrarily *stretched* axes, which are
+  symmetrized exactly by an internal ``area²`` weighting. Curvilinear
+  grids (``NemoFilter``'s ORCA ``mesh_mask`` grids: measured 0.6 relative
+  asymmetry, grid-wide, irreparable by any diagonal weighting — the
+  symmetrized operator is even indefinite) are rejected and stay on
+  Jacobi; a symmetric reassembly of that stencil is possible follow-up
+  work. Caches saved by older package versions in float32 produce a
   harmless storage-roundoff warning.
 * The preconditioner choice is not persisted by ``save_to_file``.
 

@@ -21,11 +21,12 @@ Notes:
 - The V-cycle path verifies the true (unweighted) residual after the solve
   and raises `SolverNotConvergedError` if the tolerance was not met — the
   default path keeps JAX CG's silent behaviour, unchanged.
-- Supported systems: triangular nodes and elements (FESOM, ICON) and
-  uniform lat-lon grids; spatially varying `k` and the metric-terms
-  (`full=True`) system raise clear errors; structurally asymmetric
-  stencils (stretched lat-lon grids, e.g. the NEMO/FOCI ORCA grid at 0.6
-  relative asymmetry) are refused at setup.
+- Supported systems: triangular nodes and elements (FESOM, ICON) and all
+  tensor-product lat-lon grids, including stretched axes (symmetrized
+  exactly by an internal `area²` weighting); spatially varying `k` and
+  the metric-terms (`full=True`) system raise clear errors; curvilinear
+  stencils (NEMO/FOCI ORCA `mesh_mask` grids, 0.6 relative asymmetry
+  under any diagonal weighting) are refused at setup.
 - `set_backend("gpu")` now selects the concrete `cuda` platform when the
   split CUDA plugin (`jax[cuda12]`) is installed — with the plugin, JAX's
   `"gpu"` alias also probes a ROCm stub whose failure made GPU selection

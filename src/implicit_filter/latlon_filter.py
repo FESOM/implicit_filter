@@ -257,9 +257,18 @@ class LatLonFilter(Filter):
 
             # The lat-lon stencil is assembled negative-semidefinite (the
             # solve scales by -1/k^2), so the PSD-convention stencil is -S.
+            # The symmetrizing weight is area^2, not area: the stencil entry
+            # (i -> j) is (hc_ij / hh[dir, i]) / area_i with hh_x = g(x),
+            # hh_y = h(y), area = g*h on the tensor-product grid prepare()
+            # builds, and W_i * S_ij = W_j * S_ji for both directions exactly
+            # when W = (g*h)^2 -- including arbitrarily stretched axes.
+            # (Curvilinear grids such as NEMO's ORCA are not tensor-product;
+            # their stencil is structurally asymmetric under any diagonal
+            # weight and the V-cycle setup rejects them.)
             tts = solve_with_vcycle(
                 ss=-np.asarray(self._ss), ii=self._ii, jj=self._jj,
-                area=self._area, n_size=int(self._e2d), n=n,
+                area=np.square(np.asarray(self._area, dtype=np.float64)),
+                n_size=int(self._e2d), n=n,
                 k=validate_scalar_k(k_arg), apply_A=apply_A,
                 b_pert=ttw, x0_pert=x0_pert, tol=tol, maxiter=maxiter,
                 options=self.preconditioner_options,

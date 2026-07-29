@@ -25,6 +25,7 @@ def probe(path, family):
     n = area.size
     if family == "latlon":
         ss = -ss                       # assembly is negative-semidefinite
+        area = area ** 2               # tensor-product symmetrizing weight
     S = sp.csr_matrix((ss, (ii, jj)), shape=(n, n))
     K = sp.diags(area) @ S
     diff = (K - K.T).tocoo()

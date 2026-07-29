@@ -134,8 +134,9 @@ filtered = flter.compute(2, 2*math.pi / distance, data)
 
 Works identically on CPU and GPU; requires a spatially uniform filter scale.
 See the [documentation](https://fesom.github.io/implicit_filter/) for how it
-works, tuning knobs, limitations (e.g. stretched NEMO grids are rejected), and
-measured before/after benchmarks.
+works, tuning knobs, limitations (e.g. curvilinear NEMO `mesh_mask` grids are
+rejected; stretched regular lat-lon grids are supported), and measured
+before/after benchmarks.
 
 ## 🔺 Filtering on elements
 

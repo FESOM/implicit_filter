@@ -160,19 +160,24 @@ def test_latlon_vcycle_matches_direct_and_jacobi(prepared_latlon):
     assert np.abs(out - ref).max() < 5e-2
 
 
-def test_latlon_stretched_grid_rejected_with_clear_error():
-    # On stretched grids the lat-lon FV stencil weighted by cell area is
-    # structurally asymmetric (measured 0.6 relative on the real NEMO/FOCI
-    # grid), so the V-cycle setup must refuse it loudly instead of running
-    # broken numerics. Uniform grids remain supported.
+def test_latlon_stretched_grid_supported_via_area_squared_weight():
+    # Stretched tensor-product grids are asymmetric under the plain area
+    # weight (7e-2 relative on this fixture) but exactly symmetric under
+    # area^2, so the V-cycle must work -- and match a direct solve.
     lon = np.linspace(0.0, 20.0, 45)
     lat = np.concatenate([np.linspace(-10.0, 0.0, 15),
                           np.linspace(0.5, 10.0, 25)])   # non-uniform spacing
     f = LatLonFilter()
     f.prepare(lat, lon, cartesian=True, local=True)
+    rng = np.random.default_rng(17)
+    data2d = rng.normal(size=(f._nx, f._ny))
+    k, n = 0.5, 2
+    x_true = _direct_solve(-np.asarray(f._ss), f._ii, f._jj, int(f._e2d),
+                           n, k, np.reshape(np.asarray(data2d), int(f._e2d)))
     f.set_preconditioner("vcycle")
-    with pytest.raises(ValueError, match="asymmet"):
-        f.compute(2, 0.5, np.ones((f._nx, f._ny)))
+    out = f.compute(n, k, data2d)
+    f.set_preconditioner("jacobi")
+    assert np.abs(np.reshape(out, int(f._e2d)) - x_true).max() < 1e-8
 
 
 def test_full_metric_terms_rejected():
