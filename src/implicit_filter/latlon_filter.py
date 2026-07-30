@@ -12,6 +12,7 @@ from implicit_filter.filter import Filter
 from implicit_filter.utils.utils import (
     SolverNotConvergedError,
     transform_attribute,
+    warn_unused_gpu_argument,
 )
 import jax.numpy as jnp
 from jax.scipy.sparse.linalg import cg
@@ -96,12 +97,14 @@ class LatLonFilter(Filter):
         mask : np.ndarray, optional
             Land-sea mask where True indicates land (default: all ocean)
         gpu : bool, optional
-            True to enable GPU acceleration (default: False)
+            Deprecated and without effect; select the backend with
+            :meth:`set_backend` instead.
 
         Notes
         -----
         - Land points are masked using Neumann boundary conditions
         """
+        warn_unused_gpu_argument(gpu)
         nx = len(longitude)
         ny = len(latitude)
         e2d = nx * ny

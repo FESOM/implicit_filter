@@ -29,7 +29,8 @@ class IconFilter(TriangularFilter):
             - True to automatically detect mask from file
             - False to treat all cells as ocean (default)
         gpu : bool, optional
-            True to enable GPU acceleration (default: False).
+            Deprecated and without effect; select the backend with
+            :meth:`set_backend` instead.
         filter_elements : bool, optional
             True to also assemble the element (triangle) filter operator,
             enabling filtering of element-based fields (default: False).
@@ -68,7 +69,8 @@ class IconFilter(TriangularFilter):
             - True: Auto-detect from 'cell_sea_land_mask'
             - False: All ocean cells (default)
         gpu : bool, optional
-            GPU acceleration flag (default: False).
+            Deprecated and without effect; select the backend with
+            :meth:`set_backend` instead.
         filter_elements : bool, optional
             True to also assemble the element (triangle) filter operator
             (default: False).

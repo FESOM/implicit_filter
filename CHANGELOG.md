@@ -31,6 +31,11 @@ Notes:
   split CUDA plugin (`jax[cuda12]`) is installed — with the plugin, JAX's
   `"gpu"` alias also probes a ROCm stub whose failure made GPU selection
   crash. CPU behaviour and `get_backend()` round-trips are unchanged.
+- The `gpu=` argument on every `prepare*` method is deprecated: it has
+  never had an effect. Passing a truthy value now emits a
+  `DeprecationWarning` pointing at `set_backend('gpu')`; the default
+  (`False`) stays silent, and the argument will be removed in a future
+  release.
 
 ### Backward compatibility
 

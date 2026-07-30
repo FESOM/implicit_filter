@@ -32,6 +32,7 @@ from implicit_filter.utils._jax_function import (
 from implicit_filter.utils.utils import (
     SolverNotConvergedError,
     transform_attribute,
+    warn_unused_gpu_argument,
 )
 from jax.scipy.sparse.linalg import cg
 from implicit_filter.filter import Filter
@@ -380,6 +381,9 @@ class TriangularFilter(Filter):
         """
         Prepare filter for a specific triangular mesh.
 
+        The ``gpu`` argument is deprecated (it never had an effect); use
+        :meth:`set_backend` instead.
+
         Computes mesh topology, geometric properties, and assembles the filter
         operator matrix. Must be called before any filtering operations.
 
@@ -406,7 +410,8 @@ class TriangularFilter(Filter):
         mask : np.ndarray, optional
             Element mask where True indicates ocean (default: all ocean).
         gpu : bool, optional
-            True to enable GPU acceleration (default: False).
+            Deprecated and without effect; select the backend with
+            :meth:`set_backend` instead.
         filter_elements : bool, optional
             True to assemble filter operators for elements in addition to nodes (default: False).
         elem_weights : {'equilateral', 'geometric'}, optional
@@ -433,6 +438,7 @@ class TriangularFilter(Filter):
         Coordinates are expected in degrees while cyclic_length is in radians.
         The mask is converted to nodal representation where True indicates land.
         """
+        warn_unused_gpu_argument(gpu)
         if elem_weights not in ("equilateral", "geometric"):
             raise ValueError(
                 f"Unknown elem_weights {elem_weights!r}; "

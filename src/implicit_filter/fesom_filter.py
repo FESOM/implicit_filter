@@ -54,7 +54,8 @@ class FesomFilter(TriangularFilter):
         mask : np.ndarray, optional
             Element land mask where True indicates land (default: None).
         gpu : bool, optional
-            True to enable GPU acceleration (default: False).
+            Deprecated and without effect; select the backend with
+            :meth:`set_backend` instead.
         filter_elements : bool, optional
             True to also assemble the element (triangle) filter operator,
             enabling filtering of element-based fields (default: False).
@@ -107,7 +108,8 @@ class FesomFilter(TriangularFilter):
         mask : np.ndarray, optional
             Element land mask (default: None).
         gpu : bool, optional
-            GPU acceleration flag (default: False).
+            Deprecated and without effect; select the backend with
+            :meth:`set_backend` instead.
         filter_elements : bool, optional
             True to also assemble the element (triangle) filter operator
             (default: False).

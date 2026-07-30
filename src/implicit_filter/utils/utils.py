@@ -10,6 +10,20 @@ class SolverNotConvergedError(Exception):
         self.errors = errors
 
 
+def warn_unused_gpu_argument(gpu):
+    """Warn when the deprecated, ineffective ``gpu=`` argument is used.
+
+    The flag has never had an effect; warning only when it is truthy keeps
+    existing ``gpu=False`` calls (indistinguishable from the default) silent.
+    """
+    if gpu:
+        warnings.warn(
+            "the 'gpu' argument has never had an effect and is deprecated; "
+            "it will be removed in a future release. Select the backend "
+            "with set_backend('gpu') before the first compute instead.",
+            DeprecationWarning, stacklevel=3)
+
+
 class VeryStupidIdeaError(Exception):
     def __init__(self, message, errors):
         super().__init__(message)
