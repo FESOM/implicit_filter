@@ -47,11 +47,11 @@ def transform_attribute(self, atr: str, lmbd, fill=None):
     """
     If attribute atr exists, then transform it using given Callable lmbd; otherwise it set with fill value
     """
-    if hasattr(self, atr) and getattr(self,atr) is not None:
-        setattr(self, atr, lmbd(getattr(self, atr)))
-    else:
+    val = getattr(self, atr, None)
+    if val is None or (hasattr(val, 'dtype') and val.dtype == object):
         setattr(self, atr, fill)
-
+    else:
+        setattr(self, atr, lmbd(val))
 
 def get_backend(backend: str):
     if backend == "gpu":
