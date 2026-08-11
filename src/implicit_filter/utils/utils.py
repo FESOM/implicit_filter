@@ -47,7 +47,7 @@ def transform_attribute(self, atr: str, lmbd, fill=None):
     """
     If attribute atr exists, then transform it using given Callable lmbd; otherwise it set with fill value
     """
-    if hasattr(self, atr):
+    if hasattr(self, atr) and getattr(self,atr) is not None:
         setattr(self, atr, lmbd(getattr(self, atr)))
     else:
         setattr(self, atr, fill)

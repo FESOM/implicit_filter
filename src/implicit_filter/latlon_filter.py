@@ -51,11 +51,21 @@ class LatLonFilter(Filter):
         Boolean mask for valid grid points (False indicates land)
     """
 
+    # The lat-lon stencil (_ss) is assembled negative-semidefinite, unlike
+    # TriangularFilter's; build_smat() uses this to scale by -1/k^2 instead
+    # of +1/k^2 so batch compute matches this class's own _compute.
+    _STENCIL_SIGN = -1.0
+
     def __init__(self, *initial_data, **kwargs):
         super().__init__(*initial_data, **kwargs)
         it = lambda ar: int(ar)
         ar = lambda ar: np.array(ar)
         st = lambda ar: str(ar)
+
+        # Files saved before the _e2d -> _n2d rename restore as _e2d; adopt
+        # it so transform_attribute below doesn't reset _n2d to the fill value.
+        if hasattr(self, "_e2d") and not hasattr(self, "_n2d"):
+            self._n2d = self._e2d
 
         # Transform and initialize attributes with default values
         transform_attribute(self, "_n2d", it, 0)

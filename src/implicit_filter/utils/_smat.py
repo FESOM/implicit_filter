@@ -9,8 +9,8 @@ import jax
 import jax.numpy as jnp
 from jax import ops
 import numpy as np
+import scipy.sparse as sp
 import jax.scipy.sparse.linalg as jspsl
-from implicit_filter.filter import Filter
 
 
 
@@ -46,66 +46,71 @@ jax.tree_util.register_pytree_node(
 # ---------------------------------------------------------------------------
 
 def build_smat(
-    X : Filter, 
-    kl:float | np.ndarray,
-    is_elem: bool = False
-    ) -> SmatData:
+    X,
+    kl: float | np.ndarray,
+    is_elem: bool = False,
+    ):
     """
-    Build the sparse matrix in CSR format for the given filter and filter wavelength.
+    Build the raw scaled stencil matrix for the given filter and filter wavelength.
+
+    Assembly runs on the host with scipy (mirroring how ``prepare()`` builds
+    the mesh operator), and returns a scipy sparse matrix rather than
+    :class:`SmatData` so callers (e.g. ``Filter._batch_compute``) can combine
+    it into stage matrices (``I + c1*Smat + c2*Smat**2``) with ordinary
+    sparse arithmetic before converting each stage to :class:`SmatData` via
+    :func:`to_smat_data`, which moves it onto the JAX device.
 
     Parameters
     ----------
     X : Filter
-        The filter object containing the grid information and filter coefficients.
+        The filter object (``TriangularFilter`` or ``LatLonFilter``)
+        containing the grid information and filter coefficients.
     kl : float | np.ndarray
-        Filter wavelength in spatial units. 
+        Filter wavelength in spatial units.
         Can be a float (applied to entire mesh) or an array with scales for each node or element.
         Size of the array must match the size of the input data.
     is_elem : bool, optional
-        If True, the filter is applied to elements; if False, it is applied to nodes. 
-        Default is False (node-based filtering). 
+        If True, the filter is applied to elements; if False, it is applied to nodes.
+        Default is False (node-based filtering).
         Triggered by the _batch_compute function in the filters.
-    
-    
+
     Returns
     -------
-    SmatData
-        A SmatData object containing the sparse matrix data in CSR format, 
-        along with the diagonal and row IDs.
+    scipy.sparse.csr_matrix
+        The scaled stencil matrix, signed to match ``X``'s own ``_compute``
+        convention (see ``X._STENCIL_SIGN``: +1 for TriangularFilter,
+        -1 for LatLonFilter).
     """
+    n_size = int(X._n2d if not is_elem else X._e2d)
+    ss = np.asarray(X._ss_e if is_elem else X._ss)
+    ii = np.asarray(X._ii_e if is_elem else X._ii)
+    jj = np.asarray(X._jj_e if is_elem else X._jj)
 
-    n_size = X._n2d if not is_elem else X._e2d
-    ss = X._ss_e if is_elem else X._ss
-    ii = X._ii_e if is_elem else X._ii
-    jj = X._jj_e if is_elem else X._jj
+    kl = np.full(n_size, kl) if isinstance(kl, (float, int)) else np.asarray(kl)
 
-    if isinstance(kl, float):
-        kl = np.full(n_size, kl)
+    Smat = sp.csc_matrix((ss, (ii, jj)), shape=(n_size, n_size))
 
-    Smat = X.csc_matrix(X.convers(ss),
-                        X.convers(ii),
-                        X.convers(jj),
-                        shape=(n_size, n_size))
-    
-    scaling_vector = 1.0 / np.square(kl)
-    nnz_per_column = np.diff(X.tonumpy(Smat.indptr))
+    sign = getattr(X, "_STENCIL_SIGN", 1.0)
+    scaling_vector = sign / np.square(kl)
+    nnz_per_column = np.diff(Smat.indptr)
     multipliers = np.repeat(scaling_vector, nnz_per_column)
-    Smat.data *= X.convers(multipliers)
+    Smat.data *= multipliers
 
-    Smat_csr = Smat.tocsr()
-    diag = X.tonumpy(Smat_csr.diagonal())
-    row_ids = np.repeat(
-        np.arange(n_size), 
-        np.diff(X.tonumpy(Smat_csr.indptr))
-    )
+    return Smat.tocsr()
 
+
+def to_smat_data(Smat_scipy, convers=jnp.array) -> SmatData:
+    """Convert a scipy/cupy CSR (or CSC) sparse matrix to :class:`SmatData`."""
+    csr = Smat_scipy.tocsr()
+    diag = np.array(csr.diagonal())
+    row_ids = np.repeat(np.arange(csr.shape[0]), np.diff(csr.indptr))
     return SmatData(
-        data = X.convers(Smat_csr.data),
-        indices = X.convers(Smat_csr.indices),
-        indptr = X.convers(Smat_csr.indptr),
-        diag = X.convers(diag),
-        row_ids = X.convers(row_ids),
-        shape = (n_size, n_size)
+        data=convers(csr.data),
+        indices=convers(csr.indices),
+        indptr=convers(csr.indptr),
+        diag=convers(diag),
+        row_ids=convers(row_ids),
+        shape=csr.shape,
     )
 
 def _matvec(
