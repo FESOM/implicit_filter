@@ -129,6 +129,20 @@ def filter_matrix(S, k, n):
     A.eliminate_zeros()
     return A.tocsr()
 
+def stage_matrix(S, k, c1, c2):
+    """``A = I + c1*(S/k^2) + c2*(S/k^2)^2`` as a scipy CSR matrix.
+
+    The stage form of the factorised higher-order filter (Danilov et al.
+    2024). Every stage is a polynomial in S, so D*A stays symmetric exactly
+    as for the single-power form, and the rest of the machinery is unchanged.
+    ``(c1, c2) = (gamma, 0)`` and ``(0, gamma)`` recover n = 1 and n = 2.
+    """
+    A1 = sp.csr_matrix(S, dtype=np.float64) * (1.0 / float(k) ** 2)
+    A = sp.identity(S.shape[0], format="csr", dtype=np.float64) + c1 * A1
+    if c2 != 0.0:
+        A = A + c2 * (A1 ** 2)
+    A.eliminate_zeros()
+    return A.tocsr()
 
 def _assert_roundoff_symmetric(A, label):
     """Return the symmetrized matrix, refusing structural asymmetry.
@@ -182,7 +196,7 @@ def _to_coo_jnp(A):
             jnp.asarray(C.row), jnp.asarray(C.col), int(C.shape[0]))
 
 
-def setup_vcycle(S, area, k, n, P_ops, *, degree=3, alpha=4.0, n_cycles=1,
+def setup_vcycle(S, area, k, n, P_ops, *, stage=None, degree=3, alpha=4.0, n_cycles=1,
                  seed=42, lam_safety=1.1):
     """Build all per-(k, n) V-cycle state on the symmetrized operator D @ A.
 
@@ -199,6 +213,7 @@ def setup_vcycle(S, area, k, n, P_ops, *, degree=3, alpha=4.0, n_cycles=1,
         Filter order (1 = harmonic, 2 = biharmonic).
     P_ops : list of scipy.sparse.csr_matrix
         Prolongators from :func:`build_hierarchy` (k-independent).
+    stage : tuple, optional — (c1, c2) of a factorised stage; overrides n.
     degree, alpha, n_cycles, seed, lam_safety : optional
         Chebyshev degree per pre/post smooth, spectral interval divisor
         (damps [lam_max/alpha, lam_max]), V-cycles per application, power
@@ -212,7 +227,7 @@ def setup_vcycle(S, area, k, n, P_ops, *, degree=3, alpha=4.0, n_cycles=1,
     VcycleData
     """
     area = np.asarray(area, dtype=np.float64)
-    A = filter_matrix(S, k, n)
+    A = filter_matrix(S, k, n) if stage is None else stage_matrix(S, k, *stage)
     A_hat = sp.diags(area) @ A
     A_hat = _assert_roundoff_symmetric(A_hat.tocsr(), "A_hat_0 = D*A")
 
@@ -394,7 +409,7 @@ def validate_scalar_k(kl):
 
 
 def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
-                      x0_pert, tol, maxiter, options, cache, tag):
+                      x0_pert, tol, maxiter, options, cache, tag, stage=None):
     """Solve ``A x = b_pert`` via CG on the symmetrized system with M = V-cycle.
 
     The CG runs on ``(D A) x = D b_pert`` (SPD), preconditioned by one
@@ -428,21 +443,23 @@ def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
             S, area_np,
             max_levels=options["max_levels"], max_coarse=options["max_coarse"],
             strength=options["strength"], seed=options["seed"])
-    d_key = ("data",) + sys_id + (int(n), k)
+    stage_id = ((float(stage[0]), float(stage[1])) if stage is not None
+                else (int(n),))
+    d_key = ("data",) + sys_id + stage_id + (k,)
     if d_key not in cache:
         cache[d_key] = setup_vcycle(
-            cache[("S",) + sys_id], area_np, k, n, cache[h_key],
+            cache[("S",) + sys_id], area_np, k, n, cache[h_key], stage=stage,
             degree=options["degree"], alpha=options["alpha"],
             n_cycles=options["n_cycles"], seed=options["seed"],
             lam_safety=options["lam_safety"])
-        # Keep only the most recent per-(k, n) setup per system: at n=2 the
+        # Keep every stage of the current k, drop the rest: at n=2 the
         # fine-level operator holds the sparse power of S on the device, and
         # accumulating one copy per filter scale exhausts GPU memory on
-        # multi-million-node meshes (~5 GB each at 7.4M nodes). Re-setup for
-        # a revisited scale is sub-second at 10^5 and ~10 s at 10^7 nodes;
-        # the k-independent hierarchy is kept.
+        # multi-million-node meshes (~5 GB each at 7.4M nodes). Both stages of
+        # one wavenumber are needed within a single compute() call, so
+        # evicting on every setup would rebuild them alternately.
         for stale in [q for q in cache
-                      if q[0] == "data" and q != d_key and q[1] == tag]:
+                      if q[0] == "data" and q[1] == tag and q[-1] != k]:
             cache.pop(stale)
 
     M = make_vcycle_preconditioner(cache[d_key])
@@ -462,5 +479,7 @@ def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
             raise SolverNotConvergedError(
                 "V-cycle-preconditioned CG did not reach the requested "
                 f"tolerance (achieved {rel:.3e} > {tol:.3e})",
-                [f"tag={tag}", f"n={n}", f"k={k}"])
+                [f"tag={tag}", f"n={n}",
+                 f"stage={stage}" if stage is not None else "stage=none",
+                 f"k={k}"])
     return x
