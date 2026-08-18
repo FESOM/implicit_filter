@@ -717,6 +717,116 @@ class TriangularFilter(Filter):
 
         return spectra
 
+    def compute_spectra_scalar_many(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        data: np.ndarray,
+        mask: np.ndarray | None = None,
+        on: str | None = None,
+        *,
+        highpass: bool = True,
+        gamma: float | None = None,
+        demean: bool = False,
+        vcycle_above: float | None = None,
+    ) -> np.ndarray:
+        """
+        Compute scalar spectra for several snapshots, wavenumber-outer.
+
+        Same result as calling :meth:`compute_spectra_scalar` once per
+        snapshot, but the loop order is reversed: the outer loop runs over
+        wavenumbers, so a V-cycle setup built for one ``k`` serves every
+        snapshot instead of being rebuilt for each. With the Jacobi
+        preconditioner there is no setup to reuse and the order is
+        irrelevant.
+
+        Parameters
+        ----------
+        n : int
+            Filter order (must be positive).
+        k : Iterable | np.ndarray
+            Target wavelengths for spectral analysis.
+        data : np.ndarray
+            Scalar field, shape ``(nt, N)`` — one row per snapshot.
+        mask : np.ndarray, optional
+            Boolean mask of length ``N``, True excludes a point. The same
+            mask is applied to every snapshot.
+        on : {'nodes', 'elements'}, optional
+            Where the data lives; inferred from ``N`` by default.
+        highpass, gamma, demean
+            As in :meth:`compute_spectra_scalar`. ``demean`` removes the
+            area-weighted mean of each snapshot separately.
+        vcycle_above : float | None, optional
+            If given, switch to the V-cycle preconditioner for filter scales
+            ``2*pi/k > vcycle_above`` and to Jacobi below. The preconditioner
+            in effect on entry is restored before returning. Measured on a
+            15192-node mesh, the V-cycle starts to win at n >= 3 somewhere
+            below L = 1000 (n=4, L=3500: 2.7 s against 66 s for Jacobi) and
+            loses at small scales, so a threshold around 1000 is a reasonable
+            starting point. Pass ``k`` sorted so the switch happens once.
+
+        Returns
+        -------
+        np.ndarray
+            Shape ``(nt, len(k) + 1)``. Column 0 is the total variance of
+            each snapshot, columns 1.. the variance at each wavelength.
+        """
+        data = np.asarray(data)
+        if data.ndim != 2:
+            raise ValueError(
+                f"data must be 2-D (nt, N); got shape {data.shape}. "
+                "Use compute_spectra_scalar for a single snapshot.")
+        nt, N = data.shape
+        nr = len(k)
+
+        if mask is None:
+            mask = np.zeros(N, dtype=bool)
+        mask = np.asarray(mask)
+        if mask.shape != (N,):
+            raise ValueError(
+                f"mask must have shape ({N},); got {mask.shape}")
+
+        is_elem = self._resolve_target(N, on)
+        placement = "elements" if is_elem else "nodes"
+        area_arr = np.array(self._elem_area) if is_elem else np.array(self._area)
+
+        not_mask = ~mask
+        selected_area = area_arr[not_mask]
+        area_sum = np.sum(selected_area)
+
+        work = data.astype(np.float64, copy=True)
+        if demean:
+            for t in range(nt):
+                m = np.sum(selected_area * work[t][not_mask]) / area_sum
+                work[t][not_mask] = work[t][not_mask] - m
+
+        spectra = np.zeros((nt, nr + 1))
+        for t in range(nt):
+            spectra[t, 0] = np.sum(
+                selected_area * (np.square(work[t]))[not_mask]) / area_sum
+
+        pc_entry = self.get_preconditioner()
+        try:
+            for i in range(nr):
+                if vcycle_above is not None:
+                    scale = 2.0 * np.pi / float(np.max(k[i]))
+                    want = "vcycle" if scale > vcycle_above else "jacobi"
+                    if self.get_preconditioner() != want:
+                        self.set_preconditioner(want)
+                for t in range(nt):
+                    ttu = self.compute(n, k[i], work[t], on=placement,
+                                       highpass=highpass, gamma=gamma)
+                    if highpass:
+                        ttu -= work[t]
+                    ttu[mask] = 0.0
+                    spectra[t, i + 1] = np.sum(
+                        selected_area * (np.square(ttu))[not_mask]) / area_sum
+        finally:
+            if self.get_preconditioner() != pc_entry:
+                self.set_preconditioner(pc_entry)
+
+        return spectra
+
     def compute_spectra_velocity(
         self,
         n: int,
@@ -812,6 +922,102 @@ class TriangularFilter(Filter):
             spectra[i + 1] = np.sum(
                 selected_area * (np.square(ttu) + np.square(ttv))[not_mask]
             ) / area_sum
+
+        return spectra
+
+    def compute_spectra_velocity_many(
+        self,
+        n: int,
+        k: Iterable | np.ndarray,
+        ux: np.ndarray,
+        vy: np.ndarray,
+        mask: np.ndarray | None = None,
+        on: str | None = None,
+        *,
+        highpass: bool = True,
+        gamma: float | None = None,
+        demean: bool = False,
+        vcycle_above: float | None = None,
+    ) -> np.ndarray:
+        """
+        Compute velocity spectra for several snapshots, wavenumber-outer.
+
+        See :meth:`compute_spectra_scalar_many` for the loop-order rationale
+        and for ``vcycle_above``.
+
+        Parameters
+        ----------
+        ux, vy : np.ndarray
+            Velocity components, shape ``(nt, N)`` each.
+
+        Returns
+        -------
+        np.ndarray
+            Shape ``(nt, len(k) + 1)``; column 0 is the total kinetic energy
+            of each snapshot.
+        """
+        ux = np.asarray(ux)
+        vy = np.asarray(vy)
+        if ux.ndim != 2 or ux.shape != vy.shape:
+            raise ValueError(
+                "ux and vy must both be 2-D (nt, N) and of equal shape; got "
+                f"{ux.shape} and {vy.shape}")
+        nt, N = ux.shape
+        nr = len(k)
+
+        if mask is None:
+            mask = np.zeros(N, dtype=bool)
+        mask = np.asarray(mask)
+        if mask.shape != (N,):
+            raise ValueError(f"mask must have shape ({N},); got {mask.shape}")
+
+        is_elem = self._resolve_target(N, on)
+        placement = "elements" if is_elem else "nodes"
+        area_arr = np.array(self._elem_area) if is_elem else np.array(self._area)
+
+        not_mask = ~mask
+        selected_area = area_arr[not_mask]
+        area_sum = np.sum(selected_area)
+
+        uw = ux.astype(np.float64, copy=True)
+        vw = vy.astype(np.float64, copy=True)
+        if demean:
+            for t in range(nt):
+                mu = np.sum(selected_area * uw[t][not_mask]) / area_sum
+                mv = np.sum(selected_area * vw[t][not_mask]) / area_sum
+                uw[t][not_mask] = uw[t][not_mask] - mu
+                vw[t][not_mask] = vw[t][not_mask] - mv
+
+        spectra = np.zeros((nt, nr + 1))
+        for t in range(nt):
+            spectra[t, 0] = np.sum(
+                selected_area * (np.square(uw[t]) + np.square(vw[t]))[not_mask]
+            ) / area_sum
+
+        pc_entry = self.get_preconditioner()
+        try:
+            for i in range(nr):
+                if vcycle_above is not None:
+                    scale = 2.0 * np.pi / float(np.max(k[i]))
+                    want = "vcycle" if scale > vcycle_above else "jacobi"
+                    if self.get_preconditioner() != want:
+                        self.set_preconditioner(want)
+                for t in range(nt):
+                    ttu, ttv = self.compute_velocity(
+                        n, k[i], uw[t], vw[t], on=placement,
+                        highpass=highpass, gamma=gamma)
+                    if highpass:
+                        ttu -= uw[t]
+                        ttv -= vw[t]
+                    ttu[mask] = 0.0
+                    ttv[mask] = 0.0
+                    spectra[t, i + 1] = np.sum(
+                        selected_area
+                        * (np.square(ttu) + np.square(ttv))[not_mask]
+                    ) / area_sum
+        finally:
+            if self.get_preconditioner() != pc_entry:
+                self.set_preconditioner(pc_entry)
 
         return spectra
 
