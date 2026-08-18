@@ -9,6 +9,9 @@ Verifies:
 """
 import numpy as np
 import pytest
+import scipy.sparse as sp
+from scipy.sparse.linalg import cg, LinearOperator
+
 from implicit_filter import TriangularFilter
 from implicit_filter.utils._auxiliary import make_tri
 from implicit_filter.utils.utils import filter_stages
@@ -44,25 +47,44 @@ def build_filter(Lx=20, filter_elements=True):
 
 # ---------------------------------------------------------------------------
 # Reference helpers: rebuild the OLD behavior independently inside the test
+#
+# These used to go through the filter's backend abstraction
+# (filt.csc_matrix / convers / identity / cg / tonumpy). That abstraction was
+# removed when TriangularFilter went matrix-free; on the CPU backend it was
+# scipy anyway, so the reference is now written directly against scipy.
 # ---------------------------------------------------------------------------
 
+def _reference_cg(A, b, M, tol=1e-6, maxiter=150000):
+    """scipy CG, tolerant of the tol -> rtol rename in scipy 1.14."""
+    try:
+        return cg(A, b, M=M, tol=tol, maxiter=maxiter)
+    except TypeError:
+        return cg(A, b, M=M, rtol=tol, maxiter=maxiter)
+
+
 def _build_scaled_smat1(filt, ss, ii, jj, n_size, k):
-    """Build and 1/k**2-scale Smat1 exactly as _compute does."""
+    """Build and 1/k**2-scale Smat1 as _compute does.
+
+    Column-wise scaling is kept (rather than a single scalar multiply) so
+    that a spatially varying k array would work here too.
+    """
     kl = np.ones(n_size) * k
-    Smat1 = filt.csc_matrix(
-        (filt.convers(ss), (filt.convers(ii), filt.convers(jj))),
+    Smat1 = sp.csc_matrix(
+        (np.asarray(ss, dtype=np.float64),
+         (np.asarray(ii), np.asarray(jj))),
         shape=(n_size, n_size),
     )
     scaling_vector = 1.0 / np.square(kl)
-    nnz_per_column = np.diff(filt.tonumpy(Smat1.indptr))
-    multipliers = np.repeat(scaling_vector, filt.tonumpy(nnz_per_column))
-    Smat1.data *= filt.convers(multipliers)
+    nnz_per_column = np.diff(Smat1.indptr)
+    multipliers = np.repeat(scaling_vector, nnz_per_column)
+    Smat1.data = Smat1.data * multipliers
     return Smat1
 
 
 def _old_compute(filt, n, k, data):
     """Original single-system formula:  identity + 2.0*(Smat1**n).
-    Uses Smat1**n (NOT @) to stay compatible with the JAX-backed CPU backend.
+
+    Uses Smat1**n (NOT @) because ** is the true sparse matrix power here.
     """
     n_size = len(data)
     is_elem = (n_size == filt._e2d)
@@ -71,17 +93,17 @@ def _old_compute(filt, n, k, data):
     jj = filt._jj_e if is_elem else filt._jj
 
     Smat1 = _build_scaled_smat1(filt, ss, ii, jj, n_size, k)
-    Smat = filt.identity(n_size) + 2.0 * (Smat1 ** n)
+    Smat = (sp.identity(n_size, format="csc") + 2.0 * (Smat1 ** n)).tocsc()
 
-    ttu = filt.convers(data)
+    ttu = np.asarray(data, dtype=np.float64)
     ttw = ttu - Smat @ ttu
-    b = 1.0 / Smat.diagonal()
-    arr = filt.convers(np.arange(n_size))
-    pre = filt.csc_matrix((b, (arr, arr)), shape=(n_size, n_size))
-    tts, code = filt.cg(Smat, ttw, None, 1e-6, 150000, pre)
+
+    b = 1.0 / Smat.diagonal()  # Jacobi preconditioner
+    pre = LinearOperator(Smat.shape, matvec=lambda x, b=b: b * x)
+
+    tts, code = _reference_cg(Smat, ttw, pre)
     assert code == 0, "reference solver did not converge"
-    tts += ttu
-    return filt.tonumpy(tts)
+    return np.asarray(tts + ttu)
 
 
 # ---------------------------------------------------------------------------
@@ -128,12 +150,12 @@ class TestFactorization:
     def test_stage_product_matches_target(self, n, gamma):
         filt, n2d, _ = build_filter(20)
         Smat1 = _build_scaled_smat1(filt, filt._ss, filt._ii, filt._jj, n2d, 5.0)
-        I = filt.identity(n2d)
+        I = sp.identity(n2d, format="csc")
 
         # target operator
         target = (I + gamma * (Smat1 ** n)).toarray()
 
-        # product of stages (use ** for the square to stay backend-safe)
+        # product of stages (** is the true sparse matrix power)
         prod = I
         for (c1, c2) in filter_stages(n, gamma):
             stage = I + c1 * Smat1
