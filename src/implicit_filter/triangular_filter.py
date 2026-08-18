@@ -603,13 +603,32 @@ class TriangularFilter(Filter):
             )
             ss_e, ii_e, jj_e = fast_assemble_from_intermediate(e2d, ee_num, ee_pos, smooth_m)
 
-            # Masking as for the nodal operator, but with the original
-            # element-based mask (True = ocean). Enforces the same Neumann BC.
+            # Land masking for the element operator, using the original
+            # element-based mask (True = ocean), as for the nodal operator.
+            ss_e = np.asarray(ss_e)
+            ii_e = np.asarray(ii_e)
+            jj_e = np.asarray(jj_e)
             mask_e = np.asarray(mask)
-            mask_sp_e = np.logical_and(mask_e[np.asarray(ii_e)], mask_e[np.asarray(jj_e)])
-            ss_e = ss_e[mask_sp_e]
+            mask_sp_e = np.logical_and(mask_e[ii_e], mask_e[jj_e])
+
+            # Neumann BC: the diagonal is assembled as minus the sum of the
+            # off-diagonals, so every row sums to zero and a constant field is
+            # in the operator's null space. Dropping the coupling to a land
+            # cell without touching the diagonal breaks that property for the
+            # ocean cells along the coast, and a constant field is no longer
+            # preserved there. Adding the dropped (negative) off-diagonal back
+            # onto the diagonal restores the zero row sum, which is what "no
+            # flux through the boundary" means.
+            dropped = (~mask_sp_e) & (ii_e != jj_e)
+            correction = np.zeros(e2d, dtype=ss_e.dtype)
+            np.add.at(correction, ii_e[dropped], ss_e[dropped])
+
+            ss_e = ss_e[mask_sp_e].copy()
             ii_e = ii_e[mask_sp_e]
             jj_e = jj_e[mask_sp_e]
+
+            diag_e = ii_e == jj_e
+            ss_e[diag_e] = ss_e[diag_e] + correction[ii_e[diag_e]]
 
             self._ss_e = jnp.array(ss_e)
             self._ii_e = jnp.array(ii_e)
