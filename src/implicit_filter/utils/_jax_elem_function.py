@@ -142,6 +142,15 @@ def fast_build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full_fo
     Fully vectorized construction of smoothing and metric matrices.
     No Python loops.
 
+    Land cells (``elem_area == 0``, i.e. masked out in :func:`areas`) are
+    treated exactly like the domain boundary: a coupling is written only when
+    the neighbour exists *and* is itself a valid cell. Since the diagonal is
+    then set as minus the sum of the off-diagonals, every row still sums to
+    zero, so a constant field stays in the operator's null space -- which is
+    what the Neumann condition means. Dropping the couplings after assembly
+    instead would leave the diagonal inconsistent and break that property for
+    the ocean cells along the coast.
+
     Parameters
     ----------
     scheme : {'equilateral', 'geometric'}
@@ -173,15 +182,27 @@ def fast_build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full_fo
     smooth_m = np.zeros((4, e2d))
     metric = np.zeros((4, e2d))
 
-    # Mask for elements with positive area
+    # Mask for elements with positive area. elem_area is already zeroed for
+    # masked (land) cells in areas(), so this is the land mask as well.
     valid = elem_area > 0
 
     safe_area = np.where(valid, elem_area, 1.0)  # avoid div/0
     off_diag = -np.sqrt(3) / safe_area
 
+    # Per-neighbour-slot activity: the cell itself must be valid, the k-th
+    # neighbour must exist (ee_num > k; unused slots hold -1 in ee_pos), and
+    # that neighbour must be valid too. The has_neighbour guard is needed
+    # before indexing valid[] because -1 would silently read the last cell.
+    active_k = []
+    for k in range(3):
+        has_neighbour = ee_num > k
+        nb_valid = np.zeros(e2d, dtype=bool)
+        nb_valid[has_neighbour] = valid[ee_pos[k, has_neighbour]]
+        active_k.append(valid & has_neighbour & nb_valid)
+
     # Fill off-diagonal entries: rows 1, 2, 3 (for neighbors 0, 1, 2)
     for k in range(3):
-        active = valid & (ee_num > k)
+        active = active_k[k]
         if scheme == "geometric":
             smooth_m[k + 1, active] = -weights[k, active] / safe_area[active]
         else:
@@ -193,7 +214,7 @@ def fast_build_smoothing_and_metric(e2d, n2d, ee_num, ee_pos, elem_area, full_fo
     if full_form and Mt is not None and dxcell is not None:
         smooth_m[0, valid] += Mt[valid] ** 2
         for k in range(3):
-            active = valid & (ee_num > k)
+            active = active_k[k]
             metric[k + 1, active] = 2.0 * dxcell[k, active] * Mt[active] / elem_area[active]
 
     return smooth_m, metric
