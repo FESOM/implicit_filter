@@ -60,7 +60,7 @@ def get_backend(backend: str):
             tonumpy = cupy.asnumpy
 
             cg = lambda Smat, ttw, x0, tol, maxiter, pre: cupy_cg(
-                A=Smat, b=ttw, x0=x0, tol=tol, maxiter=maxiter, M=pre
+                A=Smat, b=ttw, x0=x0, rtol=tol, maxiter=maxiter, M=pre
             )
             return csc_matrix, identity, diags, cg, convers, tonumpy
 
