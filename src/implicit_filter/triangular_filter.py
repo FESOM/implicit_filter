@@ -255,6 +255,102 @@ class TriangularFilter(Filter):
 
         return np.array(tts)
 
+    def _compute_batch(self, n, kl, ttu, gamma=2.0, x0=None, tol=1e-6, maxiter=150000,
+                        is_elem=None) -> np.ndarray:
+        """
+        Batched counterpart to :meth:`_compute`: solves the same per-stage
+        system for a whole leading batch of right-hand sides (e.g. time
+        steps or depth levels) at once via ``jax.vmap`` over the matrix-free
+        stencil, instead of looping :meth:`compute`/:meth:`compute_velocity`
+        one field at a time.
+
+        Parameters
+        ----------
+        ttu : np.ndarray, shape (T, n_size)
+            Batch of right-hand sides.
+        x0 : np.ndarray, shape (T, n_size), optional
+            Batch of warm-start fields; see :meth:`_compute`'s caveat that a
+            warm start is only used for a single-stage solve (n = 1 or 2).
+
+        With the V-cycle preconditioner selected (:meth:`set_preconditioner`),
+        each stage's setup (mesh + stage + k, independent of the batch) is
+        built once via
+        :func:`implicit_filter.utils._vcycle.prepare_vcycle_preconditioner`
+        and then applied to the whole batch via
+        :func:`implicit_filter.utils._vcycle.solve_with_vcycle_batch`; unlike
+        the single-field V-cycle path, this forgoes the automatic
+        retry-at-tighter-tolerance on non-convergence (it needs a concrete
+        residual norm, which isn't available under ``jax.vmap``).
+        """
+        kl_arg = kl  # pre-broadcast value; the V-cycle path needs a scalar k
+        if is_elem is None:
+            is_elem = (ttu.shape[-1] == self._e2d)
+        if is_elem and self._ss_e is None:
+            raise ValueError("Filter was not prepared with filter_elements=True")
+
+        n_size = self._e2d if is_elem else self._n2d
+        ss = self._ss_e if is_elem else self._ss
+        ii = self._ii_e if is_elem else self._ii
+        jj = self._jj_e if is_elem else self._jj
+
+        if isinstance(kl, (float, int, np.number)):
+            kl = np.ones(n_size) * kl
+
+        scaling_vector = 1.0 / np.square(kl)
+        data = ss * scaling_vector[jj]
+
+        diag_mask = ii == jj
+        Smat1_diag = jnp.zeros(n_size).at[ii[diag_mask]].add(data[diag_mask])
+
+        stages = filter_stages(n, gamma)
+        use_vcycle = self.get_preconditioner() == "vcycle"
+
+        tts = jnp.array(ttu)
+        x0_j = None if x0 is None else jnp.array(x0)
+
+        for (c1, c2) in stages:
+            def apply_A(x, c1=c1, c2=c2):
+                Sx = jnp.zeros_like(x).at[ii].add(data * x[jj])
+                y = x + c1 * Sx
+                if c2 != 0.0:
+                    y = y + c2 * jnp.zeros_like(x).at[ii].add(data * Sx[jj])
+                return y
+
+            approx_diag_Smat = 1.0 + c1 * Smat1_diag + c2 * (Smat1_diag ** 2)
+
+            def precond(x, d=approx_diag_Smat):
+                return x / d
+
+            ttw = jax.vmap(apply_A)(tts)
+            ttw = tts - ttw
+            x0_pert = (None if (x0_j is None or len(stages) > 1)
+                       else (x0_j - tts))
+
+            if use_vcycle and c2 != 0.0:
+                from implicit_filter.utils._vcycle import (
+                    solve_with_vcycle_batch, validate_scalar_k)
+
+                sol = solve_with_vcycle_batch(
+                    ss=ss, ii=ii, jj=jj,
+                    area=self._elem_area if is_elem else self._area,
+                    n_size=n_size, n=n, stage=(c1, c2),
+                    k=validate_scalar_k(kl_arg),
+                    apply_A=apply_A, b_pert_batch=ttw, x0_pert_batch=x0_pert,
+                    tol=tol, maxiter=maxiter, options=self.preconditioner_options,
+                    cache=self.vcycle_cache, tag="elem" if is_elem else "node")
+            else:
+                M = None if self.get_preconditioner() == "none" else precond
+                solve_one = lambda b, x0b: cg(apply_A, b, x0=x0b, tol=tol,
+                                               maxiter=maxiter, M=M)[0]
+                if x0_pert is None:
+                    sol = jax.vmap(lambda b: solve_one(b, None))(ttw)
+                else:
+                    sol = jax.vmap(solve_one)(ttw, x0_pert)
+
+            tts = sol + tts
+
+        return np.array(tts)
+
     def _compute_full(self, n, kl, ttuv, gamma=2.0, x0=None, tol=1e-5,
                       maxiter=150000) -> np.ndarray:
         if n > 2:

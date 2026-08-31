@@ -408,26 +408,32 @@ def validate_scalar_k(kl):
     return float(uniq[0])
 
 
-def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
-                      x0_pert, tol, maxiter, options, cache, tag, stage=None):
-    """Solve ``A x = b_pert`` via CG on the symmetrized system with M = V-cycle.
+def prepare_vcycle_preconditioner(*, ss, ii, jj, area, n_size, n, k,
+                                   options, cache, tag, stage=None) -> Callable:
+    """Build (or fetch from ``cache``) the V-cycle preconditioner for one
+    (mesh, stage, k) operator, without solving anything.
 
-    The CG runs on ``(D A) x = D b_pert`` (SPD), preconditioned by one
-    V-cycle per iteration. ``ss/ii/jj`` must be the PSD-convention stencil
-    ``S = D^{-1} K`` (pass ``-ss`` for the lat-lon family). ``apply_A`` is
-    the host's matrix-free operator for the *original* system; the
-    symmetrized operator is ``area * apply_A(x)``. ``cache`` is the filter
-    instance's runtime dict; ``tag`` distinguishes the node/element/lat-lon
-    systems sharing one instance.
+    This is the data-independent half of :func:`solve_with_vcycle`: setup
+    depends only on the operator -- mesh, stage ``(c1, c2)``, and scalar
+    ``k`` -- never on the right-hand side being solved. Callers that need
+    to solve many right-hand sides through the *same* operator (e.g.
+    :func:`solve_with_vcycle_batch`'s ``jax.vmap`` over a time or depth
+    axis) call this once and reuse the returned preconditioner for every
+    one of them, instead of re-deriving it per solve.
 
-    Because CG stops on the D-weighted residual, the unweighted residual is
-    verified afterwards (with one bounded tighter-tolerance retry); jax's cg
-    reports no status, so this gate is the convergence check.
+    ``ss/ii/jj`` must be the PSD-convention stencil ``S = D^{-1} K`` (pass
+    ``-ss`` for the lat-lon family). ``cache`` is the filter instance's
+    runtime dict; ``tag`` distinguishes the node/element/lat-lon systems
+    sharing one instance.
+
+    Returns
+    -------
+    Callable
+        ``M(r_hat) ~= A_hat^{-1} r_hat``: JAX-traceable, linear, SPD (see
+        :func:`make_vcycle_preconditioner`), safe to use directly inside
+        ``jax.vmap``/``jax.jit`` since building it already ran outside the
+        trace.
     """
-    from jax.scipy.sparse.linalg import cg
-
-    from .utils import SolverNotConvergedError
-
     k = float(k)
     area_np = np.asarray(area, dtype=np.float64)
     # The system fingerprint guards against a re-prepared instance reusing a
@@ -462,8 +468,36 @@ def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
                       if q[0] == "data" and q[1] == tag and q[-1] != k]:
             cache.pop(stale)
 
-    M = make_vcycle_preconditioner(cache[d_key])
-    area_j = jnp.asarray(area_np)
+    return make_vcycle_preconditioner(cache[d_key])
+
+
+def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
+                      x0_pert, tol, maxiter, options, cache, tag, stage=None):
+    """Solve ``A x = b_pert`` via CG on the symmetrized system with M = V-cycle.
+
+    The CG runs on ``(D A) x = D b_pert`` (SPD), preconditioned by one
+    V-cycle per iteration. ``apply_A`` is the host's matrix-free operator
+    for the *original* system; the symmetrized operator is
+    ``area * apply_A(x)``. See :func:`prepare_vcycle_preconditioner` for
+    ``ss/ii/jj``/``cache``/``tag``.
+
+    Because CG stops on the D-weighted residual, the unweighted residual is
+    verified afterwards (with one bounded tighter-tolerance retry); jax's cg
+    reports no status, so this gate is the convergence check. This retry
+    needs a concrete residual norm, so it cannot run under ``jax.vmap``/
+    ``jax.jit``; see :func:`solve_with_vcycle_batch` for the batched
+    counterpart, which forgoes it.
+    """
+    from jax.scipy.sparse.linalg import cg
+
+    from .utils import SolverNotConvergedError
+
+    k = float(k)
+    M = prepare_vcycle_preconditioner(
+        ss=ss, ii=ii, jj=jj, area=area, n_size=n_size, n=n, k=k,
+        options=options, cache=cache, tag=tag, stage=stage)
+
+    area_j = jnp.asarray(np.asarray(area, dtype=np.float64))
     apply_A_hat = lambda x: area_j * apply_A(x)
     b_hat = area_j * b_pert
 
@@ -483,3 +517,44 @@ def solve_with_vcycle(*, ss, ii, jj, area, n_size, n, k, apply_A, b_pert,
                  f"stage={stage}" if stage is not None else "stage=none",
                  f"k={k}"])
     return x
+
+
+def solve_with_vcycle_batch(*, ss, ii, jj, area, n_size, n, k, apply_A,
+                             b_pert_batch, x0_pert_batch, tol, maxiter,
+                             options, cache, tag, stage=None):
+    """Batched counterpart to :func:`solve_with_vcycle`.
+
+    Solves the same V-cycle-preconditioned system for a whole leading batch
+    of right-hand sides (e.g. time steps or depth levels) via ``jax.vmap``,
+    reusing one preconditioner (built once, outside the vmap, via
+    :func:`prepare_vcycle_preconditioner`) across every lane.
+
+    Unlike :func:`solve_with_vcycle`, this runs exactly one CG pass per
+    batch element with no adaptive retry-at-tighter-tolerance: that retry
+    needs a concrete (non-traced) residual norm to decide whether to rerun,
+    which isn't available under ``jax.vmap``. Check the residual yourself
+    afterwards if you need a convergence guarantee.
+
+    ``apply_A`` must depend only on its argument ``x`` (no per-lane state)
+    -- ``b_pert_batch``/``x0_pert_batch`` (shape ``(T, n_size)``, the latter
+    optional) are the only batched inputs.
+    """
+    import jax
+    from jax.scipy.sparse.linalg import cg
+
+    k = float(k)
+    M = prepare_vcycle_preconditioner(
+        ss=ss, ii=ii, jj=jj, area=area, n_size=n_size, n=n, k=k,
+        options=options, cache=cache, tag=tag, stage=stage)
+
+    area_j = jnp.asarray(np.asarray(area, dtype=np.float64))
+    apply_A_hat = lambda x: area_j * apply_A(x)
+
+    def solve_one(b_pert, x0_pert):
+        b_hat = area_j * b_pert
+        x, _ = cg(apply_A_hat, b_hat, x0=x0_pert, tol=tol, maxiter=maxiter, M=M)
+        return x
+
+    if x0_pert_batch is None:
+        return jax.vmap(lambda b: solve_one(b, None))(b_pert_batch)
+    return jax.vmap(solve_one)(b_pert_batch, x0_pert_batch)

@@ -13,7 +13,10 @@ from implicit_filter.utils.utils import (
     SolverNotConvergedError,
     transform_attribute,
     warn_unused_gpu_argument,
+    filter_stages,
+    get_gamma,
 )
+import jax
 import jax.numpy as jnp
 from jax.scipy.sparse.linalg import cg
 
@@ -50,11 +53,6 @@ class LatLonFilter(Filter):
     _mask_n : np.ndarray
         Boolean mask for valid grid points (False indicates land)
     """
-
-    # The lat-lon stencil (_ss) is assembled negative-semidefinite, unlike
-    # TriangularFilter's; build_smat() uses this to scale by -1/k^2 instead
-    # of +1/k^2 so batch compute matches this class's own _compute.
-    _STENCIL_SIGN = -1.0
 
     def __init__(self, *initial_data, **kwargs):
         super().__init__(*initial_data, **kwargs)
@@ -235,10 +233,27 @@ class LatLonFilter(Filter):
         n: int,
         k: float | np.ndarray,
         data: np.ndarray,
+        gamma: float = 2.0,
         x0: np.ndarray | None = None,
         maxiter: int = 150_000,
         tol: float = 1e-6,
     ) -> np.ndarray:
+        """
+        Solve the implicit filter system, stage by stage.
+
+        For n >= 3 the operator ``I + gamma*S**n`` is factorised into stages of
+        order <= 2 (Danilov et al. 2024); see
+        :func:`implicit_filter.utils.utils.filter_stages`. Each stage solves
+        ``(I + c1*S + c2*S**2) x = b`` in perturbation form, and the output of
+        one stage is the input of the next. For n = 1, 2 there is a single
+        stage and this reduces to the original single-system formula.
+
+        ``filter_stages`` only factorises n = 1, 2, 3, 4; unlike the
+        pre-staging implementation, arbitrary n is no longer supported (this
+        matches :meth:`TriangularFilter._compute`'s constraint, taken on for
+        the same reason: it's the staged factorisation that keeps CG's
+        condition number bounded at higher order).
+        """
         k_arg = k  # pre-broadcast value; the V-cycle path needs a scalar k
         if isinstance(k, (float, int, np.number)):
             k = np.ones(self._n2d) * k
@@ -246,59 +261,173 @@ class LatLonFilter(Filter):
         scaling_vector = -1.0 / np.square(k)
         data_smat1 = self._ss * scaling_vector[self._jj]
 
-        def apply_A(x):
-            y = x
-            for _ in range(n):
-                y = jnp.zeros_like(x).at[self._ii].add(data_smat1 * y[self._jj])
-            return x + 2.0 * y
+        diag_mask = self._ii == self._jj
+        Smat1_diag = jnp.zeros(self._n2d).at[self._ii[diag_mask]].add(data_smat1[diag_mask])
+
+        stages = filter_stages(n, gamma)
+        use_vcycle = self.get_preconditioner() == "vcycle"
+
+        tts = jnp.array(data)
+        for (c1, c2) in stages:
+            # c1/c2 are bound as defaults so the closure captures this stage's
+            # coefficients rather than the loop variables' final values.
+            def apply_A(x, c1=c1, c2=c2):
+                Sx = jnp.zeros_like(x).at[self._ii].add(data_smat1 * x[self._jj])
+                y = x + c1 * Sx
+                if c2 != 0.0:
+                    y = y + c2 * jnp.zeros_like(x).at[self._ii].add(data_smat1 * Sx[self._jj])
+                return y
+
+            # Approximate diagonal of this stage. diag(S**2) is approximated by
+            # diag(S)**2, as in the original implementation.
+            approx_diag_Smat = 1.0 + c1 * Smat1_diag + c2 * (Smat1_diag ** 2)
+
+            def precond(x, d=approx_diag_Smat):
+                return x / d
+
+            ttw = tts - apply_A(tts)  # Work with perturbations
+            # A warm start only has a meaningful shape for a single-stage
+            # solve; with several stages the caller's x0 refers to the final
+            # field, not to this stage's intermediate solution.
+            x0_pert = (None if (x0 is None or len(stages) > 1)
+                       else (jnp.array(x0) - tts))
+
+            # Per-stage preconditioner choice: mirrors TriangularFilter's
+            # rationale -- a linear stage (c2 == 0) stays cheap for Jacobi,
+            # while a quadratic stage is where the V-cycle pays off.
+            if use_vcycle and c2 != 0.0:
+                from implicit_filter.utils._vcycle import (
+                    solve_with_vcycle, validate_scalar_k)
+
+                # The lat-lon stencil is assembled negative-semidefinite (the
+                # solve scales by -1/k^2), so the PSD-convention stencil is -S.
+                # The symmetrizing weight is area^2, not area: the stencil entry
+                # (i -> j) is (hc_ij / hh[dir, i]) / area_i with hh_x = g(x),
+                # hh_y = h(y), area = g*h on the tensor-product grid prepare()
+                # builds, and W_i * S_ij = W_j * S_ji for both directions exactly
+                # when W = (g*h)^2 -- including arbitrarily stretched axes.
+                # (Curvilinear grids such as NEMO's ORCA are not tensor-product;
+                # their stencil is structurally asymmetric under any diagonal
+                # weight and the V-cycle setup rejects them.)
+                sol = solve_with_vcycle(
+                    ss=-np.asarray(self._ss), ii=self._ii, jj=self._jj,
+                    area=np.square(np.asarray(self._area, dtype=np.float64)),
+                    n_size=int(self._n2d), n=n, stage=(c1, c2),
+                    k=validate_scalar_k(k_arg), apply_A=apply_A,
+                    b_pert=ttw, x0_pert=x0_pert, tol=tol, maxiter=maxiter,
+                    options=self.preconditioner_options,
+                    cache=self.vcycle_cache, tag="latlon")
+            else:
+                M = None if self.get_preconditioner() == "none" else precond
+                sol, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=M)
+                if code is not None and code != 0:
+                    raise SolverNotConvergedError(
+                        "Solver has not converged without metric terms",
+                        [f"output code with code: {code}"],
+                    )
+
+            tts = sol + tts  # add the perturbation back; input of the next stage
+
+        return np.array(tts)
+
+    def _compute_batch(
+        self,
+        n: int,
+        k: float | np.ndarray,
+        data: np.ndarray,
+        gamma: float = 2.0,
+        x0: np.ndarray | None = None,
+        maxiter: int = 150_000,
+        tol: float = 1e-6,
+    ) -> np.ndarray:
+        """
+        Batched counterpart to :meth:`_compute`: solves the same per-stage
+        system for a whole leading batch of right-hand sides (e.g. time
+        steps or depth levels) at once via ``jax.vmap`` over the matrix-free
+        stencil, instead of looping :meth:`compute`/:meth:`compute_velocity`
+        one field at a time.
+
+        Parameters
+        ----------
+        data : np.ndarray, shape (T, n2d)
+            Batch of right-hand sides.
+        x0 : np.ndarray, shape (T, n2d), optional
+            Batch of warm-start fields; see :meth:`_compute`'s caveat that a
+            warm start is only used for a single-stage solve (n = 1 or 2).
+
+        With the V-cycle preconditioner selected (:meth:`set_preconditioner`),
+        each stage's setup (mesh + stage + k, independent of the batch) is
+        built once via
+        :func:`implicit_filter.utils._vcycle.prepare_vcycle_preconditioner`
+        and then applied to the whole batch via
+        :func:`implicit_filter.utils._vcycle.solve_with_vcycle_batch`; unlike
+        the single-field V-cycle path, this forgoes the automatic
+        retry-at-tighter-tolerance on non-convergence (it needs a concrete
+        residual norm, which isn't available under ``jax.vmap``).
+        """
+        k_arg = k  # pre-broadcast value; the V-cycle path needs a scalar k
+        if isinstance(k, (float, int, np.number)):
+            k = np.ones(self._n2d) * k
+
+        scaling_vector = -1.0 / np.square(k)
+        data_smat1 = self._ss * scaling_vector[self._jj]
 
         diag_mask = self._ii == self._jj
         Smat1_diag = jnp.zeros(self._n2d).at[self._ii[diag_mask]].add(data_smat1[diag_mask])
-        approx_diag_Smat = 1.0 + 2.0 * (Smat1_diag ** n)
-        
-        def precond(x):
-            return x / approx_diag_Smat
 
-        ttu = jnp.array(data)
-        ttw = ttu - apply_A(ttu)  # Work with perturbations
+        stages = filter_stages(n, gamma)
+        use_vcycle = self.get_preconditioner() == "vcycle"
 
-        x0_pert = None if x0 is None else (jnp.array(x0) - ttu)
+        tts = jnp.array(data)
+        x0_j = None if x0 is None else jnp.array(x0)
 
-        if self.get_preconditioner() == "vcycle":
-            from implicit_filter.utils._vcycle import (
-                solve_with_vcycle, validate_scalar_k)
+        for (c1, c2) in stages:
+            def apply_A(x, c1=c1, c2=c2):
+                Sx = jnp.zeros_like(x).at[self._ii].add(data_smat1 * x[self._jj])
+                y = x + c1 * Sx
+                if c2 != 0.0:
+                    y = y + c2 * jnp.zeros_like(x).at[self._ii].add(data_smat1 * Sx[self._jj])
+                return y
 
-            # The lat-lon stencil is assembled negative-semidefinite (the
-            # solve scales by -1/k^2), so the PSD-convention stencil is -S.
-            # The symmetrizing weight is area^2, not area: the stencil entry
-            # (i -> j) is (hc_ij / hh[dir, i]) / area_i with hh_x = g(x),
-            # hh_y = h(y), area = g*h on the tensor-product grid prepare()
-            # builds, and W_i * S_ij = W_j * S_ji for both directions exactly
-            # when W = (g*h)^2 -- including arbitrarily stretched axes.
-            # (Curvilinear grids such as NEMO's ORCA are not tensor-product;
-            # their stencil is structurally asymmetric under any diagonal
-            # weight and the V-cycle setup rejects them.)
-            tts = solve_with_vcycle(
-                ss=-np.asarray(self._ss), ii=self._ii, jj=self._jj,
-                area=np.square(np.asarray(self._area, dtype=np.float64)),
-                n_size=int(self._n2d), n=n,
-                k=validate_scalar_k(k_arg), apply_A=apply_A,
-                b_pert=ttw, x0_pert=x0_pert, tol=tol, maxiter=maxiter,
-                options=self.preconditioner_options,
-                cache=self.vcycle_cache, tag="latlon")
-        else:
-            M = precond if self.get_preconditioner() == "jacobi" else None
-            tts, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=M)
-            if code is not None and code != 0:
-                raise SolverNotConvergedError(
-                    "Solver has not converged without metric terms",
-                    [f"output code with code: {code}"],
-                )
+            approx_diag_Smat = 1.0 + c1 * Smat1_diag + c2 * (Smat1_diag ** 2)
 
-        tts += ttu
+            def precond(x, d=approx_diag_Smat):
+                return x / d
+
+            ttw = tts - jax.vmap(apply_A)(tts)
+            x0_pert = (None if (x0_j is None or len(stages) > 1)
+                       else (x0_j - tts))
+
+            if use_vcycle and c2 != 0.0:
+                from implicit_filter.utils._vcycle import (
+                    solve_with_vcycle_batch, validate_scalar_k)
+
+                # See _compute's note: the lat-lon stencil is assembled
+                # negative-semidefinite, so the PSD-convention stencil is -S,
+                # and the symmetrizing weight is area^2, not area.
+                sol = solve_with_vcycle_batch(
+                    ss=-np.asarray(self._ss), ii=self._ii, jj=self._jj,
+                    area=np.square(np.asarray(self._area, dtype=np.float64)),
+                    n_size=int(self._n2d), n=n, stage=(c1, c2),
+                    k=validate_scalar_k(k_arg),
+                    apply_A=apply_A, b_pert_batch=ttw, x0_pert_batch=x0_pert,
+                    tol=tol, maxiter=maxiter, options=self.preconditioner_options,
+                    cache=self.vcycle_cache, tag="latlon")
+            else:
+                M = None if self.get_preconditioner() == "none" else precond
+                solve_one = lambda b, x0b: cg(apply_A, b, x0=x0b, tol=tol,
+                                               maxiter=maxiter, M=M)[0]
+                if x0_pert is None:
+                    sol = jax.vmap(lambda b: solve_one(b, None))(ttw)
+                else:
+                    sol = jax.vmap(solve_one)(ttw, x0_pert)
+
+            tts = sol + tts
+
         return np.array(tts)
 
-    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None) -> np.ndarray:
+    def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None, *,
+                highpass: bool = True, gamma: float | None = None) -> np.ndarray:
         """
         Apply filter to scalar field on lat-lon grid.
 
@@ -314,6 +443,11 @@ class LatLonFilter(Filter):
             Scalar field values on grid (shape: (nx, ny)).
         x0 : np.ndarray | None
             Initial guess for the solver.
+        highpass : bool, optional
+            Whether to use high-pass filtering. Sets gamma (2.0 vs 0.5) unless
+            gamma is given explicitly. Default True.
+        gamma : float | None, optional
+            Explicit gamma value. If None, derived from highpass. Default None.
 
         Returns
         -------
@@ -327,14 +461,16 @@ class LatLonFilter(Filter):
         """
         if n < 1:
             raise ValueError("Filter order must be positive")
+        g = get_gamma(highpass, gamma)
 
         x0_flat = np.reshape(x0, self._n2d) if x0 is not None else None
         return np.reshape(
-            self._compute(n, k, np.reshape(data, self._n2d), x0=x0_flat), (self._nx, self._ny)
+            self._compute(n, k, np.reshape(data, self._n2d), gamma=g, x0=x0_flat), (self._nx, self._ny)
         )
 
     def compute_velocity(
-        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray, ux0: np.ndarray | None = None, vy0: np.ndarray | None = None
+        self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray, ux0: np.ndarray | None = None,
+        vy0: np.ndarray | None = None, *, highpass: bool = True, gamma: float | None = None,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Apply filter to velocity components on lat-lon grid.
@@ -355,6 +491,11 @@ class LatLonFilter(Filter):
             Initial guess for ux.
         vy0 : np.ndarray | None
             Initial guess for vy.
+        highpass : bool, optional
+            Whether to use high-pass filtering. Sets gamma (2.0 vs 0.5) unless
+            gamma is given explicitly. Default True.
+        gamma : float | None, optional
+            Explicit gamma value. If None, derived from highpass. Default None.
 
         Returns
         -------
@@ -368,16 +509,17 @@ class LatLonFilter(Filter):
         """
         if n < 1:
             raise ValueError("Filter order must be positive")
+        g = get_gamma(highpass, gamma)
 
         ux0_flat = np.reshape(ux0, self._n2d) if ux0 is not None else None
         vy0_flat = np.reshape(vy0, self._n2d) if vy0 is not None else None
 
         return (
             np.reshape(
-                self._compute(n, k, np.reshape(ux, self._n2d), x0=ux0_flat), (self._nx, self._ny)
+                self._compute(n, k, np.reshape(ux, self._n2d), gamma=g, x0=ux0_flat), (self._nx, self._ny)
             ),
             np.reshape(
-                self._compute(n, k, np.reshape(vy, self._n2d), x0=vy0_flat), (self._nx, self._ny)
+                self._compute(n, k, np.reshape(vy, self._n2d), gamma=g, x0=vy0_flat), (self._nx, self._ny)
             ),
         )
 
