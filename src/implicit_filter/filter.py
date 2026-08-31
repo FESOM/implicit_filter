@@ -2,12 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Tuple, Iterable
 
 import jax
-import jax.numpy as jnp
 import numpy as np
-import scipy.sparse
-
-from implicit_filter.utils._smat import build_smat, _cg_one, to_smat_data
-from implicit_filter.utils.utils import filter_stages, get_gamma
 
 _VCYCLE_OPTION_DEFAULTS = {
     "degree": 3, "alpha": 4.0, "n_cycles": 1, "max_levels": 6,
@@ -318,59 +313,3 @@ class Filter(ABC):
             Reconstructed filter instance with restored state
         """
         return cls(**dict(np.load(file, allow_pickle=True)))
-
-    def _batch_compute(self, n, kl, ttu, gamma=2.0, tol=1e-6, maxiter=150000, highpass=True):
-        """
-        Batch-solve the filter across a leading batch dimension (e.g. time
-        steps or depth levels) via ``jax.vmap``, which can be more efficient
-        than looping over :meth:`compute` one field at a time on GPU.
-
-        Parameters
-        ----------
-        n : int
-            Filter order.
-        kl : float | np.ndarray
-            Filter scale(s).
-        ttu : np.ndarray
-            Batch of right-hand sides; shape (T, n_size) or (T, *spatial).
-        gamma : float, optional
-            Explicit gamma. Overridden by ``highpass`` unless given. Default 2.0.
-        highpass : bool, optional
-            Whether to use high-pass filtering; sets gamma unless gamma is
-            given explicitly. Default True.
-        tol, maxiter : solver tolerance and iteration cap.
-
-        Returns
-        -------
-        np.ndarray
-            Filtered batch, same shape as ``ttu``.
-        """
-        is_elem = (ttu.shape[-1] == self._e2d) if hasattr(self, "_e2d") else False
-        g = get_gamma(highpass, gamma)
-
-        # flatten spatial dims if needed
-        if ttu.ndim > 2:
-            T, spatial = ttu.shape[0], ttu.shape[1:]
-            ttu = ttu.reshape(T, -1)
-            flat = True
-        else:
-            flat = False
-            spatial = None
-            T = ttu.shape[0]
-
-        # pre-build all stage matrices in scipy, convert to SmatData once
-        Smat1 = build_smat(self, kl, is_elem=is_elem)  # returns raw scipy matrix
-        stage_smats = []
-        for (c1, c2) in filter_stages(n, g):
-            Smat_stage = scipy.sparse.identity(Smat1.shape[0], format="csr") + c1 * Smat1 + c2 * Smat1**2
-            stage_smats.append(to_smat_data(Smat_stage))  # convert once per stage
-
-        # now just loop and solve — no scipy inside the loop
-        ttu = jnp.array(ttu)
-        for smat in stage_smats:
-            solve_one = jax.jit(lambda b: _cg_one(smat, b, tol=tol, maxiter=maxiter))
-            ttu, info = jax.vmap(solve_one)(ttu)
-            ttu.block_until_ready()
-
-        ttu = np.array(ttu)
-        return ttu if not flat else ttu.reshape(T, *spatial)
