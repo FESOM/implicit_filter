@@ -1,4 +1,5 @@
 from math import pi
+import warnings
 from typing import Tuple, Iterable
 
 import numpy as np
@@ -174,6 +175,13 @@ class TriangularFilter(Filter):
         one stage is the input of the next. For n = 1, 2 there is a single
         stage and this reduces to the original single-system formula.
         """
+        # jax_enable_x64 is on, so Smat1_diag below (built from a bare
+        # jnp.zeros, no dtype) is float64 regardless of ttu's dtype; solving
+        # in float64 throughout avoids a float32 apply_A silently meeting a
+        # float64 preconditioner mid-CG, which jax's while_loop rejects as a
+        # carry dtype mismatch. Cast back to the caller's dtype on return.
+        input_dtype = np.asarray(ttu).dtype
+
         kl_arg = kl  # pre-broadcast value; the V-cycle path needs a scalar k
         if is_elem is None:
             is_elem = (len(ttu) == self._e2d)
@@ -198,7 +206,7 @@ class TriangularFilter(Filter):
         use_vcycle = self.get_preconditioner() == "vcycle"
 
 
-        tts = jnp.array(ttu)
+        tts = jnp.array(ttu, dtype=jnp.float64)
         for (c1, c2) in stages:
             # c1/c2 are bound as defaults so the closure captures this stage's
             # coefficients rather than the loop variables' final values.
@@ -221,7 +229,7 @@ class TriangularFilter(Filter):
             # solve; with several stages the caller's x0 refers to the final
             # field, not to this stage's intermediate solution.
             x0_pert = (None if (x0 is None or len(stages) > 1)
-                       else (jnp.array(x0) - tts))
+                       else (jnp.array(x0, dtype=jnp.float64) - tts))
 
             # Per-stage preconditioner choice: a linear stage (c2 == 0) stays
             # cheap for Jacobi even at large filter scales, while a quadratic
@@ -253,7 +261,7 @@ class TriangularFilter(Filter):
 
             tts = sol + tts  # add the perturbation back; input of the next stage
 
-        return np.array(tts)
+        return np.array(tts, dtype=input_dtype)
 
     def _compute_batch(self, n, kl, ttu, gamma=2.0, x0=None, tol=1e-6, maxiter=150000,
                         is_elem=None) -> np.ndarray:
@@ -282,6 +290,12 @@ class TriangularFilter(Filter):
         retry-at-tighter-tolerance on non-convergence (it needs a concrete
         residual norm, which isn't available under ``jax.vmap``).
         """
+        # See _compute's note: Smat1_diag is float64 regardless of ttu's
+        # dtype (jax_enable_x64 is on), so the solve runs in float64
+        # throughout to avoid a carry dtype mismatch under jax.vmap; the
+        # result is cast back to the caller's dtype on return.
+        input_dtype = np.asarray(ttu).dtype
+
         kl_arg = kl  # pre-broadcast value; the V-cycle path needs a scalar k
         if is_elem is None:
             is_elem = (ttu.shape[-1] == self._e2d)
@@ -305,8 +319,8 @@ class TriangularFilter(Filter):
         stages = filter_stages(n, gamma)
         use_vcycle = self.get_preconditioner() == "vcycle"
 
-        tts = jnp.array(ttu)
-        x0_j = None if x0 is None else jnp.array(x0)
+        tts = jnp.array(ttu, dtype=jnp.float64)
+        x0_j = None if x0 is None else jnp.array(x0, dtype=jnp.float64)
 
         for (c1, c2) in stages:
             def apply_A(x, c1=c1, c2=c2):
@@ -349,10 +363,15 @@ class TriangularFilter(Filter):
 
             tts = sol + tts
 
-        return np.array(tts)
+        return np.array(tts, dtype=input_dtype)
 
     def _compute_full(self, n, kl, ttuv, gamma=2.0, x0=None, tol=1e-5,
                       maxiter=150000) -> np.ndarray:
+        # See _compute's note: Smat1_diag is float64 regardless of ttuv's
+        # dtype (jax_enable_x64 is on), so the solve runs in float64
+        # throughout to avoid a carry dtype mismatch; cast back on return.
+        input_dtype = np.asarray(ttuv).dtype
+
         if n > 2:
             raise NotImplementedError(
                 "Full metric filtering is currently only implemented for n=1 "
@@ -381,9 +400,9 @@ class TriangularFilter(Filter):
         def precond(x):
             return x / approx_diag_Smat
 
-        ttuv = jnp.array(ttuv)
+        ttuv = jnp.array(ttuv, dtype=jnp.float64)
         ttw = ttuv - apply_A(ttuv)  # Work with perturbations
-        x0_pert = None if x0 is None else (jnp.array(x0) - ttuv)
+        x0_pert = None if x0 is None else (jnp.array(x0, dtype=jnp.float64) - ttuv)
 
         tts, code = cg(apply_A, ttw, x0=x0_pert, tol=tol, maxiter=maxiter, M=precond)
         if code is not None and code != 0:
@@ -393,7 +412,7 @@ class TriangularFilter(Filter):
             )
 
         tts += ttuv
-        return np.array(tts)
+        return np.array(tts, dtype=input_dtype)
 
     def compute_velocity(
         self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray,
@@ -477,13 +496,20 @@ class TriangularFilter(Filter):
             Float can be passed to be applied for entire mesh or array with scales for each node.
             Size of the array must match the size of the input data
         data : np.ndarray
-            Scalar field values.
+            Scalar field values. Either a single field, shape (n_size,), or a
+            leading batch of fields (e.g. time steps or depth levels), shape
+            (T, n_size) — the batch case is dispatched to
+            :meth:`_compute_batch` via `jax.vmap` instead of looping
+            :meth:`compute` T times. Batching is not available together with
+            full metric filtering (`full=True` in :meth:`prepare`) on nodes,
+            which has no batched solver.
         x0 : np.ndarray | None
-            Initial guess for the solver.
+            Initial guess for the solver. Same batching convention as `data`.
         on : {'nodes', 'elements'}, optional
-            Where the data lives. By default this is inferred from the length
-            of ``data``, which is ambiguous on a mesh with as many elements as
-            nodes; pass it explicitly to remove the ambiguity.
+            Where the data lives. By default this is inferred from the
+            trailing size of ``data``, which is ambiguous on a mesh with as
+            many elements as nodes; pass it explicitly to remove the
+            ambiguity.
         highpass : bool, optional
             Whether to use high-pass filtering. Sets gamma (2.0 vs 0.5) unless
             gamma is given explicitly. Default True.
@@ -493,27 +519,54 @@ class TriangularFilter(Filter):
         Returns
         -------
         np.ndarray
-            Filtered scalar field.
+            Filtered scalar field(s), same shape as `data` — (n_size,) or
+            (T, n_size).
 
         Raises
         ------
         ValueError
-            If filter order n < 1, or if ``on`` is unrecognised or disagrees
-            with the length of ``data``.
+            If filter order n < 1, if ``data`` isn't shaped (n_size,) or
+            (T, n_size), if ``on`` is unrecognised or disagrees with the
+            trailing size of ``data``, or if a batch of nodal data is
+            requested together with full metric filtering.
+        NotImplementedError
+            If a batch is requested for element-based data (`on='elements'`
+            or inferred as such); only the nodal batch path is implemented
+            and tested so far.
         """
         if n < 1:
             raise ValueError("Filter order must be positive")
         g = get_gamma(highpass, gamma)
 
-        is_elem = self._resolve_target(len(data), on)
+        data = np.asarray(data)
+        if data.ndim not in (1, 2):
+            raise ValueError(f"data must be shaped (n_size,) or (T, n_size), got {data.shape}")
+        batched = data.ndim == 2
+
+        is_elem = self._resolve_target(data.shape[-1], on)
         if is_elem and self._full:
             raise ValueError("Coupled full metric filtering not supported for elements. Please use full=False or switch to nodal filtering.")
 
-        return np.array(
-            self._compute_full(n, k, data, gamma=g, x0=x0)
-            if (self._full and not is_elem)
-            else self._compute(n, k, data, gamma=g, x0=x0, is_elem=is_elem)
-        )
+        if self._full and not is_elem:
+            if batched:
+                raise ValueError(
+                    "Batch filtering is not supported together with full metric "
+                    "filtering (full=True in prepare()); call compute() once per "
+                    "field, or use full=False."
+                )
+            return np.array(self._compute_full(n, k, data, gamma=g, x0=x0))
+
+        if batched and is_elem:
+            raise NotImplementedError(
+                "Batch filtering is not yet implemented for element-based data; "
+                "call compute() once per field, or use nodal data."
+            )
+        if batched:
+            warnings.warn(
+                "Batch filtering: dispatching to _compute_batch via jax.vmap",
+                stacklevel=2)
+        compute_fn = self._compute_batch if batched else self._compute
+        return np.array(compute_fn(n, k, data, gamma=g, x0=x0, is_elem=is_elem))
 
     def prepare(
         self,

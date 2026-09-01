@@ -1,4 +1,5 @@
 import math
+import warnings
 from typing import Tuple, Iterable
 
 import numpy as np
@@ -19,6 +20,81 @@ from implicit_filter.utils.utils import (
 import jax
 import jax.numpy as jnp
 from jax.scipy.sparse.linalg import cg
+
+
+def _offdiag_rel_asym(off_ii, off_jj, off_ss, weight, n2d):
+    """Relative asymmetry of ``D @ S`` restricted to off-diagonal entries."""
+    import scipy.sparse as sp
+
+    K = sp.csr_matrix((weight[off_ii] * off_ss, (off_ii, off_jj)), shape=(n2d, n2d))
+    diff = (K - K.T).tocoo()
+    if diff.nnz == 0:
+        return 0.0
+    denom = max(np.abs(K.data).max(), 1e-300)
+    return float(np.abs(diff.data).max() / denom)
+
+
+def _symmetrize_stencil(ss, ii, jj, area):
+    """Force ``D @ S`` to be exactly symmetric, choosing ``D`` automatically.
+
+    Unlike :class:`TriangularFilter`'s edge-based assembly (each edge weight
+    is computed once and shared, so its ``D @ S`` is symmetric to the bit),
+    this class recomputes each edge's geometry independently from both
+    endpoints (once from node ``n``'s perspective, once from its neighbor's).
+    Those two computations agree only approximately, and how closely depends
+    on the grid: a spherical grid (``cartesian=False``, zonal spacing scaled
+    by cos(latitude)) is symmetric under ``D = diag(area)``; a stretched but
+    unscaled tensor-product Cartesian grid (``cartesian=True``, ``hh``
+    separable in x and y) is instead symmetric under ``D = diag(area**2)``
+    -- each is exact for one grid family and badly wrong for the other (the
+    docstring in the vcycle call sites below has the derivation). Rather
+    than hardcode one, pick whichever weight already nearly-symmetrizes
+    ``D @ S`` for this particular grid.
+
+    Either way the two computations only agree to float64 roundoff
+    (~1e-16 relative), and squaring the stencil for a quadratic filter stage
+    amplifies that residual by orders of magnitude through cancellation, to
+    the point of tripping the V-cycle preconditioner's hard symmetry gate
+    (measured ~1e-3 on a plain uniform lat-lon box) even though the
+    underlying geometry is symmetric. Averaging each off-diagonal pair under
+    the chosen weight removes that roundoff seed at the source, before any
+    stage matrix is ever formed. The diagonal is rebuilt from the
+    symmetrized off-diagonals (rather than symmetrized itself) to preserve
+    ``S @ ones == 0``, i.e. that a constant field is unaffected by the
+    filter, and is only rebuilt for nodes that already had entries (masked
+    -- land -- nodes must stay entirely absent from the stencil).
+
+    Returns
+    -------
+    (ss, ii, jj, weight) : the symmetrized stencil plus the chosen ``D``
+        weight (``area`` or ``area**2``), for reuse by the V-cycle call
+        sites so they don't have to re-derive which one this grid needs.
+    """
+    import scipy.sparse as sp
+
+    n2d = len(area)
+    valid_nodes = np.unique(ii)
+    diag_mask = ii == jj
+    off_ii, off_jj, off_ss = ii[~diag_mask], jj[~diag_mask], ss[~diag_mask]
+
+    area2 = np.square(area)
+    weight = (area if _offdiag_rel_asym(off_ii, off_jj, off_ss, area, n2d)
+                      <= _offdiag_rel_asym(off_ii, off_jj, off_ss, area2, n2d)
+              else area2)
+
+    K = sp.csr_matrix((weight[off_ii] * off_ss, (off_ii, off_jj)), shape=(n2d, n2d))
+    K_sym = ((K + K.T) * 0.5).tocoo()
+
+    sym_ii, sym_jj = K_sym.row, K_sym.col
+    sym_ss = K_sym.data / weight[sym_ii]
+
+    row_sum = np.zeros(n2d, dtype=sym_ss.dtype)
+    np.add.at(row_sum, sym_ii, sym_ss)
+
+    out_ii = np.concatenate([sym_ii, valid_nodes])
+    out_jj = np.concatenate([sym_jj, valid_nodes])
+    out_ss = np.concatenate([sym_ss, -row_sum[valid_nodes]])
+    return out_ss, out_ii, out_jj, weight
 
 
 class LatLonFilter(Filter):
@@ -226,6 +302,10 @@ class LatLonFilter(Filter):
         self._ii = self._ii[mask_sp]
         self._jj = self._jj[mask_sp]
 
+        self._ss, self._ii, self._jj, self._vcycle_weight = _symmetrize_stencil(
+            self._ss, self._ii, self._jj, self._area
+        )
+
 
 
     def _compute(
@@ -254,6 +334,13 @@ class LatLonFilter(Filter):
         the same reason: it's the staged factorisation that keeps CG's
         condition number bounded at higher order).
         """
+        # jax_enable_x64 is on, so Smat1_diag below (built from a bare
+        # jnp.zeros, no dtype) is float64 regardless of data's dtype; solving
+        # in float64 throughout avoids a float32 apply_A silently meeting a
+        # float64 preconditioner mid-CG, which jax's while_loop rejects as a
+        # carry dtype mismatch. Cast back to the caller's dtype on return.
+        input_dtype = np.asarray(data).dtype
+
         k_arg = k  # pre-broadcast value; the V-cycle path needs a scalar k
         if isinstance(k, (float, int, np.number)):
             k = np.ones(self._n2d) * k
@@ -267,7 +354,7 @@ class LatLonFilter(Filter):
         stages = filter_stages(n, gamma)
         use_vcycle = self.get_preconditioner() == "vcycle"
 
-        tts = jnp.array(data)
+        tts = jnp.array(data, dtype=jnp.float64)
         for (c1, c2) in stages:
             # c1/c2 are bound as defaults so the closure captures this stage's
             # coefficients rather than the loop variables' final values.
@@ -290,7 +377,7 @@ class LatLonFilter(Filter):
             # solve; with several stages the caller's x0 refers to the final
             # field, not to this stage's intermediate solution.
             x0_pert = (None if (x0 is None or len(stages) > 1)
-                       else (jnp.array(x0) - tts))
+                       else (jnp.array(x0, dtype=jnp.float64) - tts))
 
             # Per-stage preconditioner choice: mirrors TriangularFilter's
             # rationale -- a linear stage (c2 == 0) stays cheap for Jacobi,
@@ -301,17 +388,25 @@ class LatLonFilter(Filter):
 
                 # The lat-lon stencil is assembled negative-semidefinite (the
                 # solve scales by -1/k^2), so the PSD-convention stencil is -S.
-                # The symmetrizing weight is area^2, not area: the stencil entry
-                # (i -> j) is (hc_ij / hh[dir, i]) / area_i with hh_x = g(x),
-                # hh_y = h(y), area = g*h on the tensor-product grid prepare()
-                # builds, and W_i * S_ij = W_j * S_ji for both directions exactly
-                # when W = (g*h)^2 -- including arbitrarily stretched axes.
-                # (Curvilinear grids such as NEMO's ORCA are not tensor-product;
-                # their stencil is structurally asymmetric under any diagonal
+                # The symmetrizing weight is area for a spherical grid
+                # (zonal spacing scaled by cos(latitude), breaking the
+                # separable-tensor-product assumption below) but area^2 for a
+                # stretched, unscaled Cartesian tensor grid (hh separable in
+                # x and y) -- each is exact for one family and badly wrong
+                # for the other, so prepare() picks whichever nearly
+                # symmetrizes D @ S for this grid and caches it as
+                # self._vcycle_weight (see _symmetrize_stencil). prepare()
+                # also symmetrizes D @ S once at assembly time under that
+                # weight: it is only exact to float64 roundoff otherwise
+                # (each edge is computed independently from both endpoints),
+                # and that residual gets amplified by orders of magnitude
+                # when S is squared for a quadratic filter stage. (Curvilinear
+                # grids such as NEMO's ORCA are not tensor-product; their
+                # stencil is structurally asymmetric under any diagonal
                 # weight and the V-cycle setup rejects them.)
                 sol = solve_with_vcycle(
                     ss=-np.asarray(self._ss), ii=self._ii, jj=self._jj,
-                    area=np.square(np.asarray(self._area, dtype=np.float64)),
+                    area=self._vcycle_weight,
                     n_size=int(self._n2d), n=n, stage=(c1, c2),
                     k=validate_scalar_k(k_arg), apply_A=apply_A,
                     b_pert=ttw, x0_pert=x0_pert, tol=tol, maxiter=maxiter,
@@ -328,7 +423,7 @@ class LatLonFilter(Filter):
 
             tts = sol + tts  # add the perturbation back; input of the next stage
 
-        return np.array(tts)
+        return np.array(tts, dtype=input_dtype)
 
     def _compute_batch(
         self,
@@ -365,6 +460,12 @@ class LatLonFilter(Filter):
         retry-at-tighter-tolerance on non-convergence (it needs a concrete
         residual norm, which isn't available under ``jax.vmap``).
         """
+        # See _compute's note: Smat1_diag is float64 regardless of data's
+        # dtype (jax_enable_x64 is on), so the solve runs in float64
+        # throughout to avoid a carry dtype mismatch under jax.vmap; the
+        # result is cast back to the caller's dtype on return.
+        input_dtype = np.asarray(data).dtype
+
         k_arg = k  # pre-broadcast value; the V-cycle path needs a scalar k
         if isinstance(k, (float, int, np.number)):
             k = np.ones(self._n2d) * k
@@ -378,8 +479,8 @@ class LatLonFilter(Filter):
         stages = filter_stages(n, gamma)
         use_vcycle = self.get_preconditioner() == "vcycle"
 
-        tts = jnp.array(data)
-        x0_j = None if x0 is None else jnp.array(x0)
+        tts = jnp.array(data, dtype=jnp.float64)
+        x0_j = None if x0 is None else jnp.array(x0, dtype=jnp.float64)
 
         for (c1, c2) in stages:
             def apply_A(x, c1=c1, c2=c2):
@@ -404,10 +505,11 @@ class LatLonFilter(Filter):
 
                 # See _compute's note: the lat-lon stencil is assembled
                 # negative-semidefinite, so the PSD-convention stencil is -S,
-                # and the symmetrizing weight is area^2, not area.
+                # and the symmetrizing weight is self._vcycle_weight (area or
+                # area^2, whichever this grid needs -- see prepare()).
                 sol = solve_with_vcycle_batch(
                     ss=-np.asarray(self._ss), ii=self._ii, jj=self._jj,
-                    area=np.square(np.asarray(self._area, dtype=np.float64)),
+                    area=self._vcycle_weight,
                     n_size=int(self._n2d), n=n, stage=(c1, c2),
                     k=validate_scalar_k(k_arg),
                     apply_A=apply_A, b_pert_batch=ttw, x0_pert_batch=x0_pert,
@@ -424,12 +526,12 @@ class LatLonFilter(Filter):
 
             tts = sol + tts
 
-        return np.array(tts)
+        return np.array(tts, dtype=input_dtype)
 
     def compute(self, n: int, k: float | np.ndarray, data: np.ndarray, x0: np.ndarray | None = None, *,
                 highpass: bool = True, gamma: float | None = None) -> np.ndarray:
         """
-        Apply filter to scalar field on lat-lon grid.
+        Apply filter to scalar field(s) on lat-lon grid.
 
         Parameters
         ----------
@@ -438,11 +540,15 @@ class LatLonFilter(Filter):
         k : float | np.ndarray
             Filter wavelength in spatial units.
             Float can be passed to be applied for entire mesh or array with scales for each node.
-            Size of the array must match the size of the input data
+            Size of the array must match the size of a single field (n2d = nx*ny), not the
+            batch dimension.
         data : np.ndarray
-            Scalar field values on grid (shape: (nx, ny)).
+            Scalar field values on grid. Either a single field, shape (nx, ny), or a leading
+            batch of fields (e.g. time steps or depth levels), shape (T, nx, ny) — the batch
+            case is dispatched to :meth:`_compute_batch` via `jax.vmap` instead of looping
+            :meth:`_compute` T times.
         x0 : np.ndarray | None
-            Initial guess for the solver.
+            Initial guess for the solver. Same batching convention as `data`.
         highpass : bool, optional
             Whether to use high-pass filtering. Sets gamma (2.0 vs 0.5) unless
             gamma is given explicitly. Default True.
@@ -452,21 +558,38 @@ class LatLonFilter(Filter):
         Returns
         -------
         np.ndarray
-            Filtered scalar field (shape: (nx, ny)).
+            Filtered scalar field(s), same shape as `data` — (nx, ny) or (T, nx, ny).
 
         Raises
         ------
         ValueError
-            If filter order n < 1.
+            If filter order n < 1, or `data` isn't shaped (nx, ny) or (T, nx, ny).
         """
         if n < 1:
             raise ValueError("Filter order must be positive")
         g = get_gamma(highpass, gamma)
 
-        x0_flat = np.reshape(x0, self._n2d) if x0 is not None else None
-        return np.reshape(
-            self._compute(n, k, np.reshape(data, self._n2d), gamma=g, x0=x0_flat), (self._nx, self._ny)
-        )
+        data = np.asarray(data)
+        grid_shape = (self._nx, self._ny)
+        if data.shape == grid_shape:
+            x0_flat = np.reshape(x0, self._n2d) if x0 is not None else None
+            return np.reshape(
+                self._compute(n, k, np.reshape(data, self._n2d), gamma=g, x0=x0_flat), grid_shape
+            )
+        elif data.ndim == 3 and data.shape[1:] == grid_shape:
+            warnings.warn(
+                "Batch filtering: dispatching to _compute_batch via jax.vmap",
+                stacklevel=2)
+            batch = data.shape[0]
+            x0_flat = np.reshape(x0, (batch, self._n2d)) if x0 is not None else None
+            return np.reshape(
+                self._compute_batch(n, k, np.reshape(data, (batch, self._n2d)), gamma=g, x0=x0_flat),
+                (batch, *grid_shape),
+            )
+        else:
+            raise ValueError(
+                f"data must be shaped {grid_shape} or (T, *{grid_shape}), got {data.shape}"
+            )
 
     def compute_velocity(
         self, n: int, k: float | np.ndarray, ux: np.ndarray, vy: np.ndarray, ux0: np.ndarray | None = None,

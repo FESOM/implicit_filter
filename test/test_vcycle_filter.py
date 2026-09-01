@@ -143,8 +143,8 @@ def test_latlon_vcycle_matches_direct_and_jacobi(prepared_latlon):
     k, n = 0.5, 2                     # (L/dx)^4 ~ 6e5: stiff
     # The lat-lon stencil is assembled negative-semidefinite and the solve
     # scales by -1/k^2, so the PSD-convention operator uses -S.
-    x_true = _direct_solve(-np.asarray(f._ss), f._ii, f._jj, int(f._e2d),
-                           n, k, np.reshape(np.asarray(data2d), int(f._e2d)))
+    x_true = _direct_solve(-np.asarray(f._ss), f._ii, f._jj, int(f._n2d),
+                           n, k, np.reshape(np.asarray(data2d), int(f._n2d)))
     f.set_preconditioner("jacobi")
     ref = f.compute(n, k, data2d)
     f.set_preconditioner("vcycle")
@@ -156,7 +156,7 @@ def test_latlon_vcycle_matches_direct_and_jacobi(prepared_latlon):
     assert p_keys, f.vcycle_cache.keys()
     assert len(f.vcycle_cache[p_keys[0]]) >= 1           # genuinely multilevel
     f.set_preconditioner("jacobi")
-    assert np.abs(np.reshape(out, int(f._e2d)) - x_true).max() < 1e-8
+    assert np.abs(np.reshape(out, int(f._n2d)) - x_true).max() < 1e-8
     assert np.abs(out - ref).max() < 5e-2
 
 
@@ -172,12 +172,12 @@ def test_latlon_stretched_grid_supported_via_area_squared_weight():
     rng = np.random.default_rng(17)
     data2d = rng.normal(size=(f._nx, f._ny))
     k, n = 0.5, 2
-    x_true = _direct_solve(-np.asarray(f._ss), f._ii, f._jj, int(f._e2d),
-                           n, k, np.reshape(np.asarray(data2d), int(f._e2d)))
+    x_true = _direct_solve(-np.asarray(f._ss), f._ii, f._jj, int(f._n2d),
+                           n, k, np.reshape(np.asarray(data2d), int(f._n2d)))
     f.set_preconditioner("vcycle")
     out = f.compute(n, k, data2d)
     f.set_preconditioner("jacobi")
-    assert np.abs(np.reshape(out, int(f._e2d)) - x_true).max() < 1e-8
+    assert np.abs(np.reshape(out, int(f._n2d)) - x_true).max() < 1e-8
 
 
 def test_full_metric_terms_rejected():
