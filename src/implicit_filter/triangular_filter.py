@@ -527,12 +527,8 @@ class TriangularFilter(Filter):
         ValueError
             If filter order n < 1, if ``data`` isn't shaped (n_size,) or
             (T, n_size), if ``on`` is unrecognised or disagrees with the
-            trailing size of ``data``, or if a batch of nodal data is
-            requested together with full metric filtering.
-        NotImplementedError
-            If a batch is requested for element-based data (`on='elements'`
-            or inferred as such); only the nodal batch path is implemented
-            and tested so far.
+            trailing size of ``data``, or if a batch is requested together
+            with full metric filtering (nodes or elements).
         """
         if n < 1:
             raise ValueError("Filter order must be positive")
@@ -556,11 +552,6 @@ class TriangularFilter(Filter):
                 )
             return np.array(self._compute_full(n, k, data, gamma=g, x0=x0))
 
-        if batched and is_elem:
-            raise NotImplementedError(
-                "Batch filtering is not yet implemented for element-based data; "
-                "call compute() once per field, or use nodal data."
-            )
         if batched:
             warnings.warn(
                 "Batch filtering: dispatching to _compute_batch via jax.vmap",
