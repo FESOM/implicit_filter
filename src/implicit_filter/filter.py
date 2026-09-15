@@ -46,10 +46,23 @@ class Filter(ABC):
         probes a ROCm stub whose failure would abort GPU selection). JAX
         fixes its platform set on first array use, so call this before the
         first compute in the process.
+
+        Only ``'cpu'`` and ``'gpu'`` are accepted (case and surrounding
+        whitespace are ignored); anything else raises ``NotImplementedError``,
+        as it did before the JAX migration. If no GPU is present, JAX falls
+        back to the CPU on its own.
+
+        Raises
+        ------
+        NotImplementedError
+            If ``backend`` is not ``'cpu'`` or ``'gpu'``.
         """
         import importlib.util
         import jax
-        if backend.lower() == "cpu":
+        name = backend.strip().lower() if isinstance(backend, str) else backend
+        if name not in ("cpu", "gpu"):
+            raise NotImplementedError(f"Backend {backend} is not supported.")
+        if name == "cpu":
             jax.config.update("jax_platforms", "cpu")
         elif importlib.util.find_spec("jax_cuda12_plugin") is not None:
             # With the split CUDA plugin, JAX's "gpu" alias also probes a

@@ -1,21 +1,24 @@
 # Direct runtime dependencies only.
 #
 # Hardware-specific JAX builds are selected through the extras declared in
-# pyproject.toml: implicit_filter[cpu] / [cuda11] / [cuda12] / [apple].
+# pyproject.toml: implicit_filter[cpu] / [cuda12] / [apple].
 # Plain "jax" here keeps a bare `pip install implicit_filter` importable; the
 # extras layer the accelerator plugins onto the same distribution.
 #
 # netCDF4 is not imported directly, but xarray needs it as the engine for the
 # .nc mesh files that every prepare_from_file() entry point reads.
 #
-# pandas and scikit-learn are needed only by the NEMO north-fold helper, and are
-# imported lazily there. They stay in the base requirements regardless, because
-# neighb='full' is NemoFilter's DEFAULT: dropping them to an extra would make a
-# plain `pip install implicit_filter` fail on the default NEMO code path. The
-# [nemo] extra is kept as a documented alias for the same two packages.
+# pandas is needed only by the NEMO north-fold helper, and is imported lazily
+# there. It stays in the base requirements regardless, because neighb='full' is
+# NemoFilter's DEFAULT: dropping it to an extra would make a plain
+# `pip install implicit_filter` fail on the default NEMO code path. The [nemo]
+# extra is kept as a documented alias for it.
 jax
 numpy
 xarray
 netCDF4
 pandas
-scikit-learn
+# scipy is a hard dependency of jax already; it is listed because
+# spherical_triangulation (used by ReducedGaussianFilter) imports
+# scipy.spatial directly.
+scipy

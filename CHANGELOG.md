@@ -2,6 +2,110 @@
 
 ## Unreleased
 
+### Packaging
+
+- **The `cuda11` extra is gone.** It pointed at `jax[cuda11_pip]`, which JAX
+  no longer provides, so `pip install "implicit_filter[cuda11]"` silently
+  installed a CPU-only build. JAX has dropped CUDA 11 support; use CUDA 12.
+- **The `apple` extra now installs `jax-metal`.** It pointed at `jax[apple]`,
+  which does not exist either and likewise installed CPU-only.
+- **New `rocm` and `tpu` extras**, forwarding to `jax[rocm]` and `jax[tpu]`, so
+  AMD GPUs and Google TPUs are installable the same way as CUDA. The ROCm
+  plugin targets ROCm 6.x and expects a matching ROCm installation on the
+  machine.
+- **scikit-learn is no longer a dependency.** It was pulled into every install
+  (57 MB) to fit the single straight line that resolves the NEMO north-fold row
+  correspondence; that fit is now an explicit numpy least-squares solve, which
+  agrees with the scikit-learn fit to within floating-point rounding -- far
+  below the integer rounding the helper applies to it -- on the column indices
+  this code path produces. pandas is still required, and still only by that
+  helper. Where `LinearRegression` used to raise on an empty set of surviving
+  columns, `np.linalg.lstsq` would have returned a degenerate all-zero line, so
+  the helper now refuses explicitly when fewer than two columns survive its
+  outlier filter -- a grid that scattered was never fittable.
+- The cupy-era extras `gpu`, `gpu_c11`, `gpu_c12` and `amgx` were removed when
+  the package moved to JAX. If you still install one of those, pip only warns
+  (`WARNING: implicit-filter ... does not provide the extra 'gpu'`) and installs
+  the base package, giving you a CPU-only build: use `cuda12` for Nvidia GPUs,
+  `apple` for Apple Silicon, and `vcycle` for what `amgx` used to provide.
+
+### Compatibility fixes against the previous release
+
+- **A failed solve raises again.** The default solver's status check was
+  inherited from scipy's CG and could never fire under JAX, whose `cg` returns
+  no status: a diverged solve, or one whose input contained NaN or inf, was
+  returned as if it were a filtered field. Every default-path solve now
+  verifies the true relative residual, retries once at a tenth of the
+  tolerance (as the V-cycle path already did) and otherwise raises
+  `SolverNotConvergedError`. Solves that already converged are returned
+  unchanged, bit for bit. Filtering data that contains NaN now raises instead
+  of silently returning it; replace non-finite values before filtering and use
+  `mask=` to exclude those points.
+- **`set_backend` validates its argument again.** Anything other than `'cpu'`
+  or `'gpu'` raises `NotImplementedError("Backend <name> is not supported.")`
+  as it did before the JAX migration, instead of being silently taken to mean
+  GPU. Case and surrounding whitespace are now ignored, so `'GPU'` is accepted.
+- **`gpu=True` selects the GPU again.** The deprecated `gpu=` argument of the
+  `prepare*` methods used to select the GPU backend; since the JAX migration it
+  only warned, silently moving those calls onto the CPU. It now forwards to
+  `set_backend('gpu')` and still warns. `gpu=False`, the default, remains a
+  no-op and will not reset a backend already chosen.
+- **Importing the package switches JAX to 64-bit mode process-wide.** This has
+  been true since the JAX migration and is now documented: results are
+  `float64` rather than JAX's default `float32`, and other JAX code in the same
+  interpreter is affected. See the precision note in the readme.
+
+### Faster `prepare` on large meshes
+
+The mesh topology and geometry loops that `TriangularFilter.prepare` runs
+before assembling the operator (`neighboring_triangles`, `neighbouring_nodes`
+and `areas`) are now vectorised NumPy (`implicit_filter.utils._fast_mesh`).
+Results are bit-identical to the pure-Python versions, which stay in
+`_auxiliary` as the tested references: the same neighbour ordering, the same
+floating-point operation order per triangle, and node areas summed in NumPy's
+own order. Meshes with non-float64 coordinates fall back to the reference
+loops on NumPy 1.x, or when `cyclic_length` is a NumPy scalar or the mask is an
+integer array, so results stay bit-identical there too. On the N320 reduced
+Gaussian grid (542 080 nodes) the three stages went from 15 s to 1.7 s and
+`prepare_from_grid("N320")` from about 33 s to about 20 s; the JAX operator
+assembly is unchanged.
+
+### Reduced Gaussian grids (ECMWF N and O grids)
+
+New `ReducedGaussianFilter` for data on ECMWF reduced Gaussian grids —
+classical `N` grids such as N320 (native ERA5, AIFS input) and octahedral `O`
+grids such as O96 (Anemoi ERA5, AIFS training) — or any other set of points
+covering the sphere. `prepare_from_grid("N320")` builds the grid from ECMWF's
+definitions (classical tables regenerated from the ecCodes GRIB samples;
+octahedral grids from `4·j + 16` points per row); `prepare_from_points`,
+`prepare_from_data_array` and `prepare_from_file(..., engine="cfgrib")` use
+the coordinates stored with the data. Data is the 1-D GRIB `values` array
+(north to south, west to east). An optional per-point `mask` excludes e.g.
+land points.
+
+The grid is Delaunay-triangulated on the sphere (convex hull of the unit
+vectors) and filtered with the existing nodal operator using a new
+`meshtype="s"`: each triangle's geometry is evaluated in the tangent plane at
+its centroid (gnomonic projection), which stays well-behaved at the poles and
+across the date line. In the lon/lat projection of `meshtype="r"` the triangles
+that close a polar cap have zero area, which poisons the operator with NaN and
+makes `compute` return the input unchanged. Measured against the analytic
+transfer function for spherical harmonics on O96 the new geometry is accurate
+to 1e-4 – 2e-3 (the expected discretisation error). The `'m'` and `'r'`
+branches are untouched; `prepare()` now rejects unknown `meshtype` values and
+refuses `meshtype="s"` with `cartesian=True` or `filter_elements=True`.
+
+New public helpers `gaussian_latitudes(N)`, `reduced_gaussian_grid(name)` and
+`spherical_triangulation(lat, lon)`; the latter refuses point sets that are
+regional or leave a hole (the origin must lie strictly inside their convex
+hull, and no triangle may span a gap much wider than the local point spacing),
+and `check_coverage=False` — also accepted by `prepare_from_points`,
+`prepare_from_data_array` and `prepare_from_file` — skips the heuristic part
+of that check for complete grids it wrongly rejects, such as one with a dense
+polar ring. `scipy` (already required by JAX) is now listed explicitly in the
+requirements. Example on public ERA5 data:
+`examples/reduced_gaussian_grid_example.ipynb`.
+
 ### V-cycle preconditioner (opt-in)
 
 New `set_preconditioner(name, **options)` / `get_preconditioner()` on every
@@ -13,14 +117,14 @@ It eliminates the Jacobi-CG convergence failures for stiff biharmonic
 configurations, with identical results on CPU and GPU (parity-tested).
 Setup needs the new optional extra `implicit_filter[vcycle]` (pyamg +
 scipy); the apply phase is pure JAX. Details, tuning knobs and measured
-before/after benchmarks: `docs/vcycle.rst` and
-`docs/benchmarks/vcycle_comparison.md`.
+before/after benchmarks: `docs/vcycle.rst`.
 
 Notes:
 
 - The V-cycle path verifies the true (unweighted) residual after the solve
-  and raises `SolverNotConvergedError` if the tolerance was not met — the
-  default path keeps JAX CG's silent behaviour, unchanged.
+  and raises `SolverNotConvergedError` if the tolerance was not met. The
+  default path now does the same (see the compatibility fixes above), so a
+  failed solve raises on either path.
 - Supported systems: triangular nodes and elements (FESOM, ICON) and all
   tensor-product lat-lon grids, including stretched axes (symmetrized
   exactly by an internal `area²` weighting); spatially varying `k` and
@@ -31,10 +135,10 @@ Notes:
   split CUDA plugin (`jax[cuda12]`) is installed — with the plugin, JAX's
   `"gpu"` alias also probes a ROCm stub whose failure made GPU selection
   crash. CPU behaviour and `get_backend()` round-trips are unchanged.
-- The `gpu=` argument on every `prepare*` method is deprecated: it has
-  never had an effect. Passing a truthy value now emits a
-  `DeprecationWarning` pointing at `set_backend('gpu')`; the default
-  (`False`) stays silent, and the argument will be removed in a future
+- The `gpu=` argument on every `prepare*` method is deprecated. Passing a
+  truthy value emits a `DeprecationWarning` and forwards to
+  `set_backend('gpu')`; the default (`False`) stays silent and leaves the
+  selected backend alone, and the argument will be removed in a future
   release.
 
 ### Backward compatibility
@@ -64,11 +168,13 @@ Everything else — filtering on nodes and elements, velocity, spectra,
 `full=True`, `LatLonFilter`, the conversion helpers, error types for invalid
 input — was verified byte-for-byte identical.
 
-`pandas` and `scikit-learn` were briefly moved to an optional `[nemo]` extra and
-have been **restored to the base requirements**: `neighb='full'` is
-`NemoFilter`'s default, so a plain `pip install implicit_filter` must keep
-working on that path. They are still imported lazily and still produce a clear
-message naming the extra if absent.
+`pandas` was briefly moved to an optional `[nemo]` extra and has been
+**restored to the base requirements**: `neighb='full'` is `NemoFilter`'s
+default, so a plain `pip install implicit_filter` must keep working on that
+path. It is still imported lazily and still produces a clear message naming the
+extra if absent. (`scikit-learn` was restored alongside it at the time; it has
+since been dropped from the package entirely -- see Packaging under Unreleased
+above.)
 
 The trimming of `requirements.txt` does mean packages the old pin set installed
 transitively (`matplotlib`, `requests`, `Bottleneck`, `numexpr`, and build tools
@@ -237,7 +343,9 @@ accepted only if it carries `(z, y, x)`.
   runtime dependencies.
 - `pandas` and `scikit-learn` moved to an optional `[nemo]` extra; they are
   imported lazily and only by the NEMO north-fold helper, which now raises a
-  message naming the extra when they are absent.
+  message naming the extra when they are absent. (Both were restored to the
+  base requirements later in this same release; `scikit-learn` has since been
+  dropped from the package entirely -- see Packaging under Unreleased above.)
 - Added a `[test]` extra (`pytest`, `scipy`) — `scipy` was previously an
   undeclared test dependency that resolved only because JAX happens to require
   it. CI now installs it explicitly.

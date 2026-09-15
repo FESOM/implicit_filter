@@ -14,9 +14,13 @@ if __name__ == "__main__":
     rank = int(os.environ.get("SLURM_PROCID", 1))  # Task unique number
     num_tasks = int(os.environ.get("SLURM_NTASKS", 1))  # Total number of tasks
 
-    # Loading filter and making sure it uses gpu
+    # Make sure the filter uses the GPU. This has to happen before
+    # load_from_file: JAX fixes its platform when the first array is created,
+    # and loading the cache creates the filter's arrays, so a set_backend after
+    # it would be inert.
+    IconFilter().set_backend("gpu")
+
     icon_filter = IconFilter.load_from_file(filter_cache)
-    icon_filter.set_backend("gpu")
 
     ds = xr.open_dataset(dataset_path)
     time = ds.time.values

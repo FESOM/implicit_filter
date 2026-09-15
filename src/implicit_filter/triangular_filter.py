@@ -10,11 +10,13 @@ jax.config.update("jax_platforms", "cpu")
 
 from implicit_filter.utils._auxiliary import (
     R_EARTH,
-    neighboring_triangles,
-    neighbouring_nodes,
-    areas,
     find_and_sort_edges_and_triangles,
     calculate_triangle_centers,
+)
+from implicit_filter.utils._fast_mesh import (
+    fast_neighboring_triangles,
+    fast_neighbouring_nodes,
+    fast_areas,
 )
 from implicit_filter.utils._jax_elem_function import (
     vectorized_orient_edges,
@@ -32,7 +34,8 @@ from implicit_filter.utils._jax_function import (
 from implicit_filter.utils.utils import (
     SolverNotConvergedError,
     transform_attribute,
-    warn_unused_gpu_argument,
+    verify_cg_convergence,
+    apply_deprecated_gpu_argument,
 )
 from jax.scipy.sparse.linalg import cg
 from implicit_filter.filter import Filter
@@ -214,6 +217,9 @@ class TriangularFilter(Filter):
                     "Solver has not converged without metric terms",
                     [f"output code with code: {code}"],
                 )
+            tts = verify_cg_convergence(
+                apply_A, ttw, tts, tol, maxiter, M,
+                "Solver has not converged without metric terms")
 
         tts += ttu
         return np.array(tts)
@@ -253,6 +259,9 @@ class TriangularFilter(Filter):
                 "Solver has not converged with metric terms",
                 [f"output code with code: {code}"],
             )
+        tts = verify_cg_convergence(
+            apply_A, ttw, tts, tol, maxiter, precond,
+            "Solver has not converged with metric terms")
 
         tts += ttuv
         return np.array(tts)
@@ -381,8 +390,8 @@ class TriangularFilter(Filter):
         """
         Prepare filter for a specific triangular mesh.
 
-        The ``gpu`` argument is deprecated (it never had an effect); use
-        :meth:`set_backend` instead.
+        The ``gpu`` argument is deprecated: ``gpu=True`` forwards to
+        :meth:`set_backend`; call that directly instead.
 
         Computes mesh topology, geometric properties, and assembles the filter
         operator matrix. Must be called before any filtering operations.
@@ -400,7 +409,18 @@ class TriangularFilter(Filter):
         ycoord : np.ndarray
             Y-coordinates of mesh nodes (degrees).
         meshtype : str, optional
-            Mesh type coordinate unit: 'm' for metric, 'r' for radial(degrees).
+            Coordinate handling: 'm' for metric coordinates, 'r' for lon/lat in
+            degrees projected onto the plane (cyclic correction, default), or
+            's' for lon/lat in degrees with per-triangle tangent-plane
+            geometry -- required for global meshes that include the poles,
+            e.g. reduced Gaussian grids. Like 'r', 's' is second-order
+            accurate in the triangle size; what it adds is the absence of the
+            lon/lat projection's polar and date-line degeneracies. 's'
+            requires ``cartesian=False`` and does not support
+            ``filter_elements``. Note that the metric terms of ``full=True``
+            use ``Mt = tan(lat) / R``, which grows without bound towards the
+            poles, so the coupled vector system is ill-conditioned there on
+            any spherical mesh, 's' included.
         cartesian : bool, optional
             True for Cartesian coordinates, False for spherical.
         cyclic_length : float, optional
@@ -410,8 +430,8 @@ class TriangularFilter(Filter):
         mask : np.ndarray, optional
             Element mask where True indicates ocean (default: all ocean).
         gpu : bool, optional
-            Deprecated and without effect; select the backend with
-            :meth:`set_backend` instead.
+            Deprecated; ``gpu=True`` forwards to :meth:`set_backend`
+            ("gpu"). Select the backend with :meth:`set_backend` instead.
         filter_elements : bool, optional
             True to assemble filter operators for elements in addition to nodes (default: False).
         elem_weights : {'equilateral', 'geometric'}, optional
@@ -438,12 +458,34 @@ class TriangularFilter(Filter):
         Coordinates are expected in degrees while cyclic_length is in radians.
         The mask is converted to nodal representation where True indicates land.
         """
-        warn_unused_gpu_argument(gpu)
         if elem_weights not in ("equilateral", "geometric"):
             raise ValueError(
                 f"Unknown elem_weights {elem_weights!r}; "
                 "expected 'equilateral' or 'geometric'"
             )
+        if meshtype not in ("m", "r", "s"):
+            raise ValueError(
+                f"Unknown meshtype {meshtype!r}; expected 'm' (metric "
+                "coordinates), 'r' (lon/lat in degrees, planar projection) or "
+                "'s' (lon/lat in degrees, spherical tangent-plane geometry)"
+            )
+        if meshtype == "s" and cartesian:
+            raise ValueError(
+                "meshtype='s' evaluates the geometry on the sphere; "
+                "cartesian=True contradicts it. Use meshtype='r' for planar "
+                "lon/lat meshes."
+            )
+        if meshtype == "s" and filter_elements:
+            raise NotImplementedError(
+                "filter_elements=True is not available for meshtype='s': the "
+                "element (triangle-centre) operator's edge geometry is only "
+                "implemented for the planar projections 'm' and 'r'. Prepare "
+                "with filter_elements=False and filter data on the nodes."
+            )
+        # Forwarded after the argument checks above so that a rejected call
+        # leaves the process-wide JAX platform alone, and before any array is
+        # created so the selection can still take effect.
+        apply_deprecated_gpu_argument(self, gpu)
         # NOTE: xcoord & ycoord are in degrees, but cyclic_length is in radians
         self._n2d = n2d
         self._e2d = e2d
@@ -451,9 +493,9 @@ class TriangularFilter(Filter):
 
         if mask is None:
             mask = np.ones(e2d, dtype=np.bool_)
-        ne_num, ne_pos = neighboring_triangles(n2d, e2d, tri)
-        nn_num, nn_pos = neighbouring_nodes(n2d, tri, ne_num, ne_pos)
-        area, elem_area, dx, dy, Mt = areas(
+        ne_num, ne_pos = fast_neighboring_triangles(n2d, e2d, tri)
+        nn_num, nn_pos = fast_neighbouring_nodes(n2d, tri, ne_num, ne_pos)
+        area, elem_area, dx, dy, Mt = fast_areas(
             n2d,
             e2d,
             tri,
@@ -581,7 +623,8 @@ class TriangularFilter(Filter):
         -------
         np.ndarray
             Power spectral density at wavelengths [0, k0, k1, ...]:
-            [0] : Total variance
+            [0] : area-weighted mean square of the data (the variance only
+                  if the data has zero mean)
             [1:] : Variance at each wavelength k
         """
         nr = len(k)
@@ -643,7 +686,8 @@ class TriangularFilter(Filter):
         -------
         np.ndarray
             Kinetic energy spectral density at wavelengths [0, k0, k1, ...]:
-            [0] : Total kinetic energy
+            [0] : area-weighted mean of u^2 + v^2 (the variance only if the
+                  data has zero mean)
             [1:] : Kinetic energy at each wavelength k
 
         Notes

@@ -31,6 +31,11 @@ Triangular Mesh Filters
    :undoc-members:
    :show-inheritance:
 
+.. automodule:: implicit_filter.reduced_gaussian_filter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Structured Grid Filters
 -----------------------
 
@@ -53,7 +58,10 @@ Utility Functions
              transform_mask_from_elements_to_nodes,
              transform_mask_from_nodes_to_elements,
              transform_to_T_cells,
-             convert_to_wavenumbers
+             convert_to_wavenumbers,
+             gaussian_latitudes,
+             reduced_gaussian_grid,
+             spherical_triangulation
    :noindex:
 
 .. autofunction:: implicit_filter.transform_velocity_to_nodes
@@ -67,6 +75,12 @@ Utility Functions
 .. autofunction:: implicit_filter.transform_to_T_cells
 
 .. autofunction:: implicit_filter.convert_to_wavenumbers
+
+.. autofunction:: implicit_filter.gaussian_latitudes
+
+.. autofunction:: implicit_filter.reduced_gaussian_grid
+
+.. autofunction:: implicit_filter.spherical_triangulation
 
 Submodules
 ----------

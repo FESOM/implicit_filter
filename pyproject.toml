@@ -35,20 +35,28 @@ dependencies = {file = ["requirements.txt"]}
 cpu = [
     "jax[cpu]"
 ]
-cuda11 = [
-    "jax[cuda11_pip]"
-]
 cuda12 = [
     "jax[cuda12]"
 ]
-apple = [
-    "jax[apple]"
+# AMD GPUs through JAX's ROCm plugin, which targets ROCm 6.x; a matching ROCm
+# installation has to be present on the machine already.
+rocm = [
+    "jax[rocm]"
 ]
-# Required only by NemoFilter(neighb='full'), which uses a linear fit to
-# resolve the north-fold row correspondence.
+tpu = [
+    "jax[tpu]"
+]
+# Apple Silicon GPUs are served by Apple's PJRT plugin, not by a jax extra:
+# "jax[apple]" does not exist -- pip only warns about the unknown extra and
+# installs plain jax, i.e. a CPU-only build.
+apple = [
+    "jax-metal"
+]
+# Required only by NemoFilter(neighb='full'), which uses a least-squares fit to
+# resolve the north-fold row correspondence. pandas is a base requirement, so
+# this extra is a documented alias rather than an additional install.
 nemo = [
-    "pandas",
-    "scikit-learn"
+    "pandas"
 ]
 # Required only by set_preconditioner("vcycle"): pyamg builds the multigrid
 # hierarchy at setup time; the apply phase is pure JAX.
@@ -60,7 +68,6 @@ test = [
     "pytest",
     "scipy",
     "pandas",
-    "scikit-learn",
     "pyamg"
 ]
 

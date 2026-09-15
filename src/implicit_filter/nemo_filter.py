@@ -115,8 +115,8 @@ class NemoFilter(LatLonFilter):
             - True: Auto-detect from 'tmask' variable (default)
             - False: All ocean cells
         gpu : bool, optional
-            Deprecated and without effect; select the backend with
-            :meth:`set_backend` instead.
+            Deprecated; ``gpu=True`` forwards to :meth:`set_backend`
+            ("gpu"). Select the backend with :meth:`set_backend` instead.
         neighb : str, optional
             Neighborhood type:
             - 'full': Full 4-point neighborhood with North Pole handling
@@ -159,8 +159,8 @@ class NemoFilter(LatLonFilter):
         mask : np.ndarray | bool, optional
             Land-sea mask specification (see prepare_from_file).
         gpu : bool, optional
-            Deprecated and without effect; select the backend with
-            :meth:`set_backend` instead.
+            Deprecated; ``gpu=True`` forwards to :meth:`set_backend`
+            ("gpu"). Select the backend with :meth:`set_backend` instead.
         neighb : str, optional
             Neighborhood type (see prepare_from_file).
 
@@ -176,8 +176,8 @@ class NemoFilter(LatLonFilter):
         - Handles North Pole folding in 'full' neighborhood configuration
         - Grid metrics are converted from meters to kilometers for consistency
         """
-        from implicit_filter.utils.utils import warn_unused_gpu_argument
-        warn_unused_gpu_argument(gpu)
+        from implicit_filter.utils.utils import apply_deprecated_gpu_argument
+        apply_deprecated_gpu_argument(self, gpu)
         north_adj = None
 
         if neighb == "full":

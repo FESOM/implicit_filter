@@ -36,6 +36,7 @@ Key Features
 ------------
 
 * **Mesh Agnostic**: Can work on triangular or quadrilateral mesh. Native support for **FESOM**, **ICON**, **NEMO**, and regular **Longitude-Latitude** meshes.
+* **Reduced Gaussian grids**: native support for ECMWF's classical (**N320**) and octahedral (**O96**) reduced Gaussian grids used by IFS, ERA5 and AIFS.
 * **Element and Node Filtering**: Supports filtering on both mesh nodes and elements (triangles) natively for triangular meshes, automatically adjusting based on input data size.
 * **Variable scale filtering**: Filter size can be set individually for each mesh node.
 * **GPU Accelerated**: optimized for Nvidia GPUs and Apple Silicon using `JAX <https://jax.readthedocs.io/>`_ for massive performance gains.
@@ -63,17 +64,27 @@ For CUDA 12.x:
 
    python -m pip install "implicit_filter[cuda12] @ git+https://github.com/FESOM/implicit_filter.git"
 
-For CUDA 11.x:
+For AMD GPUs (ROCm):
 
 .. code-block:: bash
 
-   python -m pip install "implicit_filter[cuda11] @ git+https://github.com/FESOM/implicit_filter.git"
+   python -m pip install "implicit_filter[rocm] @ git+https://github.com/FESOM/implicit_filter.git"
+
+This pulls JAX's ROCm plugin, which targets ROCm 6.x; a matching ROCm installation has to be present on the machine already.
+
+For Google TPUs:
+
+.. code-block:: bash
+
+   python -m pip install "implicit_filter[tpu] @ git+https://github.com/FESOM/implicit_filter.git"
 
 For Apple Silicon (M1/M2/M3):
 
 .. code-block:: bash
 
    python -m pip install "implicit_filter[apple] @ git+https://github.com/FESOM/implicit_filter.git"
+
+This installs Apple's ``jax-metal`` plugin, which JAX uses for Metal GPUs; it is experimental and macOS-only. ``jax-metal`` releases lag JAX by a long way, so it may not support the latest ``jax``; if the plugin refuses to load, pin ``jax`` to a version it supports.
 
 Quick Start
 -----------
@@ -94,11 +105,14 @@ Here is a complete example of how to load a FESOM mesh, prepare the filter, and 
 
    # 2. Initialize Filter
    flter = FesomFilter()
-   flter.prepare_from_file(mesh_path)
 
-   # 2b. Select the backend. Importing implicit_filter pins JAX to CPU, and
-   # the `gpu=` argument is not yet implemented, so ask for the GPU here:
+   # 2a. Select the backend FIRST. Importing implicit_filter pins JAX to CPU,
+   # and JAX fixes its platform when the first array is created, so this has
+   # to come before prepare_from_file (and before any other compute):
    flter.set_backend("gpu")
+
+   # 2b. Build the filter
+   flter.prepare_from_file(mesh_path)
 
    # 3. Caching (Optional but Recommended)
    flter.save_to_file("filter_cache")
@@ -110,7 +124,9 @@ Here is a complete example of how to load a FESOM mesh, prepare the filter, and 
    # 5. Apply Filter
    filtered_data = flter.compute(1, 2*math.pi / distance, unfiltered_data)
 
-You can switch between CPU and GPU at runtime using the `set_backend` method:
+Select between CPU and GPU with the ``set_backend`` method. It has to be
+called before the first ``prepare`` or ``compute`` call in the process,
+because JAX fixes its platform when the first array is created:
 
 .. code-block:: python
 
@@ -125,6 +141,16 @@ You can switch between CPU and GPU at runtime using the `set_backend` method:
    Importing ``implicit_filter`` sets JAX's platform to CPU for the whole
    process. ``set_backend("gpu")`` is therefore required to use a GPU, and it
    also affects any other JAX code running in the same interpreter.
+
+.. note::
+
+   Importing ``implicit_filter`` also switches JAX into 64-bit mode
+   (``jax.config.update("jax_enable_x64", True)``) for the whole process.
+   Filter state and results are therefore ``float64``, where JAX's own default
+   is ``float32``, and any other JAX code in the same interpreter gets
+   ``float64`` defaults as well. The filter needs the precision -- the
+   operator's condition number grows as ``(L/dx)^{2n}`` -- so turning it back
+   off is not supported.
 
 Filtering on elements
 ---------------------
@@ -168,6 +194,42 @@ For advanced performance, you can warm-start the iterative solver if you have a 
 
    filtered_data = flter.compute(1, 2*math.pi / distance, unfiltered_data, x0=previous_guess)
 
+Reduced Gaussian grids (ECMWF, ERA5, AIFS)
+------------------------------------------
+
+ECMWF products live on *reduced Gaussian grids*: classical ``N`` grids such as
+**N320** (native ERA5) and octahedral ``O`` grids such as **O96** (Anemoi ERA5,
+AIFS training). ``ReducedGaussianFilter`` triangulates the grid points on the
+sphere and filters them as mesh nodes, with spherical geometry that needs no
+special treatment at the poles or the date line:
+
+.. code-block:: python
+
+   from implicit_filter import ReducedGaussianFilter
+
+   flter = ReducedGaussianFilter()
+   flter.prepare_from_grid("N320")             # or "O96", "N128", ...
+   filtered = flter.compute(1, 2*math.pi / distance, data)   # data: the GRIB `values` array
+
+``data`` is the 1-D ``values`` array of a GRIB message (or of the ERA5 zarr
+stores): rows from north to south, west to east from 0° longitude. The filter
+can also be built from the coordinates stored with the data, which works for
+any set of points covering the sphere:
+
+.. code-block:: python
+
+   ds = xr.open_dataset("era5.grib", engine="cfgrib")
+   flter.prepare_from_data_array(ds)                 # 1-D latitude/longitude coordinates
+   flter.prepare_from_points(lat, lon)                # plain arrays in degrees
+   flter.prepare_from_points(lat, lon, mask=~np.isnan(sst))   # skip land points
+   # fill NaN first: masked points are returned unchanged
+   filtered = flter.compute(1, 2*math.pi / distance, np.where(np.isnan(sst), 0.0, sst))
+
+Everything else -- velocity filtering, spectra, caching, backends, the V-cycle
+preconditioner -- works as for any triangular mesh. Element filtering is not
+available (the data is nodal). ``prepare`` takes about 20 s and the cache about
+260 MB per N320-sized grid (540 k points); larger grids scale accordingly.
+
 Examples Gallery
 ----------------
 
@@ -205,6 +267,11 @@ The ``implicit_filter`` package provides several interactive Jupyter notebook ex
       :link: https://github.com/FESOM/implicit_filter/blob/main/examples/nemo_example.ipynb
 
       An example demonstrating the usage of the filter specifically tailored for NEMO ocean model outputs.
+
+   .. grid-item-card:: 🌐 Reduced Gaussian Grids (ERA5 on O96 and N320)
+      :link: https://github.com/FESOM/implicit_filter/blob/main/examples/reduced_gaussian_grid_example.ipynb
+
+      Filtering ECMWF reduced Gaussian grid data — ERA5 on the octahedral O96 and the native N320 grid — from public zarr stores, including masked SST and spectra.
 
    .. grid-item-card:: 📊 Spectra Extraction
       :link: https://github.com/FESOM/implicit_filter/blob/main/examples/spectra_extraction.ipynb

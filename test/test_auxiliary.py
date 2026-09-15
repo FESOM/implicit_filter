@@ -201,9 +201,8 @@ def test_find_adjacent_points_north():
     try:
         import xarray as xr
         import pandas as pd
-        from sklearn.linear_model import LinearRegression
     except (ImportError, ValueError):
-        pytest.skip("Pandas/Xarray/Sklearn not available, skipping test")
+        pytest.skip("Pandas/Xarray not available, skipping test")
         
     x = np.arange(5)
     y = np.arange(5)
@@ -227,6 +226,117 @@ def test_find_adjacent_points_north():
     assert corresponds == -2
     assert len(adjacent_x) == 3
     assert_array_equal(adjacent_x.values, [1, 2, 3])
+
+
+def _north_fold_dataset(nx=40, ny=6, collisions=(2, 4)):
+    """A synthetic north fold whose greedy match is imperfect.
+
+    The redundant last row mirrors row -3, so the true correspondence is the
+    straight line ``x -> nx - 1 - x``. Each column in ``collisions`` is made
+    indistinguishable from its right neighbour at the rounding precision the
+    helper matches on, which makes the greedy pass hand that pair out in the
+    wrong order -- exactly the rounding damage the linear fit exists to repair.
+    The line still has to come back out.
+    """
+    import numpy as np
+    xr = pytest.importorskip("xarray")
+
+    lon = np.tile(np.linspace(0.0, 360.0, nx, endpoint=False), (ny, 1))
+    lat = np.tile(np.linspace(-80.0, 80.0, ny)[:, None], (1, nx))
+    for j in collisions:
+        lon[-3, j] = np.nextafter(lon[-3, j + 1], np.inf)
+    lon[-1, :] = lon[-3, ::-1]
+    lat[-1, :] = lat[-3, :]
+    return xr.Dataset(
+        {"glamt": (["y", "x"], lon), "gphit": (["y", "x"], lat)},
+        coords={"x": np.arange(nx), "y": np.arange(ny)},
+    )
+
+
+def _north_fold_fit_by_hand(ds, prec):
+    """Redo the helper's match, outlier filter and fit in plain numpy.
+
+    Deliberately independent of the implementation: no pandas, and the least
+    squares is solved here rather than read back out of the returned Series.
+    """
+    import numpy as np
+
+    ilon = (np.asarray(ds.glamt) / prec).astype(int)
+    redundant, corresponds = ilon[-1, 1:-1], ilon[-3, 1:-1]
+    reference = np.arange(1, ilon.shape[1] - 1)
+
+    matched = []                      # the greedy, injective match
+    for value in redundant:
+        for column, other in zip(reference, corresponds):
+            if other == value and column not in matched:
+                matched.append(column)
+                break
+    matched = np.array(matched, dtype=float)
+
+    jumps = np.abs(np.diff(matched, prepend=np.nan))
+    keep = jumps < 1.5 * np.nanmean(jumps)          # NaN compares False
+    slope, intercept = np.linalg.lstsq(
+        np.column_stack([reference[keep], np.ones(keep.sum())]).astype(float),
+        matched[keep],
+        rcond=None,
+    )[0]
+    fitted = np.round(slope * reference + intercept).astype(int)
+    return reference, matched.astype(int), fitted
+
+
+def test_north_fold_fit_is_a_least_squares_line():
+    """The north-fold helper fits one straight line and rounds it to columns.
+
+    Pins the fit against an independent numpy solve and against the mapping the
+    synthetic fold was built with, so that swapping the solver underneath cannot
+    change which column each reference column is mapped to.
+    """
+    import numpy as np
+    pytest.importorskip("xarray")
+    from implicit_filter.utils._auxiliary import find_adjacent_points_north
+
+    nx, prec = 40, 1e-5
+    ds = _north_fold_dataset(nx=nx)
+    fit, row = find_adjacent_points_north(ds, prec)
+
+    assert row in (-2, -3)
+    values = np.asarray(fit)
+    assert values.dtype.kind == "i"
+
+    reference, matched, expected = _north_fold_fit_by_hand(ds, prec)
+    assert_array_equal(np.asarray(fit.index), reference)
+
+    # The fold mirrors row -3, so this is the answer independently of any fit.
+    assert_array_equal(values, nx - 1 - reference)
+    # ... and the rounded least-squares line solved here reproduces it exactly.
+    assert_array_equal(values, expected)
+    # The greedy match on its own does not: returning it unfitted, bending the
+    # fit into a curve or truncating instead of rounding all move the answer.
+    assert not np.array_equal(matched, values)
+
+
+def test_north_fold_fit_refuses_too_few_clean_points():
+    """Too few surviving columns must raise, not return a degenerate line.
+
+    ``np.linalg.lstsq`` is happy to solve a rank-deficient system -- an empty
+    clean set yields slope 0, intercept 0 and maps every column to 0 -- so the
+    helper guards the fit explicitly rather than returning nonsense.
+    """
+    import numpy as np
+    xr = pytest.importorskip("xarray")
+    from implicit_filter.utils._auxiliary import find_adjacent_points_north
+
+    nx, ny = 4, 4
+    lon = np.tile(np.linspace(0.0, 360.0, nx, endpoint=False), (ny, 1))
+    lat = np.tile(np.linspace(-80.0, 80.0, ny)[:, None], (1, nx))
+    lon[-1, :] = lon[-3, ::-1]
+    lat[-1, :] = lat[-3, :]
+    ds = xr.Dataset(
+        {"glamt": (["y", "x"], lon), "gphit": (["y", "x"], lat)},
+        coords={"x": np.arange(nx), "y": np.arange(ny)},
+    )
+    with pytest.raises(ValueError, match="too few to fit a line"):
+        find_adjacent_points_north(ds, 1e-5)
 
 
 def test_calculate_laplacian_weights():

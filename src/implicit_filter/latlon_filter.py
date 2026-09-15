@@ -12,7 +12,8 @@ from implicit_filter.filter import Filter
 from implicit_filter.utils.utils import (
     SolverNotConvergedError,
     transform_attribute,
-    warn_unused_gpu_argument,
+    verify_cg_convergence,
+    apply_deprecated_gpu_argument,
 )
 import jax.numpy as jnp
 from jax.scipy.sparse.linalg import cg
@@ -97,14 +98,14 @@ class LatLonFilter(Filter):
         mask : np.ndarray, optional
             Land-sea mask where True indicates land (default: all ocean)
         gpu : bool, optional
-            Deprecated and without effect; select the backend with
-            :meth:`set_backend` instead.
+            Deprecated; ``gpu=True`` forwards to :meth:`set_backend`
+            ("gpu"). Select the backend with :meth:`set_backend` instead.
 
         Notes
         -----
         - Land points are masked using Neumann boundary conditions
         """
-        warn_unused_gpu_argument(gpu)
+        apply_deprecated_gpu_argument(self, gpu)
         nx = len(longitude)
         ny = len(latitude)
         e2d = nx * ny
@@ -284,6 +285,9 @@ class LatLonFilter(Filter):
                     "Solver has not converged without metric terms",
                     [f"output code with code: {code}"],
                 )
+            tts = verify_cg_convergence(
+                apply_A, ttw, tts, tol, maxiter, M,
+                "Solver has not converged without metric terms")
 
         tts += ttu
         return np.array(tts)
@@ -399,7 +403,8 @@ class LatLonFilter(Filter):
         -------
         np.ndarray
             Power spectral density at wavelengths [0, k0, k1, ...]:
-            [0] : Total variance
+            [0] : area-weighted mean square of the data (the variance only
+                  if the data has zero mean)
             [1:] : Variance at each wavelength k
         """
         nr = len(k)
@@ -459,7 +464,8 @@ class LatLonFilter(Filter):
         -------
         np.ndarray
             Kinetic energy spectral density at wavelengths [0, k0, k1, ...]:
-            [0] : Total kinetic energy
+            [0] : area-weighted mean of u^2 + v^2 (the variance only if the
+                  data has zero mean)
             [1:] : Kinetic energy at each wavelength k
         """
 

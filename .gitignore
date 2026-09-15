@@ -247,3 +247,10 @@ coverage.xml
 *.mo
 *.pot
 /main.py
+
+# Working notes: design specs, implementation plans, and the benchmark harness
+# with its results and report. Kept on disk, deliberately not part of the
+# repository.
+docs/superpowers/
+docs/benchmarks/
+benchmarks/

@@ -23,7 +23,13 @@ try:
     from .latlon_filter import LatLonFilter
 except Exception:
     LatLonFilter = None
+from .reduced_gaussian_filter import ReducedGaussianFilter
 from .utils._auxiliary import make_tri, convert_to_wavenumbers
+from .utils._gaussian_grid import (
+    gaussian_latitudes,
+    reduced_gaussian_grid,
+    spherical_triangulation,
+)
 from .utils.conversion_tools import (
     transform_velocity_to_nodes,
     transform_scalar_to_nodes,

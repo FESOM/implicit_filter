@@ -1,3 +1,0 @@
-slurm_*.log
-*.npz
-gpu_probe.py

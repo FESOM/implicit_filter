@@ -142,6 +142,84 @@ def neighbouring_nodes(
     return nn_num, nn_pos
 
 
+def tangent_plane_geometry(
+    tri: np.ndarray, xcoord: np.ndarray, ycoord: np.ndarray, mask: np.ndarray
+):
+    """
+    P1 triangle geometry on the sphere via the tangent plane at each centroid.
+
+    Every triangle is evaluated in the plane tangent to the unit sphere at
+    the direction of its centroid (gnomonic projection), where the usual
+    planar formulas apply. The gnomonic map takes geodesics to straight lines
+    but preserves neither area nor angle, so like the planar branches of
+    ``areas`` this is second-order accurate in the triangle size: the
+    projected triangle is inflated by O(h^2) (about 5e-5 relative for a
+    1 degree triangle). What it has over the lon/lat projection of
+    ``meshtype='r'`` is the absence of that projection's degeneracies -- the
+    fans that close the polar caps of a global triangulation (whose vertices
+    share one latitude and therefore have zero area in the lon/lat plane) and
+    triangles straddling the date line need no special treatment.
+    Vectorised over triangles.
+
+    Parameters
+    ----------
+    tri : np.ndarray
+        Element connectivity, shape (e2d, 3).
+    xcoord, ycoord : np.ndarray
+        Node longitudes and latitudes in degrees (any longitude convention).
+    mask : np.ndarray
+        Element mask, shape (e2d,); 1/True keeps the element, 0/False zeroes
+        its area (land).
+
+    Returns
+    -------
+    elem_area : np.ndarray
+        Triangle areas in km^2, shape (e2d,).
+    dx, dy : np.ndarray
+        Derivatives of the P1 basis functions, shape (e2d, 3), in the local
+        (east, north) basis. The nodal Laplacian uses dx*dx + dy*dy, which is
+        invariant under rotation of that basis; the orientation only matters
+        for the metric terms of ``full=True``.
+    Mt : np.ndarray
+        Metric factor tan(lat_c) / R at the centroid, shape (e2d,) -- the same
+        quantity ``meshtype='r'`` uses.
+    """
+    r_earth = R_EARTH
+    lon = np.radians(np.asarray(xcoord, dtype=float))
+    lat = np.radians(np.asarray(ycoord, dtype=float))
+    p = np.column_stack(
+        [np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)])
+    v = p[tri]                                              # (e2d, 3, 3)
+    c = v.sum(axis=1)
+    c /= np.linalg.norm(c, axis=1, keepdims=True)           # centroid direction
+    # Local east/north unit vectors at c. Exactly at a pole east is undefined;
+    # the fallback fixes an arbitrary but right-handed basis. The Laplacian is
+    # invariant under this choice, the metric terms are not (and are unbounded
+    # at the pole anyway).
+    east = np.column_stack([-c[:, 1], c[:, 0], np.zeros(len(c))])
+    norm = np.linalg.norm(east, axis=1)
+    at_pole = norm < 1e-12
+    east[at_pole] = (1.0, 0.0, 0.0)
+    norm[at_pole] = 1.0
+    east /= norm[:, None]
+    north = np.cross(c, east)
+    # Gnomonic projection onto the tangent plane at c, then planar coordinates.
+    q = v / np.einsum("eij,ej->ei", v, c)[:, :, None]
+    qc = q - c[:, None, :]
+    x = np.einsum("eij,ej->ei", qc, east) * r_earth
+    y = np.einsum("eij,ej->ei", qc, north) * r_earth
+    x2 = x[:, 1] - x[:, 0]
+    x3 = x[:, 2] - x[:, 0]
+    y2 = y[:, 1] - y[:, 0]
+    y3 = y[:, 2] - y[:, 0]
+    d = x2 * y3 - y2 * x3
+    dx = np.column_stack([(y2 - y3) / d, y3 / d, -y2 / d])
+    dy = np.column_stack([(x3 - x2) / d, -x3 / d, x2 / d])
+    elem_area = 0.5 * np.abs(d) * np.asarray(mask, dtype=float)
+    Mt = np.tan(np.arcsin(np.clip(c[:, 2], -1.0, 1.0))) / r_earth
+    return elem_area, dx, dy, Mt
+
+
 def areas(
     n2d: int,
     e2d: int,
@@ -185,7 +263,9 @@ def areas(
         for the j-th node. Unused entries are filled with zeros.
 
     meshtype : str
-        Mesh type, either 'm' (metric) or 'r' (radial).
+        Mesh type: 'm' (metric coordinates), 'r' (lon/lat in degrees, planar
+        projection with a cyclic correction) or 's' (lon/lat in degrees,
+        spherical tangent-plane geometry, see ``tangent_plane_geometry``).
 
     carthesian : bool
         Boolean indicating whether the mesh is in Cartesian coordinates.
@@ -283,6 +363,12 @@ def areas(
             Mt = np.zeros([e2d])
         else:
             Mt = (np.sin(rad * np.sum(ycoord[tri], axis=1) / 3.0) / Mt) / r_earth
+
+    elif meshtype == "s":
+        # Spherical tangent-plane geometry; well-behaved at the poles and
+        # across the date line, no cyclic correction needed. Ignores
+        # `carthesian`.
+        elem_area, dx, dy, Mt = tangent_plane_geometry(tri, xcoord, ycoord, mask)
 
     # Calculate scalar cell (cluster) area for each node.
     area = np.zeros([n2d])
@@ -405,14 +491,13 @@ def find_adjacent_points_north(
     """
     try:
         import pandas as pd
-        from sklearn.linear_model import LinearRegression
     except ImportError as exc:  # pragma: no cover - exercised via import blocking
         raise ImportError(
-            "Resolving the NEMO north-fold row correspondence requires pandas "
-            "and scikit-learn, which are optional dependencies. Install them "
-            "with:  pip install 'implicit_filter[nemo]'\n"
+            "Resolving the NEMO north-fold row correspondence requires pandas, "
+            "which is an optional dependency. Install it with:  "
+            "pip install 'implicit_filter[nemo]'\n"
             "Alternatively use NemoFilter(...) with neighb='west-east' or "
-            "neighb='local', which do not need them."
+            "neighb='local', which do not need it."
         ) from exc
 
     # load mesh mask
@@ -492,15 +577,41 @@ def find_adjacent_points_north(
         abs(adjacent_x.diff()) < 1.5 * abs(adjacent_x.diff()).mean()
     ).dropna()
 
-    # fit clean adjacent indices
-    lr = LinearRegression()
-    lr.fit(
-        np.array(adjacent_x_sanitized.index).reshape(-1, 1),
-        np.array(adjacent_x_sanitized).reshape(-1, 1),
-    )
+    # Fit one straight line through the clean adjacent indices and evaluate it
+    # at every reference column. This replaces a scikit-learn LinearRegression
+    # fit, and agrees with it to within floating-point rounding -- far below the
+    # integer rounding applied immediately below -- for the full-rank,
+    # contiguous integer column indices this function produces. The two are not
+    # interchangeable in general: LinearRegression mean-centres before solving
+    # while the design matrix here carries an explicit intercept column, so they
+    # diverge on rank-deficient or badly scaled inputs (a single clean point,
+    # a constant index, indices offset by ~1e9). None of those are reachable
+    # here: the index is always 0..nx-1, the injectivity guard above makes the
+    # matched columns distinct, and the guard below rules out the rank-deficient
+    # cases. Dropping scikit-learn saves 57 MB from every install for this one
+    # line fit.
+    clean_x = np.asarray(adjacent_x_sanitized.index, dtype=float)
+    clean_y = np.asarray(adjacent_x_sanitized, dtype=float)
+    if len(clean_x) < 2:
+        # np.linalg.lstsq on a (0, 2) or (1, 2) design happily returns a
+        # degenerate line -- all-zero for the empty case, mapping every column
+        # to 0 -- where scikit-learn raised. Fail loudly instead, as the
+        # injectivity guard above does.
+        raise ValueError(
+            "Could not resolve the north-fold row correspondence: only "
+            f"{len(clean_x)} of {n_expected} matched columns survived the "
+            "outlier filter, which is too few to fit a line through (at least "
+            "two are needed). The matched columns are too scattered for this "
+            "method. Use NemoFilter(...) with neighb='west-east' (zonal "
+            "periodicity, no north fold) or neighb='local' (no periodic "
+            "connections), or adjust lon_lat_prec_degrees."
+        )
+    slope, intercept = np.linalg.lstsq(
+        np.column_stack([clean_x, np.ones_like(clean_x)]), clean_y, rcond=None
+    )[0]
     adjacent_x_fit = (
         pd.Series(
-            lr.predict(np.array(adjacent_x.index).reshape(-1, 1)).reshape(-1),
+            slope * np.asarray(adjacent_x.index, dtype=float) + intercept,
             index=adjacent_x.index,
             name="adjacent_x",
         )

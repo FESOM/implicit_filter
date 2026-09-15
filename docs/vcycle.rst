@@ -36,8 +36,13 @@ Requires the optional setup-time dependencies::
 
 .. code-block:: python
 
+    # Optional; the V-cycle works identically on the CPU. The backend has to
+    # be selected before load_from_file, because JAX fixes its platform when
+    # the first array is created and loading the cache creates the filter's
+    # arrays; a set_backend after it would be inert.
+    FesomFilter().set_backend("gpu")
+
     flter = FesomFilter.load_from_file("filter_cache.npz")
-    flter.set_backend("gpu")              # optional; CPU works identically
     flter.set_preconditioner("vcycle")
     filtered = flter.compute(2, 2 * math.pi / distance, data)
 
@@ -122,11 +127,10 @@ Limitations
 Benchmarks
 ----------
 
-Measured before/after comparisons (CORE2 126k-node FESOM mesh and the
-7.4M-node ICON grid, CPU and GPU, Jacobi vs V-cycle, with provenance) are
-committed at ``docs/benchmarks/vcycle_comparison.md``. Headline: stiff
-configurations where Jacobi-CG does not converge at all are solved by the
-V-cycle in tens of iterations; at the production tolerance the GPU solve
+Before/after comparisons have been measured on the CORE2 126k-node FESOM
+mesh and the 7.4M-node ICON grid, on CPU and GPU, Jacobi against V-cycle.
+Stiff configurations where Jacobi-CG does not converge at all are solved by
+the V-cycle in tens of iterations; at the production tolerance the GPU solve
 of a 126k-node biharmonic filter takes a few hundredths of a second.
 
 References
@@ -136,5 +140,3 @@ References
   analysis for biharmonic filters at large scale ratios.
 * K. Nowak et al. (2025), *Implicit filtering on unstructured meshes*,
   arXiv:2404.07398.
-* Project design notes:
-  ``docs/superpowers/specs/2026-07-28-vcycle-preconditioner-design.md``.

@@ -184,8 +184,8 @@ class TestBackendReporting:
 
 
 class TestDefaultNemoPathDependencies:
-    """neighb='full' is NemoFilter's default and needs pandas + scikit-learn,
-    so both must remain base requirements rather than optional extras."""
+    """neighb='full' is NemoFilter's default and needs pandas, so pandas must
+    remain a base requirement rather than an optional extra."""
 
     def test_declared_in_requirements(self):
         from pathlib import Path
@@ -195,8 +195,6 @@ class TestDefaultNemoPathDependencies:
             pytest.skip("requirements.txt not available")
         text = req.read_text().lower()
         assert "pandas" in text
-        assert "scikit-learn" in text
-
-    def test_both_importable(self):
-        pytest.importorskip("pandas")
-        pytest.importorskip("sklearn")
+        # scikit-learn was dropped: the north-fold fit is plain numpy now, and
+        # reinstating a 57 MB dependency for it should not pass unnoticed.
+        assert "scikit-learn" not in text
