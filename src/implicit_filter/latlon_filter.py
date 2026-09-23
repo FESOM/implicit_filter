@@ -129,6 +129,67 @@ class LatLonFilter(Filter):
     _mask_n : np.ndarray
         Boolean mask for valid grid points (False indicates land)
     """
+    # ------------------------------------------------------------------
+    # V-cycle weight recovery for filters restored from disk.
+    #
+    # `_vcycle_weight` is produced only by `_symmetrize_stencil` during
+    # `prepare()`, and `save_to_file`/`load_from_file` do not round-trip it:
+    # a saved .npz carries _n2d/_nx/_ny/_ss/_ii/_jj/_area/_backend/_mask_n
+    # and nothing else. A filter loaded from a cache file therefore has no
+    # `_vcycle_weight`, while `set_preconditioner('vcycle')` still succeeds
+    # (it only builds the pyamg hierarchy), so the failure surfaced far
+    # downstream as an AttributeError on the first `compute`.
+    #
+    # The weight is not extra information: it is whichever of `area` or
+    # `area**2` better symmetrizes `D @ S`, and that choice is recoverable
+    # from the persisted stencil by re-running the comparison
+    # `_symmetrize_stencil` itself makes. Recovering it beats adding it to
+    # the save format, because it also repairs every cache file already on
+    # disk without regenerating any of them.
+    #
+    # `__getattr__` runs only when normal attribute lookup FAILS, so a
+    # freshly prepared filter (which assigns `_vcycle_weight` directly) never
+    # reaches this path and is bit-for-bit unaffected.
+    # ------------------------------------------------------------------
+    def _recompute_vcycle_weight(self):
+        """Re-derive the V-cycle symmetrizing weight from the stored stencil.
+
+        Mirrors the selection in `_symmetrize_stencil` exactly. Run against
+        the already-symmetrized stencil a cache file holds, the originally
+        chosen weight is the one that leaves `D @ S` symmetric, so the same
+        weight is selected - by a wider margin than at prepare() time, not a
+        narrower one.
+        """
+        area = np.asarray(self._area)
+        ii = np.asarray(self._ii)
+        jj = np.asarray(self._jj)
+        ss = np.asarray(self._ss)
+
+        offdiag = ii != jj
+        off_ii, off_jj, off_ss = ii[offdiag], jj[offdiag], ss[offdiag]
+        n2d = len(area)
+        area2 = np.square(area)
+        return (area if _offdiag_rel_asym(off_ii, off_jj, off_ss, area, n2d)
+                        <= _offdiag_rel_asym(off_ii, off_jj, off_ss, area2, n2d)
+                else area2)
+
+    def __getattr__(self, name):
+        # Consulted only when the attribute is genuinely absent.
+        if name == '_vcycle_weight':
+            for required in ('_area', '_ii', '_jj', '_ss'):
+                if required not in self.__dict__:
+                    raise AttributeError(
+                        f"{type(self).__name__!r} cannot rebuild '_vcycle_weight': "
+                        f"{required!r} is missing too, so this object was neither "
+                        f"prepared nor loaded correctly."
+                    )
+            weight = self._recompute_vcycle_weight()
+            # cache on the instance so the recomputation happens at most once
+            object.__setattr__(self, '_vcycle_weight', weight)
+            return weight
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        ) 
 
     def __init__(self, *initial_data, **kwargs):
         super().__init__(*initial_data, **kwargs)
